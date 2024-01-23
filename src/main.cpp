@@ -11,6 +11,18 @@
 
 #include <esp_log.h>
 
+/* ESP32 WROOM-32E */
+
+// 主显示器 Spi：
+#define DO 14
+#define DI 13
+#define DC 26
+#define RES 25
+#define CS 27
+// 副显示器 I2C
+#define SCK 22
+#define SDA 21
+
 // // callback when data is sent from Master to Slave
 // void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 // {
