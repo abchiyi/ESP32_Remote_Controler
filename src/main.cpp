@@ -67,9 +67,6 @@ void setup()
 {
   ESP_LOGI(TAG, "Total APs scanned = %u", 123);
   radio.begin(&data, 0);
-
-  // esp_now_register_send_cb(OnDataSent);
-  // esp_now_register_recv_cb(OnDataRecv);
 }
 
 int num = 0;
@@ -78,6 +75,6 @@ void loop()
   if (radio.getPairStatus())
   {
     esp_now_send(radio.vehcile->peer_addr, (uint8_t *)&num, sizeof(&num));
-    delay(100);
+    // delay(100);
   }
 }
