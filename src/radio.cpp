@@ -3,20 +3,52 @@
 #include <radio.h>
 #include <WiFi.h>
 
+#define CONNECT_TIMEOUT 200 // ms // 连接同步等待时间
 #define TAG "Radio"
-
 String SSID;
 int32_t RSSI;
 String BSSIDstr;
 int32_t CHANNEL;
-uint8_t *key;
 uint8_t *staMac;
 
-#define PRINTSCANRESULTS 0
-#define DELETEBEFOREPAIR 0
-
 bool IsPaired = false;
+void *presend_data;
+int32_t send_gap_ms;
+
 esp_now_peer_info_t slave;
+
+void onDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
+{
+}
+
+void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
+{
+  char macStr[18];
+  snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
+           mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+  Serial.print("Last Packet Sent to: ");
+  Serial.println(macStr);
+  Serial.print("Last Packet Send Status: ");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+  Serial.print("This Mac :");
+  Serial.println(WiFi.macAddress());
+}
+
+/* 检查连接同步状态，
+一段时间内没有接收到回复信息，
+或连续数据发送失败则认为连接已断开 */
+void TaskDataSync(void *pt)
+{
+  // 超时设置
+  int32_t Connected = 500; // ms
+  while (true)
+  {
+    if (!IsPaired)
+    {
+      Connected
+    }
+  }
+}
 
 // 此回调用于配对
 void PeerDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
@@ -34,7 +66,6 @@ void PeerDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     ESP_LOGI(TAG, "Recv data from : %s", macStr);
-    // ESP_LOGI(TAG, "Recv data : %s", *incomingData);
     ESP_LOGI(TAG, "Peer success ");
     IsPaired = true;
   }
@@ -46,10 +77,11 @@ void PeerDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
   esp_now_unregister_recv_cb(); // 此回调在配对完成后删除
 }
 
+// 检测  IsPaired 的状态，当未配对时将开始扫描并配对设备
 void TaskScanAndPeer(void *pt)
 {
   memset(&slave, 0, sizeof(slave));
-  Serial.println("Start scan");
+  ESP_LOGI(TAG, "Start scan");
 
   while (true)
   {
@@ -59,9 +91,8 @@ void TaskScanAndPeer(void *pt)
       int16_t scanResults = WiFi.scanNetworks(0, 0, 0, 50, 1); // 扫描1通道
       if (scanResults == 0)
       {
-        Serial.println("No WiFi devices in AP Mode found");
-        Serial.println("Try again");
-        continue; // 立即重新扫描
+        ESP_LOGI(TAG, "No WiFi devices in AP Mode found,Try again");
+        continue; // 跳过剩余 code 立即重新扫描
       }
       else
       {
@@ -76,21 +107,8 @@ void TaskScanAndPeer(void *pt)
           if (SSID.indexOf("Slave") == 0)
           {
             findSlave = true;
-
             // SSID of interest
-            Serial.println("Found a Slave.");
-            Serial.print(i + 1);
-            Serial.print(": ");
-            Serial.print(SSID);
-            Serial.print(" [");
-            Serial.print(BSSIDstr);
-            Serial.print("]");
-            Serial.print(" (");
-            Serial.print(RSSI);
-            Serial.print(")");
-            Serial.print("Channel :");
-            Serial.print(CHANNEL);
-            Serial.println("");
+            ESP_LOGI(TAG, "Found a Slave : %u : SSID: %s, BSSID: [%s], RSSI:  (%lu), Channel: %lu", i + 1, SSID, BSSIDstr.c_str(), RSSI, CHANNEL);
 
             // 设置从机配对信息
             // Get BSSID => Mac Address of the Slave
@@ -118,17 +136,16 @@ void TaskScanAndPeer(void *pt)
 
       if (findSlave)
       {
-        Serial.println("to peer");
+        ESP_LOGI(TAG, "To Peer");
         esp_err_t addStatus = esp_now_add_peer(&slave);
 
         // 配对成功 or 配对已存在即配对成功，否则重新循环并扫描配对AP
         // TODO 向从机发送配对成功信息
         if (addStatus == ESP_OK || addStatus == ESP_ERR_ESPNOW_EXIST)
         {
-
-          esp_now_send(slave.peer_addr, key, sizeof(key));
-          Serial.print("Sennd - ");
-          Serial.println(*key);
+          uint8_t data = 0;
+          ESP_LOGI(TAG, "Send peer message to %s", SSID.c_str());
+          esp_now_send(slave.peer_addr, &data, sizeof(data));
 
           esp_now_register_recv_cb(PeerDataRecv); // 此回调用于配对
           int conter = 0;
@@ -143,50 +160,46 @@ void TaskScanAndPeer(void *pt)
             vTaskDelay(50);
             conter++;
           }
-
-          // IsPaired = true;
+        }
+        else
+        {
+          ESP_LOGE(TAG, "Peer fail");
         }
       }
-
-      vTaskDelay(5);
+      // vTaskDelay(5);
     }
     else
     {
-      // Serial.println("Paired");
       vTaskDelay(100);
     }
   }
 }
 
-void Radio::begin()
+/**
+ * @brief 开启 esp now 连接
+ * @param presend_data 需要同步的数据的指针
+ * @param send_gap_ms 数据同步间隔 /ms,为 0 则不设置间隔
+ */
+void Radio::begin(void *presend_data, int send_gap_ms)
 {
   isPaired = &IsPaired;
   vehcile = &slave;
 
-  // 初始化时生成一个用于配对的随机钥匙
-  // srand((unsigned)time(NULL));
-  long v = random();
-  key = (uint8_t *)&v;
-
   WiFi.mode(WIFI_STA);
   esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-  if (esp_now_init() == ESP_OK)
-  {
-    Serial.println("ESPNow Init Success");
-  }
-  else
-  {
-    Serial.println("ESPNow Init Failed...restarting...");
-    ESP.restart();
-  }
-  Serial.print("STA MAC: ");
-  Serial.println(WiFi.macAddress());
-  Serial.print("STA CHANNEL ");
-  Serial.println(WiFi.channel());
-}
+  esp_now_init() == ESP_OK
+      ? ESP_LOGI(TAG, "ESPNow Init Success")
+      : ESP_LOGE(TAG, "ESPNow Init Failed...restarting...");
+  ESP_LOGI(TAG, "STA MAC: %s, STA CHANNEL: %u", WiFi.macAddress().c_str(), WiFi.channel());
 
-void Radio::startPairing()
-{
   // 扫描&配对从机
   xTaskCreate(TaskScanAndPeer, "TaskScanAndPeer", 4096, NULL, 2, NULL);
+}
+
+/**
+ * @brief 获取配对状态
+ */
+bool Radio::getPairStatus()
+{
+  return *isPaired;
 }

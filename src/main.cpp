@@ -23,6 +23,8 @@
 #define SCK 22
 #define SDA 21
 
+#define TAG "Main ESP32 RC"
+
 // // callback when data is sent from Master to Slave
 // void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 // {
@@ -60,12 +62,11 @@
 
 Radio radio;
 
+int data = 1;
 void setup()
 {
-  Serial.begin(115200);
-  ESP_LOGI("TAG", "Total APs scanned = %u", 123);
-  radio.begin();
-  radio.startPairing();
+  ESP_LOGI(TAG, "Total APs scanned = %u", 123);
+  radio.begin(&data, 0);
 
   // esp_now_register_send_cb(OnDataSent);
   // esp_now_register_recv_cb(OnDataRecv);
@@ -74,30 +75,9 @@ void setup()
 int num = 0;
 void loop()
 {
-  if (*radio.isPaired)
+  if (radio.getPairStatus())
   {
     esp_now_send(radio.vehcile->peer_addr, (uint8_t *)&num, sizeof(&num));
     delay(100);
   }
-  // bool isPaired = manageSlave();
-
-  // if (!isPaired)
-  //   ScanForSlave();
-
-  // if (slave.channel == CHANNEL)
-  // {
-  //   if (isPaired)
-  //   {
-  //     sendData();
-  //   }
-  //   else
-  //   {
-  //     Serial.println("Slave pair failed!");
-  //   }
-  // }
-  // else
-  // {
-  //   // No slave found to process
-  // }
-  // delay(1000);
 }
