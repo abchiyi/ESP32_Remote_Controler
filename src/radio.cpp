@@ -33,7 +33,7 @@ void TaskSend(void *pt)
         ESP_LOGE(TAG, "data send fail");
       }
     }
-    vTaskDelay(1);
+    vTaskDelay(8);
   }
 }
 
@@ -199,7 +199,7 @@ void Radio::begin(void *presend_data, int send_gap_ms)
   esp_now_register_recv_cb(onDataRecv);
   ESP_LOGI(TAG, "STA MAC: %s, STA CHANNEL: %u", WiFi.macAddress().c_str(), WiFi.channel());
   ESP_LOGI(TAG, "SET All Task");
-  // xTaskCreate(TaskConnectedWatch, "TaskConnectedWatch", 2048, NULL, 2, NULL);
+  xTaskCreate(TaskConnectedWatch, "TaskConnectedWatch", 2048, NULL, 2, NULL);
   xTaskCreate(TaskScanAndPeer, "TaskScanAndPeer", 4096, NULL, 2, NULL);
   xTaskCreate(TaskSend, "TaskSend", 2048, NULL, 2, NULL);
   ESP_LOGI(TAG, "started");
