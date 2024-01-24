@@ -3,15 +3,17 @@
 #include <radio.h>
 #include <WiFi.h>
 
-#define CONNECT_TIMEOUT 500 // ms // 连接同步等待时间
 #define TAG "Radio"
 String SSID;
 int32_t RSSI;
 String BSSIDstr;
 int32_t CHANNEL;
 
-int ConnectedTimeOut = CONNECT_TIMEOUT; // ms
 esp_now_peer_info_t slave;
+
+int CONNECT_TIMEOUT = 500;              // ms // 连接同步等待时间
+int ConnectedTimeOut = CONNECT_TIMEOUT; // ms
+const int MinSendGapMs = 8;
 bool PairRuning = false;
 bool IsPaired = false;
 int Send_gap_ms = 0;
@@ -126,11 +128,9 @@ void TaskSend(void *pt)
                                       (uint8_t *)Presend_data,
                                       sizeof(&Presend_data));
       if (status != ESP_OK)
-      {
         ESP_LOGE(TAG, "data send fail");
-      }
     }
-    vTaskDelay(8);
+    vTaskDelay(Send_gap_ms);
   }
 }
 
@@ -215,8 +215,9 @@ void TaskScanAndPeer(void *pt)
           ESP_LOGI(TAG, "Send peer message to %s", SSID.c_str());
           esp_now_send(slave.peer_addr, &data, sizeof(data));
 
-          int conter = CONNECT_TIMEOUT;
-          while (!IsPaired) // 等待从机发回 STA 模式 mac 地址
+          // 等待从机发回 STA 模式 mac 地址
+          int conter = 100; // ms
+          while (!IsPaired)
           {
             if (conter < 1)
             {
@@ -248,7 +249,8 @@ void Radio::begin(void *presend_data, int send_gap_ms)
   isPaired = &IsPaired;
   vehcile = &slave;
   Presend_data = presend_data;
-  Send_gap_ms = send_gap_ms;
+  Send_gap_ms = send_gap_ms <= MinSendGapMs ? MinSendGapMs : send_gap_ms;
+  CONNECT_TIMEOUT = Send_gap_ms + 100; // 配置接收等待时间
 
   ESP_LOGI(TAG, "init");
   // set wifi

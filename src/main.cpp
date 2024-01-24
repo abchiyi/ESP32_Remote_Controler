@@ -30,10 +30,16 @@ Radio radio;
 int data = 1;
 void setup()
 {
-  radio.begin(&data, 0);
+  radio.begin(&data, 100);
 }
 
-int num = 0;
 void loop()
 {
+  data = 0;
+  for (int i = 0; i <= 255; i++)
+  {
+    data++;
+    delay(100);
+    ESP_LOGI(TAG, "Data : %u", data);
+  }
 }
