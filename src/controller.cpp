@@ -208,8 +208,6 @@ void TaskUpdate(void *pt)
       syncAnalogHat(Xbox.getAnalogHat(LeftHatY), JoyLVert);
       *BtnLS = Xbox.getButtonPress(L3);
 
-      // *JoyRHori = Xbox.getAnalogHat(RightHatX);
-      // *JoyRVert = Xbox.getAnalogHat(RightHatY);
       syncAnalogHat(Xbox.getAnalogHat(RightHatX), JoyRHori);
       syncAnalogHat(Xbox.getAnalogHat(RightHatY), JoyRVert);
       *BtnRS = Xbox.getButtonPress(R3);
