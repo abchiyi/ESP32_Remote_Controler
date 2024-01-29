@@ -1,15 +1,20 @@
+#include <Arduino.h>
+#include <esp_log.h>
 
-#include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+// // 显示依赖
+// #include <SPI.h>
+// #include <Wire.h>
+// #include <Adafruit_GFX.h>
+// #include <Adafruit_SSD1306.h>
 
+// 无线依赖
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <radio.h>
 #include <WiFi.h>
 
-#include <esp_log.h>
+// 控制器依赖
+#include <controller.h>
 
 /* ESP32 WROOM-32E */
 
@@ -27,19 +32,31 @@
 
 Radio radio;
 
+Controller controller;
+
+const int deadZone = 8000;
+const int maxLength = 32768;
+const int targetMaxLength = 2048;
+const float_t step = (float_t)(maxLength - deadZone) / (float_t)targetMaxLength;
+
 int data = 1;
 void setup()
 {
-  radio.begin(&data, 100);
+  Serial.begin(115200);
+  // radio.begin(&controller, 100);
+  controller.begin();
+  ESP_LOGI(TAG, " %f", step);
 }
 
 void loop()
 {
-  data = 0;
-  for (int i = 0; i <= 255; i++)
+  if (controller.getConnectStatus())
   {
-    data++;
-    delay(100);
-    ESP_LOGI(TAG, "Data : %u", data);
+    Serial.printf("\033[2J");
+    Serial.printf("\033[%d;%dH", 0, 0);
+
+    // ESP_LOGI(TAG, "Controller : \n %s", controller.toString().c_str());
+    Serial.println("\r" + controller.toString());
   }
+  delay(100);
 }
