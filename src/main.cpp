@@ -31,22 +31,7 @@
 #define TAG "Main ESP32 RC"
 
 Radio radio;
-
 Controller controller;
-
-struct data
-{
-  bool btnA, btnB, btnX, btnY;
-  bool btnShare, btnStart, btnSelect, btnXbox;
-  bool btnLB, btnRB;
-  bool btnLS, btnRS;
-  bool btnDirUp, btnDirLeft, btnDirRight, btnDirDown;
-  int16_t joyLHori;
-  int16_t joyLVert;
-  int16_t joyRHori;
-  int16_t joyRVert;
-  int16_t trigLT, trigRT;
-} Data;
 
 esp_err_t sendCB(uint8_t *peer_addr)
 {
@@ -54,7 +39,6 @@ esp_err_t sendCB(uint8_t *peer_addr)
                       (uint8_t *)&controller,
                       sizeof(controller));
 }
-
 void setup()
 {
   Serial.begin(115200);
