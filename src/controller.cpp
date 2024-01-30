@@ -121,34 +121,34 @@ void TaskUpdate(void *pt)
 // 设置变量引用指针
 void Controller::setPointer()
 {
-  BtnA = &btnA;
-  BtnB = &btnB;
-  BtnX = &btnX;
-  BtnY = &btnY;
+  BtnA = &data.btnA;
+  BtnB = &data.btnB;
+  BtnX = &data.btnX;
+  BtnY = &data.btnY;
 
-  BtnShare = &btnShare;
-  BtnStart = &btnStart;
-  BtnSelect = &btnSelect;
-  BtnXbox = &btnXbox;
+  BtnShare = &data.btnShare;
+  BtnStart = &data.btnStart;
+  BtnSelect = &data.btnSelect;
+  BtnXbox = &data.btnXbox;
 
-  BtnLB = &btnLB;
-  BtnRB = &btnRB;
+  BtnLB = &data.btnLB;
+  BtnRB = &data.btnRB;
 
-  BtnLS = &btnLS;
-  BtnRS = &btnRS;
+  BtnLS = &data.btnLS;
+  BtnRS = &data.btnRS;
 
-  BtnDirUp = &btnDirUp;
-  BtnDirLeft = &btnDirLeft;
-  BtnDirRight = &btnDirRight;
-  BtnDirDown = &btnDirDown;
+  BtnDirUp = &data.btnDirUp;
+  BtnDirLeft = &data.btnDirLeft;
+  BtnDirRight = &data.btnDirRight;
+  BtnDirDown = &data.btnDirDown;
 
-  JoyLHori = &joyLHori;
-  JoyLVert = &joyLVert;
-  JoyRHori = &joyRHori;
-  JoyRVert = &joyRVert;
+  JoyLHori = &data.joyLHori;
+  JoyLVert = &data.joyLVert;
+  JoyRHori = &data.joyRHori;
+  JoyRVert = &data.joyRVert;
 
-  TrigLT = &trigLT;
-  TrigRT = &trigRT;
+  TrigLT = &data.trigLT;
+  TrigRT = &data.trigRT;
 
   Connected = &Xbox.XboxOneConnected;
 }
@@ -160,37 +160,6 @@ void Controller::begin()
   delay(5);
   xTaskCreate(TaskUSB, "taskUSB", 4096, NULL, 1, NULL);
   xTaskCreate(TaskUpdate, "TaskUpdate", 4096, NULL, 1, NULL);
-}
-
-// ↓this code from XboxControllerNotificationParser lib
-String Controller::toString()
-{
-  // clang-format off
-  String str = String("") +
-    "btnY: " + String(btnY) + " " +
-    "btnX: " + String(btnX) + " " +
-    "btnB: " + String(btnB) + " " +
-    "btnA: " + String(btnA) + " " +
-    "btnLB: " + String(btnLB) + " " +
-    "btnRB: " + String(btnRB) + "\n" +
-    "btnSelect: " + String(btnSelect) + " " +
-    "btnStart: " + String(btnStart) + " " +
-    "btnXbox: " + String(btnXbox) + " " +
-    "btnShare: " + String(btnShare) + " " +
-    "btnLS: " + String(btnLS) + " " +
-    "btnRS: " + String(btnRS) + "\n" +
-    "btnDirUp: " + String(btnDirUp) + " " +
-    "btnDirRight: " + String(btnDirRight) + " " +
-    "btnDirDown: " + String(btnDirDown) + " " +
-    "btnDirLeft: " + String(btnDirLeft) + "\n"
-    "joyLHori: " + String(joyLHori) + "\n" +
-    "joyLVert: " + String(joyLVert) + "\n" +
-    "joyRHori: " + String(joyRHori) + "\n" +
-    "joyRVert: " + String(joyRVert) + "\n" +
-    "trigLT: " + String(trigLT) + "\n" +
-    "trigRT: " + String(trigRT) + "\n";
-  // clang-format on
-  return str;
 }
 
 bool Controller::getConnectStatus()

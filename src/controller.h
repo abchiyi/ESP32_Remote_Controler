@@ -1,13 +1,7 @@
 #include <Arduino.h>
 
-class Controller
+struct ControllerStatus
 {
-private:
-  /* data */
-  void setPointer();
-  bool *Connected;
-
-public:
   bool btnA, btnB, btnX, btnY;
   bool btnShare, btnStart, btnSelect, btnXbox;
   bool btnLB, btnRB;
@@ -18,7 +12,17 @@ public:
   int16_t joyRHori;
   int16_t joyRVert;
   int16_t trigLT, trigRT;
+};
 
+class Controller
+{
+private:
+  /* data */
+  void setPointer();
+  bool *Connected;
+
+public:
+  ControllerStatus data;
   bool getConnectStatus();
   String toString();
   void begin();

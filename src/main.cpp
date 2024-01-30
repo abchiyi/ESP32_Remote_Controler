@@ -36,8 +36,8 @@ Controller controller;
 esp_err_t sendCB(uint8_t *peer_addr)
 {
   return esp_now_send(peer_addr,
-                      (uint8_t *)&controller,
-                      sizeof(controller));
+                      (uint8_t *)&controller.data,
+                      sizeof(controller.data));
 }
 void setup()
 {
