@@ -50,7 +50,6 @@ struct data
 
 esp_err_t sendCB(uint8_t *peer_addr)
 {
-  ESP_LOGI(TAG, "send");
   return esp_now_send(peer_addr,
                       (uint8_t *)&controller,
                       sizeof(controller));
@@ -65,12 +64,4 @@ void setup()
 
 void loop()
 {
-
-  // Data.trigLT = controller.trigLT;
-  // if (controller.getConnectStatus())
-  // {
-  // ESP_LOGI(TAG, "Controller : \n %s", controller.toString().c_str());
-  // Serial.println("\r" + controller.toString());
-  // }
-  // delay(100);
 }

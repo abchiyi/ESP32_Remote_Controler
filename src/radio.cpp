@@ -4,6 +4,7 @@
 #include <WiFi.h>
 
 #define TAG "Radio"
+
 String SSID;
 int32_t RSSI;
 String BSSIDstr;
@@ -17,7 +18,9 @@ const int MinSendGapMs = 8;
 bool PairRuning = false;
 bool IsPaired = false;
 int Send_gap_ms = 0;
-void *Presend_data;
+
+send_cb_t SENDCB;
+
 String parseMac(const uint8_t *mac)
 {
   char macStr[18];
@@ -124,9 +127,10 @@ void TaskSend(void *pt)
   {
     if (IsPaired)
     {
-      esp_err_t status = esp_now_send(slave.peer_addr,
-                                      (uint8_t *)Presend_data,
-                                      sizeof(&Presend_data));
+      esp_err_t status = SENDCB(slave.peer_addr);
+      // esp_err_t status = esp_now_send(slave.peer_addr,
+      //                                 (uint8_t *)Presend_data,
+      //                                 sizeof(&Presend_data));
       if (status != ESP_OK)
         ESP_LOGE(TAG, "data send fail");
     }
@@ -241,14 +245,14 @@ void TaskScanAndPeer(void *pt)
 
 /**
  * @brief 开启 esp now 连接
- * @param presend_data 需要同步的数据的指针
- * @param send_gap_ms 数据同步间隔 /ms,为 0 则不设置间隔
+ * @param cb_fn 发送回调
+ * @param send_gap_ms 数据同步间隔 /ms,最小值为 MinSendGapMs 定义的值
  */
-void Radio::begin(void *presend_data, int send_gap_ms)
+void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
 {
   isPaired = &IsPaired;
   vehcile = &slave;
-  Presend_data = presend_data;
+  SENDCB = cb_fn;
   Send_gap_ms = send_gap_ms <= MinSendGapMs ? MinSendGapMs : send_gap_ms;
   CONNECT_TIMEOUT = Send_gap_ms + 100; // 配置接收等待时间
 
