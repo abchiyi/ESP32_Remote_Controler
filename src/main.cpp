@@ -34,29 +34,19 @@ Radio radio;
 
 Controller controller;
 
-const int deadZone = 8000;
-const int maxLength = 32768;
-const int targetMaxLength = 2048;
-const float_t step = (float_t)(maxLength - deadZone) / (float_t)targetMaxLength;
-
-int data = 1;
 void setup()
 {
   Serial.begin(115200);
   // radio.begin(&controller, 100);
   controller.begin();
-  ESP_LOGI(TAG, " %f", step);
 }
 
 void loop()
 {
-  if (controller.getConnectStatus())
-  {
-    Serial.printf("\033[2J");
-    Serial.printf("\033[%d;%dH", 0, 0);
-
-    // ESP_LOGI(TAG, "Controller : \n %s", controller.toString().c_str());
-    Serial.println("\r" + controller.toString());
-  }
+  // if (controller.getConnectStatus())
+  // {
+  // ESP_LOGI(TAG, "Controller : \n %s", controller.toString().c_str());
+  Serial.println("\r" + controller.toString());
+  // }
   delay(100);
 }

@@ -4,7 +4,6 @@ class Controller
 {
 private:
   /* data */
-  static const uint16_t maxJoy = 0xffff;
   void setPointer();
   bool *Connected;
 
@@ -14,10 +13,10 @@ public:
   bool btnLB, btnRB;
   bool btnLS, btnRS;
   bool btnDirUp, btnDirLeft, btnDirRight, btnDirDown;
-  int16_t joyLHori = maxJoy / 2;
-  int16_t joyLVert = maxJoy / 2;
-  int16_t joyRHori = maxJoy / 2;
-  int16_t joyRVert = maxJoy / 2;
+  int16_t joyLHori;
+  int16_t joyLVert;
+  int16_t joyRHori;
+  int16_t joyRVert;
   int16_t trigLT, trigRT;
 
   bool getConnectStatus();

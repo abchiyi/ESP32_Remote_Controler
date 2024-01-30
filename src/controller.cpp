@@ -57,8 +57,8 @@ void TaskUSB(void *pt)
 // 0 ~ 2047
 const int deadZone = 8000;
 const int maxLength = 32768;
-const int targetMaxLength = 2048;
-const float_t step = (float_t)(maxLength - deadZone) / (float_t)targetMaxLength;
+const int resolution = 2048;
+const float_t step = (float_t)(maxLength - deadZone) / (float_t)resolution;
 void syncAnalogHat(int16_t _from, int16_t *_to)
 {
   // 计算除去死区后摇杆的值
@@ -256,6 +256,7 @@ void Controller::setPointer()
   Connected = &Xbox.XboxOneConnected;
 }
 
+// 启动xbox控制器
 void Controller::begin()
 {
   setPointer();
