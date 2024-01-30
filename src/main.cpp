@@ -34,19 +34,43 @@ Radio radio;
 
 Controller controller;
 
+struct data
+{
+  bool btnA, btnB, btnX, btnY;
+  bool btnShare, btnStart, btnSelect, btnXbox;
+  bool btnLB, btnRB;
+  bool btnLS, btnRS;
+  bool btnDirUp, btnDirLeft, btnDirRight, btnDirDown;
+  int16_t joyLHori;
+  int16_t joyLVert;
+  int16_t joyRHori;
+  int16_t joyRVert;
+  int16_t trigLT, trigRT;
+} Data;
+
+esp_err_t sendCB(uint8_t *peer_addr)
+{
+  ESP_LOGI(TAG, "send");
+  return esp_now_send(peer_addr,
+                      (uint8_t *)&controller,
+                      sizeof(controller));
+}
+
 void setup()
 {
   Serial.begin(115200);
-  // radio.begin(&controller, 100);
+  radio.begin(sendCB, 10);
   controller.begin();
 }
 
 void loop()
 {
+
+  // Data.trigLT = controller.trigLT;
   // if (controller.getConnectStatus())
   // {
   // ESP_LOGI(TAG, "Controller : \n %s", controller.toString().c_str());
-  Serial.println("\r" + controller.toString());
+  // Serial.println("\r" + controller.toString());
   // }
-  delay(100);
+  // delay(100);
 }
