@@ -42,8 +42,9 @@ esp_err_t sendCB(uint8_t *peer_addr)
 void setup()
 {
   Serial.begin(115200);
-  radio.begin(sendCB, 10);
   controller.begin();
+  delay(2000); // 延迟启动无线连接
+  radio.begin(sendCB, 10);
 }
 
 void loop()
