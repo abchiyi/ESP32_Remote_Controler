@@ -171,7 +171,7 @@ void TaskScanAndPeer(void *pt)
 
     if (!IsPaired && !PairRuning) // 配对中或配对完成都不在扫描AP
     {
-      ESP_LOGI(TAG, "Start scan");
+      // ESP_LOGI(TAG, "Start scan");
       scanResults = WiFi.scanNetworks(0, 0, 0, 50, 1); // 扫描1通道
       if (scanResults != 0)
       {
