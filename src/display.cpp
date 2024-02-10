@@ -44,10 +44,8 @@ void TaskDisplaySub(void *pt)
   while (true)
   {
     display->clearDisplay();
-    display->setTextSize(3);
-    display->setCursor(0, 0);
 
-    display->write(radio->isPaired ? 0x12 : 0x18);
+    // display->write(radio->isPaired ? 0x12 : 0x18);
 
     if (!radio->isPaired && !conntingAnimationTimerStared)
     {
@@ -63,37 +61,57 @@ void TaskDisplaySub(void *pt)
       conntingAnimationTimerStared = false;
     }
 
-    // ESP_LOGI(TAG, "display next trick");
+    if (radio->isPaired)
+    {
+      display->setTextSize(3);
+      display->setCursor(0, 0);
+      display->write(0x12);
 
-    if (!radio->isPaired)
-    {
-      display->setTextSize(1);
-      display->setCursor(0, 24);
-      switch (connting)
-      {
-      case 0:
-        display->write("Scanning");
-        display->write(0x2d);
-        break;
-      case 1:
-        display->write("Scanning");
-        display->write(0x5c);
-        break;
-      case 2:
-        display->write("Scanning");
-        display->write(0xb3);
-        break;
-      case 3:
-        display->write("Scanning");
-        display->write(0x2f);
-        break;
-      }
-    }
-    else
-    {
       display->setTextSize(1);
       display->setCursor(0, 24);
       display->write("connted");
+    }
+    else
+    {
+      switch (connting)
+      {
+      case 0:
+        display->setTextSize(3);
+        display->setCursor(0, 0);
+        display->write(0x2d);
+
+        display->setTextSize(1);
+        display->setCursor(0, 24);
+        display->write("Scanning");
+        break;
+      case 1:
+        display->setTextSize(3);
+        display->setCursor(0, 0);
+        display->write(0x5c);
+
+        display->setTextSize(1);
+        display->setCursor(0, 24);
+        display->write("Scanning.");
+        break;
+      case 2:
+        display->setTextSize(3);
+        display->setCursor(0, 0);
+        display->write(0xb3);
+
+        display->setTextSize(1);
+        display->setCursor(0, 24);
+        display->write("Scanning..");
+        break;
+      case 3:
+        display->setTextSize(3);
+        display->setCursor(0, 0);
+        display->write(0x2f);
+
+        display->setTextSize(1);
+        display->setCursor(0, 24);
+        display->write("Scanning...");
+        break;
+      }
     }
 
     display->display();
@@ -148,7 +166,7 @@ void Display::begin(Radio *radio)
 
   conntingAnimation = xTimerCreate(
       "Connect time out",           // 定时器任务名称
-      100,                          // 延迟多少tick后执行回调函数
+      150,                          // 延迟多少tick后执行回调函数
       pdTRUE,                       // 执行一次,pdTRUE 循环执行
       (void *)&conntingAnimationID, // 任务id
       conntingAnimationCB           // 回调函数
