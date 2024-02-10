@@ -16,7 +16,7 @@ int CONNECT_TIMEOUT = 500;              // ms // 连接同步等待时间
 int ConnectedTimeOut = CONNECT_TIMEOUT; // ms
 const int MinSendGapMs = 8;
 bool PairRuning = false;
-bool IsPaired = false;
+bool Radio::isPaired;
 int Send_gap_ms = 0;
 
 send_cb_t SENDCB;
@@ -83,7 +83,7 @@ void onDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
     if (Pair(slave))
     {
       PairRuning = false;
-      IsPaired = true;
+      Radio::isPaired = true;
     }
   }
 }
@@ -125,7 +125,7 @@ void TaskSend(void *pt)
 {
   while (true)
   {
-    if (IsPaired)
+    if (Radio::isPaired)
     {
       esp_err_t status = SENDCB(slave.peer_addr);
       // esp_err_t status = esp_now_send(slave.peer_addr,
@@ -145,13 +145,13 @@ void TaskConnectedWatch(void *pt)
 {
   while (true)
   {
-    if (IsPaired) // 连接成功时开始倒计时，超时设置状态为 “未连接”
+    if (Radio::isPaired) // 连接成功时开始倒计时，超时设置状态为 “未连接”
     {
       ConnectedTimeOut--;
       if (ConnectedTimeOut <= 0)
       {
         ESP_LOGI(TAG, "Lost connection");
-        IsPaired = false;
+        Radio::isPaired = false;
         ClearAllPair();
       }
     }
@@ -160,7 +160,7 @@ void TaskConnectedWatch(void *pt)
 }
 
 /**
- * @brief 扫描&配对从机,检测  IsPaired 的状态，当未配对时将开始扫描并配对设备
+ * @brief 扫描&配对从机,检测  Radio::isPaired 的状态，当未配对时将开始扫描并配对设备
  */
 void TaskScanAndPeer(void *pt)
 {
@@ -169,7 +169,7 @@ void TaskScanAndPeer(void *pt)
   {
     int16_t scanResults = 0;
 
-    if (!IsPaired && !PairRuning) // 配对中或配对完成都不在扫描AP
+    if (!Radio::isPaired && !PairRuning) // 配对中或配对完成都不在扫描AP
     {
       // ESP_LOGI(TAG, "Start scan");
       scanResults = WiFi.scanNetworks(0, 0, 0, 50, 1); // 扫描1通道
@@ -221,7 +221,7 @@ void TaskScanAndPeer(void *pt)
 
           // 等待从机发回 STA 模式 mac 地址
           int conter = 100; // ms
-          while (!IsPaired)
+          while (!Radio::isPaired)
           {
             if (conter < 1)
             {
@@ -250,7 +250,7 @@ void TaskScanAndPeer(void *pt)
  */
 void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
 {
-  isPaired = &IsPaired;
+  isPaired = false;
   vehcile = &slave;
   SENDCB = cb_fn;
   Send_gap_ms = send_gap_ms <= MinSendGapMs ? MinSendGapMs : send_gap_ms;
@@ -269,6 +269,8 @@ void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
   xTaskCreate(TaskConnectedWatch, "TaskConnectedWatch", 2048, NULL, 2, NULL);
   xTaskCreate(TaskScanAndPeer, "TaskScanAndPeer", 4096, NULL, 2, NULL);
   xTaskCreate(TaskSend, "TaskSend", 2048, NULL, 2, NULL);
+
+  ESP_LOGI(TAG, "init success");
 }
 
 /**
@@ -276,5 +278,5 @@ void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
  */
 bool Radio::getPairStatus()
 {
-  return *isPaired;
+  return isPaired;
 }

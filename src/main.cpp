@@ -31,7 +31,7 @@ void setup()
 {
   Serial.begin(115200);
   controller.begin();
-  delay(2000); // 延迟启动无线连接
+  delay(1000); // 延迟启动无线连接
   radio.begin(sendCB, 10);
   display.begin(&radio);
 }
