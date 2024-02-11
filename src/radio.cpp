@@ -15,6 +15,7 @@ esp_now_peer_info_t slave;
 int CONNECT_TIMEOUT = 500;              // ms // 连接同步等待时间
 int ConnectedTimeOut = CONNECT_TIMEOUT; // ms
 const int MinSendGapMs = 8;
+recvData Radio::RecvData;
 bool PairRuning = false;
 bool Radio::isPaired;
 int Send_gap_ms = 0;
@@ -69,8 +70,10 @@ bool Pair(esp_now_peer_info_t slave)
 void onDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
   ConnectedTimeOut = CONNECT_TIMEOUT; // 接收到数据时重置超时
+  memcpy(&Radio::RecvData, incomingData, sizeof(Radio::RecvData));
 
-  // ESP_LOGI(TAG, "Recv data from : %s", parseMac(mac).c_str());
+  ESP_LOGI(TAG, "Recv data from : %s, mv:%d", parseMac(mac).c_str(), Radio::RecvData.mv);
+
   if (PairRuning)
   {
     ESP_LOGI(TAG, "Recv data from : %s", parseMac(mac).c_str());
@@ -259,7 +262,6 @@ void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
   ESP_LOGI(TAG, "init");
   // set wifi
   WiFi.mode(WIFI_STA);
-  esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
   ESP_LOGI(TAG, "STA MAC: %s, STA CHANNEL: %u", WiFi.macAddress().c_str(), WiFi.channel());
 
   // set esp now

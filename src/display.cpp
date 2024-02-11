@@ -15,10 +15,16 @@ struct dataAndDisplay
 
 void TaskDisplayMain(void *pt)
 {
-  dataAndDisplay data = *(dataAndDisplay *)pt;
+  ESP_LOGI(TAG, "set data");
+  auto [display, radio] = *(dataAndDisplay *)pt;
+
+  ESP_LOGI(TAG, "start while");
   while (true)
   {
-    /* code */
+    display->setCursor(0, 0);
+    display->write("MV ");
+    display->println(radio->RecvData.mv);
+    display->display();
     vTaskDelay(16);
   }
 }
@@ -37,9 +43,9 @@ void conntingAnimationCB(TimerHandle_t xTimer)
 // 副屏幕显示内容
 void TaskDisplaySub(void *pt)
 {
-  ESP_LOGI(TAG, "task sub display get data");
+  ESP_LOGI(TAG, "display get data");
   auto [display, radio] = *(dataAndDisplay *)pt;
-  ESP_LOGI(TAG, "task sub display start update");
+  ESP_LOGI(TAG, "display start update");
 
   while (true)
   {
@@ -155,14 +161,15 @@ void Display::begin(Radio *radio)
   displayMain.setTextColor(SSD1306_WHITE);
 
   ESP_LOGI(TAG, "Set display update task");
-  // dataAndDisplay mainData;
-  // mainData.display = &displayMain;
-  // mainData.radio = radio;
-  // xTaskCreate(TaskDisplayMain,
-  //             "display main",
-  //             2048,
-  //             (void *)&mainData,
-  //             2, NULL);
+
+  dataAndDisplay mainData;
+  mainData.display = &displayMain;
+  mainData.radio = radio;
+  xTaskCreate(TaskDisplayMain,
+              "display main",
+              2048,
+              (void *)&mainData,
+              2, NULL);
 
   conntingAnimation = xTimerCreate(
       "Connect time out",           // 定时器任务名称
