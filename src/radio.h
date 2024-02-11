@@ -4,7 +4,7 @@ typedef esp_err_t (*send_cb_t)(uint8_t *);
 
 struct recvData
 {
-  int mv;
+  float volts;
 };
 
 /**

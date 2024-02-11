@@ -21,9 +21,11 @@ void TaskDisplayMain(void *pt)
   ESP_LOGI(TAG, "start while");
   while (true)
   {
+    display->clearDisplay();
+    display->setTextSize(1);
+    // 电池电压
     display->setCursor(0, 0);
-    display->write("MV ");
-    display->println(radio->RecvData.mv);
+    display->printf("Battery : %.1f V", radio->RecvData.volts);
     display->display();
     vTaskDelay(16);
   }

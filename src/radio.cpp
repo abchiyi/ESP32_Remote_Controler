@@ -72,7 +72,7 @@ void onDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
   ConnectedTimeOut = CONNECT_TIMEOUT; // 接收到数据时重置超时
   memcpy(&Radio::RecvData, incomingData, sizeof(Radio::RecvData));
 
-  ESP_LOGI(TAG, "Recv data from : %s, mv:%d", parseMac(mac).c_str(), Radio::RecvData.mv);
+  // ESP_LOGI(TAG, "Recv data from : %s, mv:%d", parseMac(mac).c_str(), Radio::RecvData.mv);
 
   if (PairRuning)
   {
