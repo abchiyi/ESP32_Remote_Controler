@@ -1,6 +1,11 @@
 #include <display.h>
 #include <esp_log.h>
 
+#define REVERSE -1
+#define FORWARD 1
+#define BRAKE 0
+#define SLIDE 2
+
 #define TAG "Display"
 
 TimerHandle_t conntingAnimation;
@@ -13,6 +18,7 @@ struct dataAndDisplay
   Radio *radio;
 };
 
+// 主屏幕显示内容
 void TaskDisplayMain(void *pt)
 {
   ESP_LOGI(TAG, "set data");
@@ -22,10 +28,33 @@ void TaskDisplayMain(void *pt)
   while (true)
   {
     display->clearDisplay();
-    display->setTextSize(1);
+    display->setTextSize(2);
+
     // 电池电压
     display->setCursor(0, 0);
-    display->printf("Battery : %.1f V", radio->RecvData.volts);
+    if (radio->isPaired)
+    {
+      display->printf("Btr: %.2fV", radio->RecvData.volts);
+    }
+    else
+    {
+      display->printf("Btr: -.--V");
+    }
+
+    // 转向角度
+    display->setTextSize(2);
+    display->setCursor(0, 18);
+    display->write("Ang:");
+    if (radio->isPaired)
+    {
+      display->printf("%d", radio->RecvData.ang);
+    }
+    else
+    {
+      display->write("---");
+    }
+    display->write(0xf8);
+
     display->display();
     vTaskDelay(16);
   }
@@ -52,8 +81,6 @@ void TaskDisplaySub(void *pt)
   while (true)
   {
     display->clearDisplay();
-
-    // display->write(radio->isPaired ? 0x12 : 0x18);
 
     if (!radio->isPaired && !conntingAnimationTimerStared)
     {
@@ -120,6 +147,31 @@ void TaskDisplaySub(void *pt)
         display->write("Scanning...");
         break;
       }
+    }
+
+    // 显示挡位
+    display->setTextSize(4);
+    display->setCursor(128 - 32, 0);
+    switch (radio->isPaired ? radio->RecvData.gear : 3)
+    {
+    case BRAKE:
+      display->write("B");
+      break;
+
+    case FORWARD:
+      display->write("D");
+      break;
+
+    case REVERSE:
+      display->write("R");
+      break;
+
+    case SLIDE:
+      display->write("N");
+      break;
+    default:
+      display->write(0x2d);
+      break;
     }
 
     display->display();

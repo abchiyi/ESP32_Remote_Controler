@@ -5,6 +5,8 @@ typedef esp_err_t (*send_cb_t)(uint8_t *);
 struct recvData
 {
   float volts;
+  int gear;
+  int ang;
 };
 
 /**
