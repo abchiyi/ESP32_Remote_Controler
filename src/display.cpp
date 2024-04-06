@@ -195,7 +195,7 @@ void Display::begin(Radio *radio)
   }
 
   ESP_LOGI(TAG, "Init display Sub");
-  displaySub = Adafruit_SSD1306(128, 32, &Wire, -1);
+  displaySub = Adafruit_SSD1306(128, 64, &Wire, -1);
   if (!displaySub.begin(SSD1306_SWITCHCAPVCC, 0x3C))
   {
     ESP_LOGE(TAG, "display sub init fail");

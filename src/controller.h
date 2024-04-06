@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <XBOXONE.h>
 
 struct ControllerStatus
 {
@@ -27,3 +28,5 @@ public:
   String toString();
   void begin();
 };
+
+extern XBOXONE Xbox;
