@@ -1,0 +1,14 @@
+{
+  "name": "WouoUI",
+  "description": "UI库",
+  "frameworks": "arduino",
+  "platforms": "esp32,espressif32",
+  "dependencies": [
+    {
+      "owner": "olikraus",
+      "name": "U8g2",
+      "platforms": ["espressif32"],
+      "version": "^2.35.9"
+    }
+  ]
+}

@@ -9,7 +9,8 @@
 
 // 控制器依赖
 #include <controller.h>
-#include <XBOXONE.h>
+#include <pins_arduino.h>
+// #include <XBOXONE.h>
 
 // 显示
 // #include <display.h>
@@ -33,9 +34,9 @@
 #define SCL 22
 #define SDA 21
 
-#define RES 32
-#define DC 33
-#define CS 25
+#define RES 6
+#define DC 5
+#define CS 4
 
 Radio radio;
 Controller controller;
@@ -139,7 +140,7 @@ void btn_scan(WouoUI *gui)
 
 // 数据层处理任务
 void TaskDataLayerUpdate(void *pt)
-{
+                   {
   while (true)
   {
     wouoUI.btnUpdate(btn_scan);
@@ -162,7 +163,7 @@ void setup()
 {
   Serial.begin(115200);
   controller.begin();
-  delay(1000); // 延迟启动无线连接
+  // delay(1000); // 延迟启动无线连接
   radio.begin(sendCB, 10);
   // display.begin(&radio);
 
