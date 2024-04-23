@@ -262,6 +262,10 @@ void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
   ESP_LOGI(TAG, "init");
   // set wifi
   WiFi.mode(WIFI_STA);
+  WiFi.enableLongRange(true);
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  esp_wifi_config_espnow_rate(WIFI_IF_STA, WIFI_PHY_RATE_LORA_500K);
+
   ESP_LOGI(TAG, "STA MAC: %s, STA CHANNEL: %u", WiFi.macAddress().c_str(), WiFi.channel());
 
   // set esp now
