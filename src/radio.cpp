@@ -4,6 +4,7 @@
 #include <WiFi.h>
 
 #define TAG "Radio"
+#define SLAVE_KE_NAME "Slave"
 
 String SSID;
 int32_t RSSI;
@@ -153,7 +154,7 @@ void TaskSend(void *pt)
   }
 }
 
-/* 检查连接同步状态，
+/* XXX 检查连接同步状态，
 一段时间内没有接收到回复信息，
 或连续数据发送失败则认为连接已断开 */
 void TaskConnectedWatch(void *pt)
@@ -197,7 +198,7 @@ void TaskScanAndPeer(void *pt)
           BSSIDstr = WiFi.BSSIDstr(i);
           CHANNEL = WiFi.channel(i);
 
-          if (SSID.indexOf("Slave") == 0)
+          if (SSID.indexOf(SLAVE_KE_NAME) == 0)
           {
             ESP_LOGI(TAG, "Found a Slave : %u : SSID: %s, BSSID: [%s], RSSI:  (%u), Channel: %u", i + 1, SSID, BSSIDstr.c_str(), RSSI, CHANNEL);
             PairRuning = true; // 进入配对模式
@@ -258,6 +259,37 @@ void TaskScanAndPeer(void *pt)
   }
 }
 
+void TaskRadioMainLoop(void *pt)
+{
+  char macStr[18];
+
+  while (true)
+  {
+    switch (radio.status)
+    {
+    case RADIO_BEFORE_WAIT_CONNECTION:
+      break;
+    case RADIO_WAIT_CONNECTION:
+      break;
+
+    case RADIO_BEFORE_CONNECTED:
+      break;
+    case RADIO_CONNECTED:
+      break;
+
+    case RADIO_BEFORE_DISCONNECT:
+      break;
+    case RADIO_DISCONNECT:
+      break;
+
+    default:
+      vTaskDelay(5);
+      break;
+      vTaskDelay(5);
+    }
+  }
+}
+
 /**
  * @brief 开启 esp now 连接
  * @param cb_fn 发送回调
@@ -278,6 +310,8 @@ void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
   xTaskCreate(TaskConnectedWatch, "TaskConnectedWatch", 2048, NULL, 2, NULL);
   xTaskCreate(TaskScanAndPeer, "TaskScanAndPeer", 4096, NULL, 2, NULL);
   xTaskCreate(TaskSend, "TaskSend", 2048, NULL, 2, NULL);
+
+  xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 4096, NULL, 2, NULL);
 
   ESP_LOGI(TAG, "Radio started :)");
 }
