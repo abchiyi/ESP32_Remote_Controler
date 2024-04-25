@@ -38,7 +38,6 @@
 #define DC 5
 #define CS 4
 
-Radio radio;
 Controller controller;
 
 // Display display;
@@ -140,7 +139,7 @@ void btn_scan(WouoUI *gui)
 
 // 数据层处理任务
 void TaskDataLayerUpdate(void *pt)
-                   {
+{
   while (true)
   {
     wouoUI.btnUpdate(btn_scan);
@@ -162,24 +161,24 @@ sendCB(uint8_t *peer_addr)
 void setup()
 {
   Serial.begin(115200);
-  controller.begin();
+  // controller.begin();
   // delay(1000); // 延迟启动无线连接
   radio.begin(sendCB, 10);
   // display.begin(&radio);
 
-  // 注册页面
-  wouoUI.addPage(P_MENU);
-  wouoUI.addPage(P_EDITOR);
-  wouoUI.addPage(P_SETTING);
-  wouoUI.addPage(P_WINDOW);
-  wouoUI.addPage(P_ABOUT);
-  wouoUI.addPage(F0TOY);
-  wouoUI.addPage(P_SLEEP);
-  wouoUI.addPage(P_MAIN);
+  // // 注册页面
+  // wouoUI.addPage(P_MENU);
+  // wouoUI.addPage(P_EDITOR);
+  // wouoUI.addPage(P_SETTING);
+  // wouoUI.addPage(P_WINDOW);
+  // wouoUI.addPage(P_ABOUT);
+  // wouoUI.addPage(F0TOY);
+  // wouoUI.addPage(P_SLEEP);
+  // wouoUI.addPage(P_MAIN);
 
-  wouoUI.setDefaultPage(P_MAIN);
+  // wouoUI.setDefaultPage(P_MAIN);
 
-  wouoUI.begin();
+  // wouoUI.begin();
 
   // 设置数据层更新任务
   xTaskCreatePinnedToCore(

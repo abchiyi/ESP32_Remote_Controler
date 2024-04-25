@@ -19,6 +19,7 @@ recvData Radio::RecvData;
 bool PairRuning = false;
 bool Radio::isPaired;
 int Send_gap_ms = 0;
+Radio radio;
 
 send_cb_t SENDCB;
 
@@ -91,28 +92,39 @@ void onDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
   }
 }
 
-void EspNowInit()
+void Radio::radioInit()
 {
-  static int counter = 0;
-  // set esp now
-  if (esp_now_init() == ESP_OK)
-  {
-    ESP_LOGI(TAG, "ESP NOW init success");
-    esp_err_t refStatus = esp_now_register_recv_cb(onDataRecv);
-    refStatus == ESP_OK
-        ? ESP_LOGI(TAG, "Register recv cb success")
-        : ESP_LOGE(TAG, "Register recv cb fail");
-    counter = 0;
-  }
+  // set wifi
+  ESP_LOGI(TAG, "Init wifi");
+  WiFi.enableLongRange(false);
+
+  // 启动WIFI IN STA mode
+  if (WiFi.mode(WIFI_STA))
+    ESP_LOGI(TAG, "WIFI Start in STA,MAC: %s, CHANNEL: %u",
+             WiFi.macAddress().c_str(), WiFi.channel());
   else
-  {
-    counter++;
-    counter <= 5
-        ? ESP_LOGE(TAG, "ESP NOW init fail, Try again...")
-        : ESP_LOGE(TAG, "ESP NOW init fail, Maximum depth, restart...");
-    delay(10);
-    counter <= 5 ? EspNowInit() : ESP.restart();
-  }
+    esp_system_abort("WIFI Start FAIL");
+
+  // 设置 ESPNOW 通讯速率
+  esp_wifi_config_espnow_rate(WIFI_IF_STA, WIFI_PHY_RATE_LORA_500K) == ESP_OK
+      ? ESP_LOGI(TAG, "Set ESPNOW WIFI_PHY_RATE_LORA_500K")
+      : ESP_LOGI(TAG, "Set ESPNOW RATE FAIL");
+
+  // 设置最大 TX Power 到 20db
+  esp_wifi_set_max_tx_power(84) == ESP_OK
+      ? ESP_LOGI(TAG, "Set TxPower 20db")
+      : ESP_LOGI(TAG, "Set TxPower Fail");
+
+  // 设置 ESPNOW
+  if (esp_now_init() != ESP_OK)
+    esp_system_abort("ESP NOW Init Fail.");
+  else
+    ESP_LOGI(TAG, "ESP NOW init success");
+
+  // 注册接收回调
+  esp_now_register_recv_cb(onDataRecv) == ESP_OK
+      ? ESP_LOGI(TAG, "Register recv cb success")
+      : ESP_LOGE(TAG, "Register recv cb fail");
 }
 
 void ClearAllPair()
@@ -120,7 +132,7 @@ void ClearAllPair()
   if (esp_now_deinit() == ESP_OK)
   {
     ESP_LOGI(TAG, "Clear All paired slave");
-    EspNowInit();
+    // EspNowInit();
   }
 }
 
@@ -259,24 +271,15 @@ void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
   Send_gap_ms = send_gap_ms <= MinSendGapMs ? MinSendGapMs : send_gap_ms;
   CONNECT_TIMEOUT = Send_gap_ms + 100; // 配置接收等待时间
 
-  ESP_LOGI(TAG, "init");
-  // set wifi
-  WiFi.mode(WIFI_STA);
-  WiFi.enableLongRange(true);
-  WiFi.setTxPower(WIFI_POWER_19_5dBm);
-  esp_wifi_config_espnow_rate(WIFI_IF_STA, WIFI_PHY_RATE_LORA_500K);
-
-  ESP_LOGI(TAG, "STA MAC: %s, STA CHANNEL: %u", WiFi.macAddress().c_str(), WiFi.channel());
-
-  // set esp now
-  EspNowInit();
+  // EspNowInit();
+  this->radioInit();
 
   ESP_LOGI(TAG, "SET All Task");
   xTaskCreate(TaskConnectedWatch, "TaskConnectedWatch", 2048, NULL, 2, NULL);
   xTaskCreate(TaskScanAndPeer, "TaskScanAndPeer", 4096, NULL, 2, NULL);
   xTaskCreate(TaskSend, "TaskSend", 2048, NULL, 2, NULL);
 
-  ESP_LOGI(TAG, "init success");
+  ESP_LOGI(TAG, "Radio started :)");
 }
 
 /**

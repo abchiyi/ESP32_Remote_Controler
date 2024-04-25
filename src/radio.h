@@ -21,4 +21,8 @@ public:
   esp_now_peer_info *vehcile; // 无线控制器的配对信息
   void begin(send_cb_t cb, int send_gap_ms);
   bool getPairStatus();
+
+  void radioInit(); // 初始化无线
 };
+
+extern Radio radio;
