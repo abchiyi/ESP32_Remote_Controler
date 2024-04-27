@@ -1,7 +1,8 @@
-#include <esp_now.h>
 #include <esp_wifi.h>
 #include <radio.h>
 #include <WiFi.h>
+#include <vector>
+#include <esp_mac.h>
 
 #define TAG "Radio"
 #define SLAVE_KE_NAME "Slave"
@@ -69,6 +70,48 @@ bool Pair(esp_now_peer_info_t slave)
   }
 }
 
+/**
+ * @brief 配对新设备
+ * @return esp_err_t ESP_OK/ESP_FAIL
+ */
+esp_err_t Radio::pairNewDevice()
+{
+  AP_Info *temp_ap_info = nullptr;
+  int16_t scanResults = 0;
+  using namespace std;
+
+  vector<vector<AP_Info>> ap_info;
+  ap_info.resize(13);
+
+  ESP_LOGI(TAG, "Start scan");
+  // 遍历1~13信道
+  for (size_t channel_i = 1; channel_i < 14; channel_i++)
+  {
+    scanResults = WiFi.scanNetworks(0, 0, 0, 100, channel_i);
+    ap_info[channel_i - 1].resize(scanResults);
+    if (scanResults == 0) // 当前信道没有扫描到设备跳转到下一信道扫描
+      continue;
+
+    for (int i = 0; i < scanResults; i++)
+    {
+      temp_ap_info = &ap_info[channel_i - 1][i];
+      temp_ap_info->CHANNEL = WiFi.channel(i);
+      temp_ap_info->SSID = WiFi.SSID(i);
+      temp_ap_info->RSSI = WiFi.RSSI(i);
+      memcpy(temp_ap_info->MAC, WiFi.BSSIDstr(i).c_str(), ESP_NOW_ETH_ALEN);
+
+      // 检索特定SSID名称以及信号强度，满足要求则开始配对
+      if (temp_ap_info->SSID.indexOf(SLAVE_KE_NAME) == 0)
+      {
+        ESP_LOGI(TAG, "SSID: %s, MAC:" MACSTR ", RSSI: %d, Channel: %d", temp_ap_info->SSID, MAC2STR(temp_ap_info->MAC), temp_ap_info->RSSI, temp_ap_info->CHANNEL);
+      }
+    }
+  }
+  WiFi.scanDelete(); // 清除扫描信息
+  ESP_LOGI(TAG, "COMP");
+  return ESP_OK;
+}
+
 void onDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
   ConnectedTimeOut = CONNECT_TIMEOUT; // 接收到数据时重置超时
@@ -128,15 +171,6 @@ void Radio::radioInit()
       : ESP_LOGE(TAG, "Register recv cb fail");
 }
 
-void ClearAllPair()
-{
-  if (esp_now_deinit() == ESP_OK)
-  {
-    ESP_LOGI(TAG, "Clear All paired slave");
-    // EspNowInit();
-  }
-}
-
 void TaskSend(void *pt)
 {
   while (true)
@@ -154,122 +188,16 @@ void TaskSend(void *pt)
   }
 }
 
-/* XXX 检查连接同步状态，
-一段时间内没有接收到回复信息，
-或连续数据发送失败则认为连接已断开 */
-void TaskConnectedWatch(void *pt)
-{
-  while (true)
-  {
-    if (Radio::isPaired) // 连接成功时开始倒计时，超时设置状态为 “未连接”
-    {
-      ConnectedTimeOut--;
-      if (ConnectedTimeOut <= 0)
-      {
-        ESP_LOGI(TAG, "Lost connection");
-        Radio::isPaired = false;
-        ClearAllPair();
-      }
-    }
-    vTaskDelay(1);
-  }
-}
-
-/**
- * @brief 扫描&配对从机,检测  Radio::isPaired 的状态，当未配对时将开始扫描并配对设备
- */
-void TaskScanAndPeer(void *pt)
-{
-
-  while (true)
-  {
-    int16_t scanResults = 0;
-
-    if (!Radio::isPaired && !PairRuning) // 配对中或配对完成都不在扫描AP
-    {
-      // ESP_LOGI(TAG, "Start scan");
-      scanResults = WiFi.scanNetworks(0, 0, 0, 50, 1); // 扫描1通道
-      if (scanResults != 0)
-      {
-        for (int i = 0; i < scanResults; i++)
-        {
-          SSID = WiFi.SSID(i);
-          RSSI = WiFi.RSSI(i);
-          BSSIDstr = WiFi.BSSIDstr(i);
-          CHANNEL = WiFi.channel(i);
-
-          if (SSID.indexOf(SLAVE_KE_NAME) == 0)
-          {
-            ESP_LOGI(TAG, "Found a Slave : %u : SSID: %s, BSSID: [%s], RSSI:  (%u), Channel: %u", i + 1, SSID, BSSIDstr.c_str(), RSSI, CHANNEL);
-            PairRuning = true; // 进入配对模式
-            WiFi.scanDelete(); // 清除扫描信息
-            break;             // 获取到第一个从机信息时结束for循环
-          }
-        }
-      }
-      else
-      {
-        ESP_LOGI(TAG, "No WiFi devices in AP Mode found,Try again");
-        continue; // 跳过剩余 code 立即重新扫描
-      }
-
-      if (PairRuning)
-      {
-        memset(&slave, 0, sizeof(slave)); // 清空对象
-        int mac[6];
-        sscanf(
-            BSSIDstr.c_str(), "%x:%x:%x:%x:%x:%x",
-            &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
-        for (int v = 0; v < 6; ++v)
-          slave.peer_addr[v] = (uint8_t)mac[v];
-        slave.channel = CHANNEL;
-        slave.encrypt = 0; // 不加密
-
-        // 匹配信道
-        esp_wifi_set_channel(slave.channel, WIFI_SECOND_CHAN_NONE);
-
-        ESP_LOGI(TAG, "Pair to %s", SSID);
-        if (Pair(slave))
-        {
-          uint8_t data = 0;
-          ESP_LOGI(TAG, "Send peer message to %s", SSID.c_str());
-          esp_now_send(slave.peer_addr, &data, sizeof(data));
-
-          // 等待从机发回 STA 模式 mac 地址
-          int conter = 100; // ms
-          while (!Radio::isPaired)
-          {
-            if (conter < 1)
-            {
-              ESP_LOGE(TAG, "Recv data time out");
-              PairRuning = false; // 等待回复信息超时退出配对模式
-              break;
-            }
-            vTaskDelay(1);
-            conter--;
-          }
-        }
-      }
-    }
-    else
-    {
-      vTaskDelay(100);
-    }
-    vTaskDelay(1);
-  }
-}
-
 void TaskRadioMainLoop(void *pt)
 {
-  char macStr[18];
 
   while (true)
   {
     switch (radio.status)
     {
-    case RADIO_BEFORE_WAIT_CONNECTION:
-      break;
-    case RADIO_WAIT_CONNECTION:
+    case RADIO_PAIR_DEVICE:
+      radio.pairNewDevice();
+      vTaskDelay(100);
       break;
 
     case RADIO_BEFORE_CONNECTED:
@@ -285,13 +213,12 @@ void TaskRadioMainLoop(void *pt)
     default:
       vTaskDelay(5);
       break;
-      vTaskDelay(5);
     }
   }
 }
 
 /**
- * @brief 开启 esp now 连接
+ * @brief 启动无线
  * @param cb_fn 发送回调
  * @param send_gap_ms 数据同步间隔 /ms,最小值为 MinSendGapMs 定义的值
  */
@@ -305,11 +232,10 @@ void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
 
   // EspNowInit();
   this->radioInit();
+  this->status = RADIO_PAIR_DEVICE;
 
   ESP_LOGI(TAG, "SET All Task");
-  xTaskCreate(TaskConnectedWatch, "TaskConnectedWatch", 2048, NULL, 2, NULL);
-  xTaskCreate(TaskScanAndPeer, "TaskScanAndPeer", 4096, NULL, 2, NULL);
-  xTaskCreate(TaskSend, "TaskSend", 2048, NULL, 2, NULL);
+  // xTaskCreate(TaskSend, "TaskSend", 2048, NULL, 2, NULL);
 
   xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 4096, NULL, 2, NULL);
 
