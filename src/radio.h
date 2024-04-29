@@ -33,14 +33,21 @@ struct AP_Info
   String SSID;
   uint8_t CHANNEL;
   uint8_t MAC[ESP_NOW_ETH_ALEN];
-  // AP_Info(String ssid, String BSSIDstr, int32_t channel, int32_t rssi)
-  // {
-  //   sscanf(BSSIDstr.c_str(), "%x:%x:%x:%x:%x:%x",
-  //          &MAC[0], &MAC[1], &MAC[2], &MAC[3], &MAC[4], &MAC[5]);
-  //   CHANNEL = channel;
-  //   SSID = ssid;
-  //   RSSI = rssi;
-  // };
+
+  bool operator<(const AP_Info &obj)
+  {
+    // a>b的时候才返回true, 期待a是较大的元素。
+    // 把较大的元素放在前面，降序排序
+    return RSSI < obj.RSSI;
+  }
+  AP_Info(String ssid, int8_t rssi, int8_t channel, String mac)
+  {
+    SSID = ssid;
+    RSSI = rssi;
+    CHANNEL = channel;
+    memcpy(MAC, mac.c_str(), ESP_NOW_ETH_ALEN);
+  };
+  AP_Info(){};
 };
 
 /**

@@ -1,8 +1,9 @@
-#include <esp_wifi.h>
 #include <radio.h>
 #include <WiFi.h>
 #include <vector>
+#include <esp_wifi.h>
 #include <esp_mac.h>
+#include <algorithm>
 
 #define TAG "Radio"
 #define SLAVE_KE_NAME "Slave"
@@ -11,6 +12,7 @@ String SSID;
 int32_t RSSI;
 String BSSIDstr;
 int32_t CHANNEL;
+using namespace std;
 
 esp_now_peer_info_t slave;
 
@@ -76,38 +78,44 @@ bool Pair(esp_now_peer_info_t slave)
  */
 esp_err_t Radio::pairNewDevice()
 {
-  AP_Info *temp_ap_info = nullptr;
   int16_t scanResults = 0;
-  using namespace std;
-
-  vector<vector<AP_Info>> ap_info;
-  ap_info.resize(13);
+  vector<AP_Info> ap_info(0);
 
   ESP_LOGI(TAG, "Start scan");
-  // 遍历1~13信道
+  // 扫描1~13信道，并储存所有查找到的AP信息
   for (size_t channel_i = 1; channel_i < 14; channel_i++)
   {
     scanResults = WiFi.scanNetworks(0, 0, 0, 100, channel_i);
-    ap_info[channel_i - 1].resize(scanResults);
-    if (scanResults == 0) // 当前信道没有扫描到设备跳转到下一信道扫描
+    if (scanResults == 0) // 当前信道没有扫描到AP跳转到下一信道扫描
       continue;
 
+    // 储存当前信道所有的AP信息
     for (int i = 0; i < scanResults; i++)
-    {
-      temp_ap_info = &ap_info[channel_i - 1][i];
-      temp_ap_info->CHANNEL = WiFi.channel(i);
-      temp_ap_info->SSID = WiFi.SSID(i);
-      temp_ap_info->RSSI = WiFi.RSSI(i);
-      memcpy(temp_ap_info->MAC, WiFi.BSSIDstr(i).c_str(), ESP_NOW_ETH_ALEN);
+      // 过滤 AP 由特定字符起始则被视为一个可以配对的设备
+      if (WiFi.SSID(i).indexOf(SLAVE_KE_NAME) == 0)
+        ap_info.emplace_back(AP_Info(
+            WiFi.SSID(i),
+            WiFi.RSSI(i),
+            WiFi.channel(i),
+            WiFi.BSSIDstr(i)));
 
-      // 检索特定SSID名称以及信号强度，满足要求则开始配对
-      if (temp_ap_info->SSID.indexOf(SLAVE_KE_NAME) == 0)
-      {
-        ESP_LOGI(TAG, "SSID: %s, MAC:" MACSTR ", RSSI: %d, Channel: %d", temp_ap_info->SSID, MAC2STR(temp_ap_info->MAC), temp_ap_info->RSSI, temp_ap_info->CHANNEL);
-      }
-    }
+    WiFi.scanDelete(); // 清除扫描信息
   }
-  WiFi.scanDelete(); // 清除扫描信息
+  // 遍历所有储存的AP
+  for (size_t i = 0; i < ap_info.size(); i++)
+    ESP_LOGI(TAG, "SSID: %s, MAC:" MACSTR ", RSSI: %d, Channel: %d",
+             ap_info[i].SSID,
+             MAC2STR(ap_info[i].MAC),
+             ap_info[i].RSSI,
+             ap_info[i].CHANNEL);
+  ESP_LOGI(TAG, "AP scan comp");
+
+  // 查找信号最强的AP
+  int8_t targetIndex =
+      max_element(ap_info.begin(), ap_info.end()) - ap_info.begin();
+
+  ESP_LOGI(TAG, "Target ---- SSID: %s, MAC:" MACSTR ", RSSI: %d, Channel: %d", ap_info[targetIndex].SSID, MAC2STR(ap_info[targetIndex].MAC), ap_info[targetIndex].RSSI, ap_info[targetIndex].CHANNEL);
+
   ESP_LOGI(TAG, "COMP");
   return ESP_OK;
 }
@@ -196,8 +204,8 @@ void TaskRadioMainLoop(void *pt)
     switch (radio.status)
     {
     case RADIO_PAIR_DEVICE:
+      // TODO 在规定时间内没有配对到设备时，发出错误提示
       radio.pairNewDevice();
-      vTaskDelay(100);
       break;
 
     case RADIO_BEFORE_CONNECTED:
