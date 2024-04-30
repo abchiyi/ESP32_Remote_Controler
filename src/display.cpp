@@ -32,7 +32,7 @@ void TaskDisplayMain(void *pt)
 
     // 电池电压
     display->setCursor(0, 0);
-    if (radio->isPaired)
+    if (radio->status == RADIO_BEFORE_CONNECTED)
     {
       display->printf("Btr: %.2fV", radio->RecvData.volts);
     }
@@ -45,7 +45,7 @@ void TaskDisplayMain(void *pt)
     display->setTextSize(2);
     display->setCursor(0, 18);
     display->write("Ang:");
-    if (radio->isPaired)
+    if (radio->status == RADIO_BEFORE_CONNECTED)
     {
       display->printf("%d", radio->RecvData.ang);
     }
@@ -82,21 +82,21 @@ void TaskDisplaySub(void *pt)
   {
     display->clearDisplay();
 
-    if (!radio->isPaired && !conntingAnimationTimerStared)
+    if (!radio->status == RADIO_BEFORE_CONNECTED && !conntingAnimationTimerStared)
     {
       ESP_LOGI(TAG, "scan anm timer start");
       xTimerStart(conntingAnimation, 300);
       conntingAnimationTimerStared = true;
     }
 
-    if (radio->isPaired && conntingAnimationTimerStared)
+    if (radio->status == RADIO_BEFORE_CONNECTED && conntingAnimationTimerStared)
     {
       ESP_LOGI(TAG, "scan anm timer stop");
       xTimerStop(conntingAnimation, 300);
       conntingAnimationTimerStared = false;
     }
 
-    if (radio->isPaired)
+    if (radio->status == RADIO_BEFORE_CONNECTED)
     {
       display->setTextSize(3);
       display->setCursor(0, 0);
@@ -152,7 +152,7 @@ void TaskDisplaySub(void *pt)
     // 显示挡位
     display->setTextSize(4);
     display->setCursor(128 - 32, 0);
-    switch (radio->isPaired ? radio->RecvData.gear : 3)
+    switch (radio->status == RADIO_BEFORE_CONNECTED ? radio->RecvData.gear : 3)
     {
     case BRAKE:
       display->write("B");
