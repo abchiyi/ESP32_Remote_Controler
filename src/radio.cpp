@@ -12,10 +12,8 @@ using namespace std;
 
 esp_now_peer_info_t slave;
 
-int CONNECT_TIMEOUT = 500;              // ms // 连接同步等待时间
-int ConnectedTimeOut = CONNECT_TIMEOUT; // ms
 const int MinSendGapMs = 8;
-recvData Radio::RecvData;
+
 bool PairRuning = false;
 int Send_gap_ms = 0;
 Radio radio;
@@ -122,27 +120,16 @@ esp_err_t Radio::pairNewDevice()
   return ESP_OK;
 }
 
-void onDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
+// 将接收到的数据更新到对象
+void onRecvCb(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
-  ConnectedTimeOut = CONNECT_TIMEOUT; // 接收到数据时重置超时
-  memcpy(&Radio::RecvData, incomingData, sizeof(Radio::RecvData));
-  ESP_LOGI(TAG, "RECV from " MACSTR ".", MAC2STR(mac));
-
-  // if (PairRuning)
-  // {
-  //   ConnectedTimeOut = CONNECT_TIMEOUT; // 接收到数据时重置超时
-  //   // slave.channel = CHANNEL;
-  //   slave.encrypt = 0;
-  //   memcpy(slave.peer_addr, mac, 6);
-
-  //   if (Pair(slave))
-  //   {
-  //     PairRuning = false;
-  //     Radio::isPaired = true;
-  //   }
-  // }
+  radio.RecvData.len = len;
+  radio.RecvData.newData = true;
+  radio.RecvData.mac = (uint8_t *)mac;
+  radio.RecvData.incomingData = (uint8_t *)incomingData;
 }
 
+// 初始化无线
 void Radio::radioInit()
 {
   // set wifi
@@ -173,11 +160,12 @@ void Radio::radioInit()
     ESP_LOGI(TAG, "ESP NOW init success");
 
   // 注册接收回调
-  esp_now_register_recv_cb(onDataRecv) == ESP_OK
+  esp_now_register_recv_cb(onRecvCb) == ESP_OK
       ? ESP_LOGI(TAG, "Register recv cb success")
       : ESP_LOGE(TAG, "Register recv cb fail");
 }
 
+// 主任务
 void TaskRadioMainLoop(void *pt)
 {
 
@@ -229,7 +217,6 @@ void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
   vehcile = &slave;
   SENDCB = cb_fn;
   Send_gap_ms = send_gap_ms <= MinSendGapMs ? MinSendGapMs : send_gap_ms;
-  CONNECT_TIMEOUT = Send_gap_ms + 100; // 配置接收等待时间
 
   // EspNowInit();
   this->radioInit();

@@ -21,11 +21,14 @@ typedef enum radio_status
   RADIO_DISCONNECT,
 } radio_status_t;
 
-struct recvData
+// 接收到的数据
+struct Data
 {
-  float volts;
-  int gear;
-  int ang;
+  int len;
+  bool newData;
+  uint8_t *mac;
+  uint8_t *incomingData;
+  Data() : newData(false){};
 };
 
 struct AP_Info
@@ -55,7 +58,7 @@ class Radio
 private:
   void radioInit(); // 初始化无线
 public:
-  static recvData RecvData;   // 接收到的数据
+  Data RecvData; // 接收到的数据
   esp_now_peer_info *vehcile; // 无线控制器的配对信息
   void begin(send_cb_t cb, int send_gap_ms);
   radio_status_t status;     //  无线状态
