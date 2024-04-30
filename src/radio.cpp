@@ -2,8 +2,10 @@
 #include <WiFi.h>
 #include <vector>
 #include <esp_wifi.h>
-#include <esp_mac.h>
 #include <algorithm>
+#include <esp_err.h>
+#include <cstring>
+#include <esp_mac.h>
 
 #define TAG "Radio"
 #define SLAVE_KE_NAME "Slave"
@@ -11,18 +13,22 @@
 using namespace std;
 
 esp_now_peer_info_t slave;
-
 const int MinSendGapMs = 8;
-
-bool PairRuning = false;
 int Send_gap_ms = 0;
 Radio radio;
 
 send_cb_t SENDCB;
 
-bool Pair(esp_now_peer_info_t slave)
+// 配对到设备
+bool pairTo(AP_Info *apInfo)
 {
-  ESP_LOGI(TAG, "Pair to " MACSTR "", MAC2STR(slave.peer_addr));
+  ESP_LOGI(TAG, "Pair to " MACSTR "", MAC2STR(apInfo->MAC));
+  memset(&slave, 0, sizeof(esp_now_peer_info_t)); // 清空对象
+  memcpy(slave.peer_addr, apInfo->MAC, ESP_NOW_ETH_ALEN);
+  slave.channel = apInfo->CHANNEL;
+  slave.ifidx = WIFI_IF_STA;
+  slave.encrypt = false;
+
   esp_err_t addStatus = esp_now_add_peer(&slave);
 
   switch (addStatus)
@@ -85,33 +91,22 @@ esp_err_t Radio::pairNewDevice()
     WiFi.scanDelete(); // 清除扫描信息
   }
 
-  // 遍历所有储存的AP
+  // 打印所有扫描到的 AP
   for (size_t i = 0; i < ap_info.size(); i++)
-    ESP_LOGI(TAG, "SSID: %s, MAC:" MACSTR ", RSSI: %d, Channel: %d",
-             ap_info[i].SSID,
-             MAC2STR(ap_info[i].MAC),
-             ap_info[i].RSSI,
-             ap_info[i].CHANNEL);
+    ESP_LOGI(TAG, "%s", ap_info[i].toStr().c_str());
+
   ESP_LOGI(TAG, "AP scan comp");
 
   if (ap_info.size() < 1) // 没有AP被扫描到
     return ESP_FAIL;
 
-  // 查找信号最强的AP
+  // 查找信号最强的AP并与其配对
   int8_t targetIndex =
       max_element(ap_info.begin(), ap_info.end()) - ap_info.begin();
 
-  ESP_LOGI(TAG,
-           "Target -- SSID: %s, MAC:" MACSTR ", RSSI: %d, Channel: %d", ap_info[targetIndex].SSID,
-           MAC2STR(ap_info[targetIndex].MAC),
-           ap_info[targetIndex].RSSI,
-           ap_info[targetIndex].CHANNEL);
+  ESP_LOGI(TAG, "Target -- %s", ap_info[targetIndex].toStr().c_str());
 
-  memcpy(slave.peer_addr, ap_info[targetIndex].MAC, ESP_NOW_ETH_ALEN);
-  slave.channel = ap_info[targetIndex].CHANNEL;
-  slave.ifidx = WIFI_IF_STA;
-  slave.encrypt = false;
-  Pair(slave);
+  pairTo(&ap_info[targetIndex]);
 
   const char data[6] = "Hello";
   esp_now_send(slave.peer_addr, (uint8_t *)&data, sizeof(data));
@@ -168,6 +163,7 @@ void Radio::radioInit()
 // 主任务
 void TaskRadioMainLoop(void *pt)
 {
+  vTaskDelay(50); // 延迟启动循环
 
   while (true)
   {
@@ -176,8 +172,13 @@ void TaskRadioMainLoop(void *pt)
     case RADIO_PAIR_DEVICE:
       // TODO 在规定时间内没有配对到设备时，发出错误提示
       if (radio.pairNewDevice() == ESP_OK)
-        break;
-      radio.status = RADIO_CONNECTED;
+        radio.status = RADIO_CONNECTED;
+      else
+      {
+        ESP_LOGI(TAG, "Pair New Devices Fail :(");
+        continue;
+      }
+
       break;
 
     case RADIO_BEFORE_CONNECTED:

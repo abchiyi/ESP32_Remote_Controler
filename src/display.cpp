@@ -29,33 +29,6 @@ void TaskDisplayMain(void *pt)
   {
     display->clearDisplay();
     display->setTextSize(2);
-
-    // 电池电压
-    display->setCursor(0, 0);
-    if (radio->status == RADIO_BEFORE_CONNECTED)
-    {
-      display->printf("Btr: %.2fV", radio->RecvData.volts);
-    }
-    else
-    {
-      display->printf("Btr: -.--V");
-    }
-
-    // 转向角度
-    display->setTextSize(2);
-    display->setCursor(0, 18);
-    display->write("Ang:");
-    if (radio->status == RADIO_BEFORE_CONNECTED)
-    {
-      display->printf("%d", radio->RecvData.ang);
-    }
-    else
-    {
-      display->write("---");
-    }
-    display->write(0xf8);
-
-    display->display();
     vTaskDelay(16);
   }
 }
@@ -147,31 +120,6 @@ void TaskDisplaySub(void *pt)
         display->write("Scanning...");
         break;
       }
-    }
-
-    // 显示挡位
-    display->setTextSize(4);
-    display->setCursor(128 - 32, 0);
-    switch (radio->status == RADIO_BEFORE_CONNECTED ? radio->RecvData.gear : 3)
-    {
-    case BRAKE:
-      display->write("B");
-      break;
-
-    case FORWARD:
-      display->write("D");
-      break;
-
-    case REVERSE:
-      display->write("R");
-      break;
-
-    case SLIDE:
-      display->write("N");
-      break;
-    default:
-      display->write(0x2d);
-      break;
     }
 
     display->display();
