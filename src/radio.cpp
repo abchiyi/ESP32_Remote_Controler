@@ -195,6 +195,8 @@ void TaskRadioMainLoop(void *pt)
     case RADIO_BEFORE_CONNECTED:
       break;
     case RADIO_CONNECTED: // 连接成功开始传输数据
+
+      // TODO 传入 一个待发送数据的指针，而不是 使用回调函数控制发送的数据
       // esp_err_t status = esp_now_send(slave.peer_addr,
       //                                 (uint8_t *)Presend_data,
       //                                 sizeof(&Presend_data));
