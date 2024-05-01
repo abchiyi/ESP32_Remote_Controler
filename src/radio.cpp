@@ -19,14 +19,22 @@ Radio radio;
 
 send_cb_t SENDCB;
 
-// 配对到设备
-bool pairTo(AP_Info *apInfo)
+/**
+ * @brief 根据 mac 地址配对到指定的设备
+ * @param macaddr 数组 mac地址
+ * @param channel wifi 频道
+ * @param ifidx 要使用的wifi接口用于收发数据
+ */
+bool pairTo(
+    uint8_t macaddr[ESP_NOW_ETH_ALEN],
+    uint8_t channel,
+    wifi_interface_t ifidx)
 {
-  ESP_LOGI(TAG, "Pair to " MACSTR "", MAC2STR(apInfo->MAC));
+  ESP_LOGI(TAG, "Pair to " MACSTR "", MAC2STR(macaddr));
   memset(&slave, 0, sizeof(esp_now_peer_info_t)); // 清空对象
-  memcpy(slave.peer_addr, apInfo->MAC, ESP_NOW_ETH_ALEN);
-  slave.channel = apInfo->CHANNEL;
-  slave.ifidx = WIFI_IF_STA;
+  memcpy(slave.peer_addr, macaddr, ESP_NOW_ETH_ALEN);
+  slave.channel = channel;
+  slave.ifidx = ifidx;
   slave.encrypt = false;
 
   esp_err_t addStatus = esp_now_add_peer(&slave);
@@ -101,15 +109,60 @@ esp_err_t Radio::pairNewDevice()
     return ESP_FAIL;
 
   // 查找信号最强的AP并与其配对
-  int8_t targetIndex =
-      max_element(ap_info.begin(), ap_info.end()) - ap_info.begin();
+  auto tragetAP =
+      &ap_info[max_element(ap_info.begin(), ap_info.end()) - ap_info.begin()];
+  ESP_LOGI(TAG, "Target AP : %s", tragetAP->toStr().c_str());
 
-  ESP_LOGI(TAG, "Target -- %s", ap_info[targetIndex].toStr().c_str());
+  //---------------- 握手 -----------------
+  HANDSHAKE_DATA send_data; // 向从机发送的握手包
+  HANDSHAKE_DATA recv_data; // 接收数据包
+  WiFi.macAddress(send_data.mac);
 
-  pairTo(&ap_info[targetIndex]);
+  auto wait_response = [&](const uint8_t *data) -> esp_err_t
+  {
+    if (esp_now_send(slave.peer_addr, data, sizeof(HANDSHAKE_DATA)) != ESP_OK)
+      return ESP_FAIL;
 
-  const char data[6] = "Hello";
-  esp_now_send(slave.peer_addr, (uint8_t *)&data, sizeof(data));
+    uint16_t counter = 0;
+    uint8_t timeout = 50;
+    while (counter <= timeout) // 从机需要在指定时间内回复握手包已确定配对
+    {
+      if (radio.RecvData.newData)
+      {
+        memcpy(&recv_data, radio.RecvData.get(), sizeof(recv_data));
+        if (send_data.code != recv_data.code)
+        {
+          ESP_LOGI(TAG, "Checksum is inconsistent");
+          return ESP_FAIL; // 配对码不一致则判断配对失败
+        }
+        return ESP_OK;
+      }
+      counter++;
+      vTaskDelay(1);
+    }
+    ESP_LOGI(TAG, "Wait for response timed out");
+    return ESP_FAIL;
+  };
+
+  // 配对到从机 AP 地址&等待响应
+  ESP_LOGI(TAG, "Pir to AP");
+  pairTo(tragetAP->MAC, tragetAP->CHANNEL, WIFI_IF_STA);
+  if (wait_response((const uint8_t *)&send_data) != ESP_OK)
+  {
+    ESP_LOGI(TAG, "AP " MACSTR " - HANDSHAKE FAIL", MAC2STR(tragetAP->MAC));
+    return ESP_FAIL;
+  }
+  ESP_LOGI(TAG, "AP " MACSTR " - HANDSHAKE SUCCESS", MAC2STR(recv_data.mac));
+
+  // 配对到从机 STA 地址&等待响应
+  ESP_LOGI(TAG, "Pir to STA");
+  pairTo(recv_data.mac, slave.channel, WIFI_IF_STA);
+  if (wait_response((const uint8_t *)&send_data) != ESP_OK)
+  {
+    ESP_LOGI(TAG, "STA " MACSTR " - HANDSHAKE FAIL"), MAC2STR(recv_data.mac);
+    return ESP_FAIL;
+  }
+  ESP_LOGI(TAG, "STA " MACSTR " - HANDSHAKE SUCCESS", MAC2STR(recv_data.mac));
 
   ESP_LOGI(TAG, "COMP");
   return ESP_OK;
@@ -176,12 +229,14 @@ void TaskRadioMainLoop(void *pt)
       else
       {
         ESP_LOGI(TAG, "Pair New Devices Fail :(");
+        radio.status = RADIO_BEFORE_CONNECTED;
         continue;
       }
 
       break;
 
     case RADIO_BEFORE_CONNECTED:
+      vTaskDelay(10);
       break;
     case RADIO_CONNECTED: // 连接成功开始传输数据
 

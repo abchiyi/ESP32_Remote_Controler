@@ -28,6 +28,12 @@ struct Data
   uint8_t *mac;
   uint8_t *incomingData;
   Data() : newData(false){};
+
+  uint8_t *get()
+  {
+    newData = false;
+    return incomingData;
+  }
 };
 
 struct AP_Info
@@ -55,6 +61,12 @@ struct AP_Info
     sprintf(temp, Template_, SSID, MAC2STR(MAC), RSSI, CHANNEL);
     return String(temp);
   }
+};
+
+struct HANDSHAKE_DATA
+{
+  uint8_t mac[ESP_NOW_ETH_ALEN];
+  uint32_t code = rand();
 };
 
 /**
