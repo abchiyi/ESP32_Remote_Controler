@@ -144,6 +144,8 @@ esp_err_t Radio::pairNewDevice()
     return ESP_FAIL;
   };
 
+  ESP_LOGI(TAG, "check code : %d", send_data.code);
+
   // 配对到从机 AP 地址&等待响应
   ESP_LOGI(TAG, "Pir to AP");
   pairTo(tragetAP->MAC, tragetAP->CHANNEL, WIFI_IF_STA);
@@ -152,7 +154,7 @@ esp_err_t Radio::pairNewDevice()
     ESP_LOGI(TAG, "AP " MACSTR " - HANDSHAKE FAIL", MAC2STR(tragetAP->MAC));
     return ESP_FAIL;
   }
-  ESP_LOGI(TAG, "AP " MACSTR " - HANDSHAKE SUCCESS", MAC2STR(recv_data.mac));
+  ESP_LOGI(TAG, "AP " MACSTR " - HANDSHAKE SUCCESS", MAC2STR(tragetAP->MAC));
 
   // 配对到从机 STA 地址&等待响应
   ESP_LOGI(TAG, "Pir to STA");

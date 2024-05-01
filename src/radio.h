@@ -66,7 +66,13 @@ struct AP_Info
 struct HANDSHAKE_DATA
 {
   uint8_t mac[ESP_NOW_ETH_ALEN];
-  uint32_t code = rand();
+  uint32_t code;
+
+  HANDSHAKE_DATA()
+  {
+    srand(time(0));
+    code = rand();
+  }
 };
 
 /**
