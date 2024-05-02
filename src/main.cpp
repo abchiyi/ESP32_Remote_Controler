@@ -148,14 +148,10 @@ void TaskDataLayerUpdate(void *pt)
   }
 }
 
-// WouoUI *wouo_ui = display
-
-esp_err_t
-sendCB(uint8_t *peer_addr)
+esp_err_t sendCB(uint8_t *peer_addr)
 {
   return esp_now_send(peer_addr,
-                      (uint8_t *)&controller.data,
-                      sizeof(controller.data));
+                      (uint8_t *)&controller.data, sizeof(controller.data));
 }
 
 void setup()
@@ -179,7 +175,7 @@ void setup()
 
   vTaskDelay(100);
 
-  radio.begin(sendCB, 10);
+  radio.begin((uint8_t *)&controller.data);
 
   // 设置数据层更新任务
   xTaskCreatePinnedToCore(

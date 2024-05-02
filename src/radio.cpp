@@ -8,16 +8,19 @@
 #include <esp_mac.h>
 
 #define TAG "Radio"
+
+/**
+ * AP扫描关键字
+ *使用该字作为SSID起始将被视为一个可配对的设备
+ * */
 #define SLAVE_KE_NAME "Slave"
 
 using namespace std;
 
 esp_now_peer_info_t slave;
-const int MinSendGapMs = 8;
-int Send_gap_ms = 0;
 Radio radio;
 
-send_cb_t SENDCB;
+bool SEND_READY = false; // 允许发送数据
 
 /**
  * @brief 根据 mac 地址配对到指定的设备
@@ -70,6 +73,31 @@ bool pairTo(
     return false;
   }
 }
+
+bool sendTo(const uint8_t *peer_addr, const uint8_t *data, size_t len)
+{
+  auto status = esp_now_send(peer_addr, data, len);
+  String error_message;
+
+  if (status == ESP_OK)
+    return true;
+
+  switch (status)
+  {
+  case ESP_ERR_ESPNOW_NO_MEM:
+    error_message = String("out of memory");
+  case ESP_ERR_ESPNOW_NOT_FOUND:
+    error_message = String("peer is not found");
+  case ESP_ERR_ESPNOW_IF:
+    error_message = String("current WiFi interface doesn't match that of peer");
+  default:
+    error_message = String("Send fail");
+  }
+
+  ESP_LOGI(TAG, "Send to " MACSTR " - %s",
+           error_message.c_str(), MAC2STR(peer_addr));
+  return false;
+};
 
 /**
  * @brief 配对新设备
@@ -170,13 +198,79 @@ esp_err_t Radio::pairNewDevice()
   return ESP_OK;
 }
 
-// 将接收到的数据更新到对象
-void onRecvCb(const uint8_t *mac, const uint8_t *incomingData, int len)
+// 接收回调
+void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
   radio.RecvData.len = len;
   radio.RecvData.newData = true;
   radio.RecvData.mac = (uint8_t *)mac;
   radio.RecvData.incomingData = (uint8_t *)incomingData;
+  SEND_READY = true; // 收到数据后允许发送
+}
+
+// 发送回调
+void onSend(const uint8_t *mac_addr, esp_now_send_status_t status)
+{
+  SEND_READY = false;
+  if (status)
+    ESP_LOGI(TAG, "Send to " MACSTR " FAIl", MAC2STR(mac_addr));
+}
+
+// 主任务
+void TaskRadioMainLoop(void *pt)
+{
+  vTaskDelay(50);              // 延迟启动循环
+  uint8_t timeout_counter = 0; // 连接超时计数器
+
+  while (true)
+  {
+    switch (radio.status)
+    {
+    case RADIO_PAIR_DEVICE:
+      // TODO 在规定时间内没有配对到设备时，发出错误提示
+      if (radio.pairNewDevice() != ESP_OK)
+      {
+        radio.status = RADIO_BEFORE_DISCONNECT;
+        ESP_LOGI(TAG, "Pair New Devices Fail :(");
+        break;
+      }
+      radio.status = RADIO_BEFORE_CONNECTED;
+      break;
+
+    case RADIO_BEFORE_CONNECTED:
+      ESP_LOGI(TAG, "CONNECTED :)");
+      radio.status = RADIO_CONNECTED;
+      SEND_READY = true;
+      break;
+
+    case RADIO_CONNECTED:
+      // 等待发送窗口超时，视为连接断开
+      SEND_READY ? timeout_counter = 0 : timeout_counter++;
+      if (timeout_counter >= radio.timeOut)
+      {
+        ESP_LOGI(TAG, "DISCONNECT with timeout");
+        radio.status = RADIO_BEFORE_DISCONNECT;
+      }
+      if (SEND_READY)
+        sendTo(slave.peer_addr, radio.dataToSent, sizeof(radio.dataToSent));
+
+      vTaskDelay(radio.sendGap);
+      break;
+
+    case RADIO_BEFORE_DISCONNECT:
+      ESP_LOGI(TAG, "RADIO_BEFORE_DISCONNECT");
+      radio.status = RADIO_DISCONNECT;
+      break;
+
+    case RADIO_DISCONNECT:
+      vTaskDelay(100);
+      break;
+
+    default:
+      vTaskDelay(5);
+      break;
+    }
+  }
 }
 
 // 初始化无线
@@ -210,78 +304,42 @@ void Radio::radioInit()
     ESP_LOGI(TAG, "ESP NOW init success");
 
   // 注册接收回调
-  esp_now_register_recv_cb(onRecvCb) == ESP_OK
+  esp_now_register_recv_cb(onRecv) == ESP_OK
+      ? ESP_LOGI(TAG, "Register recv cb success")
+      : ESP_LOGE(TAG, "Register recv cb fail");
+
+  // 注册发送回调
+  esp_now_register_send_cb(onSend) == ESP_OK
       ? ESP_LOGI(TAG, "Register recv cb success")
       : ESP_LOGE(TAG, "Register recv cb fail");
 }
 
-// 主任务
-void TaskRadioMainLoop(void *pt)
+/**
+ * @brief 启动无线
+ * @param data_to_sent 要发送的数据指针
+ */
+void Radio::begin(uint8_t *data_to_sent)
 {
-  vTaskDelay(50); // 延迟启动循环
+  vehcile = &slave;
+  this->dataToSent = data_to_sent;
 
-  while (true)
-  {
-    switch (radio.status)
-    {
-    case RADIO_PAIR_DEVICE:
-      // TODO 在规定时间内没有配对到设备时，发出错误提示
-      if (radio.pairNewDevice() == ESP_OK)
-        radio.status = RADIO_CONNECTED;
-      else
-      {
-        ESP_LOGI(TAG, "Pair New Devices Fail :(");
-        radio.status = RADIO_BEFORE_CONNECTED;
-        continue;
-      }
+  this->radioInit();
+  this->status = RADIO_PAIR_DEVICE;
 
-      break;
+  xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 4096, NULL, 2, NULL);
 
-    case RADIO_BEFORE_CONNECTED:
-      vTaskDelay(10);
-      break;
-    case RADIO_CONNECTED: // 连接成功开始传输数据
-
-      // TODO 传入 一个待发送数据的指针，而不是 使用回调函数控制发送的数据
-      // esp_err_t status = esp_now_send(slave.peer_addr,
-      //                                 (uint8_t *)Presend_data,
-      //                                 sizeof(&Presend_data));
-      if (SENDCB(slave.peer_addr) != ESP_OK)
-        ESP_LOGE(TAG, "data send fail");
-
-      vTaskDelay(Send_gap_ms);
-      break;
-
-    case RADIO_BEFORE_DISCONNECT:
-      break;
-
-    case RADIO_DISCONNECT:
-      break;
-
-    default:
-      vTaskDelay(5);
-      break;
-    }
-  }
+  ESP_LOGI(TAG, "Radio started :)");
 }
 
 /**
  * @brief 启动无线
- * @param cb_fn 发送回调
- * @param send_gap_ms 数据同步间隔 /ms,最小值为 MinSendGapMs 定义的值
+ * @param data_to_sent 要发送的数据指针
+ * @param timeout 实际超时时间为 (timeout * send_gap) ms
+ * @param send_gap 要发送的数据指针 数据发送间隔
  */
-void Radio::begin(send_cb_t cb_fn, int send_gap_ms)
+void Radio::begin(uint8_t *data_to_sent, uint8_t timeout, uint8_t send_gap)
 {
-  vehcile = &slave;
-  SENDCB = cb_fn;
-  Send_gap_ms = send_gap_ms <= MinSendGapMs ? MinSendGapMs : send_gap_ms;
-
-  // EspNowInit();
-  this->radioInit();
-  this->status = RADIO_PAIR_DEVICE;
-
-  ESP_LOGI(TAG, "SET All Task");
-  xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 4096, NULL, 2, NULL);
-
-  ESP_LOGI(TAG, "Radio started :)");
+  this->timeOut = timeout;
+  this->sendGap = sendGap;
+  this->begin(data_to_sent);
 }

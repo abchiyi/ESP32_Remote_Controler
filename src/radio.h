@@ -20,7 +20,7 @@ typedef enum radio_status
   RADIO_DISCONNECT,
 } radio_status_t;
 
-// 接收到的数据
+// 常规数据处理结构
 struct Data
 {
   int len;
@@ -36,6 +36,7 @@ struct Data
   }
 };
 
+// AP 扫描信息
 struct AP_Info
 {
   int8_t RSSI;
@@ -63,6 +64,7 @@ struct AP_Info
   }
 };
 
+// 握手数据结构
 struct HANDSHAKE_DATA
 {
   uint8_t mac[ESP_NOW_ETH_ALEN];
@@ -76,18 +78,24 @@ struct HANDSHAKE_DATA
 };
 
 /**
- * @brief 被控设备无线通讯
+ * @brief 无线通讯
  */
 class Radio
 {
 private:
   void radioInit(); // 初始化无线
+
 public:
+  uint8_t *dataToSent;        // 待发送数据
   Data RecvData;              // 接收到的数据
   esp_now_peer_info *vehcile; // 无线控制器的配对信息
-  void begin(send_cb_t cb, int send_gap_ms);
-  radio_status_t status;     //  无线状态
-  esp_err_t pairNewDevice(); // 配对新设备
+  radio_status_t status;      //  无线状态
+  esp_err_t pairNewDevice();  // 配对新设备
+  uint8_t timeOut = 3;        // 通讯超时, （timeOut * sendGap) ms
+  uint8_t sendGap = 5;        // 发送间隔
+
+  void begin(uint8_t *data_to_sent);
+  void begin(uint8_t *data_to_sent, uint8_t send_timeout, uint8_t send_gap);
 };
 
 extern Radio radio;
