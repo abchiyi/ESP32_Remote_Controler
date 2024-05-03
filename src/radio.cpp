@@ -149,11 +149,11 @@ bool handshake(uint8_t macaddr[ESP_NOW_ETH_ALEN], HANDSHAKE_DATA *recv_hsd)
   memcpy(recv_hsd, radio.RecvData.get(), sizeof(HANDSHAKE_DATA));
   ESP_LOGI(TAG, "mac :" MACSTR " code : %u", MAC2STR(recv_hsd->mac), recv_hsd->code);
   if (HSD.code == recv_hsd->code)
-    return ESP_OK;
+    return true;
 
   ESP_LOGI(TAG, "Checksum is inconsistent M:%u - S:%u",
            HSD.code, recv_hsd->code);
-  return ESP_FAIL; // 配对码不一致则判断配对失败
+  return false; // 配对码不一致则判断配对失败
 };
 
 /**
@@ -203,7 +203,7 @@ esp_err_t Radio::pairNewDevice()
   // 配对到从机 AP 地址&等待响应
   ESP_LOGI(TAG, "Pir to AP");
   pairTo(tragetAP->MAC, tragetAP->CHANNEL, WIFI_IF_STA);
-  if (handshake(tragetAP->MAC, &recv_data))
+  if (!handshake(tragetAP->MAC, &recv_data))
   {
     ESP_LOGI(TAG, "AP " MACSTR " - HANDSHAKE FAIL", MAC2STR(tragetAP->MAC));
     return ESP_FAIL;
@@ -213,7 +213,7 @@ esp_err_t Radio::pairNewDevice()
   // 配对到从机 STA 地址&等待响应
   ESP_LOGI(TAG, "Pir to STA");
   pairTo(radio.RecvData.mac, slave.channel, WIFI_IF_STA);
-  if (handshake(recv_data.mac, &recv_data))
+  if (!handshake(recv_data.mac, &recv_data))
   {
     ESP_LOGI(TAG, "STA " MACSTR " - HANDSHAKE FAIL"), MAC2STR(recv_data.mac);
     return ESP_FAIL;
