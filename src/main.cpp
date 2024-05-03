@@ -154,6 +154,11 @@ esp_err_t sendCB(uint8_t *peer_addr)
                       (uint8_t *)&controller.data, sizeof(controller.data));
 }
 
+void ISR()
+{
+  radio.status = RADIO_PAIR_DEVICE;
+};
+
 void setup()
 {
   Serial.begin(115200);
@@ -182,6 +187,10 @@ void setup()
       TaskDataLayerUpdate,
       "WouoUI datat update",
       1024 * 8, (void *)&wouoUI, 1, NULL, 0);
+
+  vTaskDelay(100);
+  pinMode(0, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(0), ISR, FALLING);
 }
 
 void loop()

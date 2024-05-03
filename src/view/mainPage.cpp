@@ -1,6 +1,7 @@
 #include <view/mainPage.h>
 #include <view/menu.h>
 #include <controller.h>
+#include <radio.h>
 
 class MainPage : public BasePage
 {
@@ -31,8 +32,15 @@ public:
 
   void render()
   {
-    u8g2->setCursor(10, 32);
-    u8g2->printf("RightHatX :%d \n", Xbox.getAnalogHat(RightHatX));
+    u8g2->setCursor(2, 10);
+    // u8g2->printf("RightHatX :%d \n", Xbox.getAnalogHat(RightHatX));
+    u8g2->print("Radio  status :");
+    u8g2->setCursor(2, 20);
+    u8g2->print(radio.status == RADIO_CONNECTED ? "CONNECTED" : "DISCONNECT");
+    u8g2->setCursor(2, 34);
+    u8g2->print("Radio pair device :");
+    u8g2->setCursor(2, 44);
+    u8g2->print(radio.status == RADIO_PAIR_DEVICE ? "RADIO_PAIR_DEVICE" : " -- ");
   };
 };
 
