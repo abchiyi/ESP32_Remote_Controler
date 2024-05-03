@@ -148,11 +148,26 @@ esp_err_t Radio::pairNewDevice()
 
   auto wait_response = [&](const uint8_t *data) -> esp_err_t
   {
-    if (esp_now_send(slave.peer_addr, data, sizeof(HANDSHAKE_DATA)) != ESP_OK)
-      return ESP_FAIL;
-
     uint16_t counter = 0;
     uint8_t timeout = 50;
+    sendTo(slave.peer_addr, data, sizeof(HANDSHAKE_DATA));
+    while (true)
+    {
+      if (radio.RecvData.newData)
+        break;
+      else
+        ESP_LOGI(TAG, "wait time %d", counter + 1);
+
+      if (counter >= timeout)
+      {
+        ESP_LOGI(TAG, "Wait for response timed out");
+        return ESP_FAIL;
+      }
+      counter++;
+      vTaskDelay(1);
+    }
+
+    counter = 0;
     while (counter <= timeout) // 从机需要在指定时间内回复握手包已确定配对
     {
       if (radio.RecvData.newData)
