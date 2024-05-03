@@ -138,7 +138,6 @@ bool handshake(uint8_t macaddr[ESP_NOW_ETH_ALEN], HANDSHAKE_DATA *recv_hsd)
   uint8_t timeout = 50; // XXX 从 radio 对象获取值
   HANDSHAKE_DATA HSD;
   WiFi.macAddress(HSD.mac);
-  ESP_LOGI(TAG, "mac :" MACSTR " code : %u", MAC2STR(HSD.mac), HSD.code);
   sendTo(macaddr, (uint8_t *)&HSD, sizeof(HSD));
   if (!waitTimeout(timeout, &radio.RecvData.newData))
   {
@@ -148,6 +147,7 @@ bool handshake(uint8_t macaddr[ESP_NOW_ETH_ALEN], HANDSHAKE_DATA *recv_hsd)
 
   memset(recv_hsd, 0, sizeof(HANDSHAKE_DATA));
   memcpy(recv_hsd, radio.RecvData.get(), sizeof(HANDSHAKE_DATA));
+  ESP_LOGI(TAG, "mac :" MACSTR " code : %u", MAC2STR(recv_hsd->mac), recv_hsd->code);
   if (HSD.code == recv_hsd->code)
     return ESP_OK;
 
@@ -297,6 +297,8 @@ void TaskRadioMainLoop(void *pt)
 
     case RADIO_BEFORE_DISCONNECT:
       ESP_LOGI(TAG, "RADIO_BEFORE_DISCONNECT");
+      // 清理储存
+      memset(&radio.RecvData, 0, sizeof(radio.RecvData));
       radio.status = RADIO_DISCONNECT;
       break;
 
