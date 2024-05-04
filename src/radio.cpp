@@ -16,20 +16,14 @@
 #define SLAVE_KE_NAME "Slave"
 using namespace std;
 
-// 常规数据处理结构
-struct Data
-{
-  int len;
-  uint8_t *mac;
-  uint8_t *incomingData;
-} RecvData;
-
 esp_now_peer_info_t slave;
 
 Radio radio;
 
-SemaphoreHandle_t NEW_DATA = NULL;   // 收到数据
-SemaphoreHandle_t SEND_READY = NULL; // 允许发送
+QueueHandle_t Q_HSD = xQueueCreate(2, sizeof(HANDSHAKE_DATA)); // 握手数据队列
+SemaphoreHandle_t NEW_DATA = NULL;                             // 收到数据
+SemaphoreHandle_t SEND_READY = NULL;                           // 允许发送
+SemaphoreHandle_t CAN_CONNECT_LAST = NULL;                     // 允许发送
 TimerHandle_t ConnectTimeoutTimer;
 const int ConnectTimeoutTimerID = 0;
 
@@ -130,14 +124,12 @@ bool handshake(uint8_t macaddr[ESP_NOW_ETH_ALEN], HANDSHAKE_DATA *recv_hsd)
   WiFi.macAddress(HSD.mac);
   sendTo(macaddr, (uint8_t *)&HSD, sizeof(HSD));
 
-  if (xSemaphoreTake(NEW_DATA, radio.timeOut) != pdTRUE)
+  if (xQueueReceive(Q_HSD, recv_hsd, radio.timeOut) != pdPASS)
   {
     ESP_LOGI(TAG, "Wait for response timed out");
     return false;
   }
 
-  memset(recv_hsd, 0, sizeof(HANDSHAKE_DATA));
-  memcpy(recv_hsd, RecvData.incomingData, sizeof(HANDSHAKE_DATA));
   ESP_LOGI(TAG, "mac :" MACSTR " code : %u", MAC2STR(recv_hsd->mac), recv_hsd->code);
   if (HSD.code == recv_hsd->code)
     return true;
@@ -146,6 +138,15 @@ bool handshake(uint8_t macaddr[ESP_NOW_ETH_ALEN], HANDSHAKE_DATA *recv_hsd)
            HSD.code, recv_hsd->code);
   return false; // 配对码不一致则判断配对失败
 };
+
+/**
+ * @brief 与指定地址握手
+ */
+bool handshake(uint8_t macaddr[ESP_NOW_ETH_ALEN])
+{
+  HANDSHAKE_DATA recv_d;
+  return handshake(macaddr, &recv_d);
+}
 
 /**
  * @brief 配对新设备
@@ -203,7 +204,7 @@ esp_err_t Radio::pairNewDevice()
 
   // 配对到从机 STA 地址&等待响应
   ESP_LOGI(TAG, "Pir to STA");
-  pairTo(RecvData.mac, slave.channel, WIFI_IF_STA);
+  pairTo(recv_data.mac, tragetAP->CHANNEL, WIFI_IF_STA);
   if (!handshake(recv_data.mac, &recv_data))
   {
     ESP_LOGI(TAG, "STA " MACSTR " - HANDSHAKE FAIL"), MAC2STR(recv_data.mac);
@@ -218,9 +219,12 @@ esp_err_t Radio::pairNewDevice()
 // 接收回调
 void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
-  RecvData.len = len;
-  RecvData.mac = (uint8_t *)mac;
-  RecvData.incomingData = (uint8_t *)incomingData;
+  HANDSHAKE_DATA hsd;
+  memcpy(&hsd, incomingData, sizeof(hsd));
+
+  if (radio.status == RADIO_DISCONNECT || radio.status == RADIO_PAIR_DEVICE)
+    if (xQueueSend(Q_HSD, &hsd, 10) != pdPASS)
+      Serial.println("Queue is full.");
 
   xSemaphoreGive(SEND_READY); // 收到数据后允许发送
   xSemaphoreGive(NEW_DATA);
@@ -261,6 +265,7 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_BEFORE_CONNECTED:
+      xSemaphoreGive(CAN_CONNECT_LAST);
       ESP_LOGI(TAG, "CONNECTED :)");
       radio.status = RADIO_CONNECTED;
       if (xTimerStart(ConnectTimeoutTimer, 10) != pdPASS)
@@ -268,18 +273,9 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_CONNECTED:
-      // if (waitTimeout(50, &SEND_READY)) // 等待发送窗口超时，视为连接断开
-      // {
-      //   sendTo(slave.peer_addr, radio.dataToSent, sizeof(radio.dataToSent));
-      //   vTaskDelay(radio.sendGap);
-      //   SEND_READY = false;
-      //   break;
-      // }
-
       if (xSemaphoreTake(SEND_READY, radio.timeOut) == pdTRUE)
       {
         sendTo(slave.peer_addr, radio.dataToSent, sizeof(radio.dataToSent));
-        ESP_LOGI(TAG, "Send");
         break;
       }
 
@@ -289,13 +285,13 @@ void TaskRadioMainLoop(void *pt)
 
     case RADIO_BEFORE_DISCONNECT:
       ESP_LOGI(TAG, "RADIO_BEFORE_DISCONNECT");
-      // 清理储存
-      memset(&RecvData, 0, sizeof(RecvData));
       radio.status = RADIO_DISCONNECT;
       break;
 
     case RADIO_DISCONNECT:
-      vTaskDelay(100);
+      if (xSemaphoreTake(CAN_CONNECT_LAST, radio.timeOut) == pdTRUE)
+        if (handshake(slave.peer_addr))
+          radio.status = RADIO_BEFORE_CONNECTED;
       break;
 
     default:
@@ -369,6 +365,7 @@ void Radio::begin(uint8_t *data_to_sent)
   // 创建信号量
   SEND_READY = xSemaphoreCreateBinary();
   NEW_DATA = xSemaphoreCreateBinary();
+  CAN_CONNECT_LAST = xSemaphoreCreateBinary();
 
   vehcile = &slave;
   this->dataToSent = data_to_sent;
@@ -376,7 +373,7 @@ void Radio::begin(uint8_t *data_to_sent)
   this->radioInit();
   this->status = RADIO_DISCONNECT;
 
-  xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 4096, NULL, 2, NULL);
+  xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 1024 * 10, NULL, 2, NULL);
 
   ESP_LOGI(TAG, "Radio started :)");
 }
