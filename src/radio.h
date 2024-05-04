@@ -91,7 +91,7 @@ public:
   esp_now_peer_info *vehcile; // 无线控制器的配对信息
   radio_status_t status;      //  无线状态
   esp_err_t pairNewDevice();  // 配对新设备
-  uint8_t timeOut = 10;       // 通讯超时, （timeOut * sendGap) ms
+  uint8_t timeOut = 50;       // 通讯超时, （timeOut * sendGap) ms
   uint8_t sendGap = 5;        // 发送间隔
 
   void begin(uint8_t *data_to_sent);

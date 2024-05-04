@@ -15,32 +15,13 @@
  * */
 #define SLAVE_KE_NAME "Slave"
 using namespace std;
-bool SEND_READY = false; // 允许发送数据
 
 esp_now_peer_info_t slave;
 Radio radio;
 
-// 连接超时控制器
+SemaphoreHandle_t SEND_READY = NULL;
 TimerHandle_t ConnectTimeoutTimer;
 const int ConnectTimeoutTimerID = 0;
-
-/**
- * @brief 阻塞等待
- * @param timeout 最大等待时间，超时返回 false
- * @param falg false等待/true结束等待并返回true
- */
-bool waitTimeout(uint timeout, bool *flag)
-{
-  uint counter = 0;
-  while (!*flag)
-  {
-    if (counter >= timeout)
-      return false;
-    counter++;
-    vTaskDelay(1);
-  }
-  return true;
-};
 
 // 连接超时控制器回调
 void IfTimeoutCB(TimerHandle_t xTimer)
@@ -139,10 +120,9 @@ bool handshake(uint8_t macaddr[ESP_NOW_ETH_ALEN], HANDSHAKE_DATA *recv_hsd)
   HANDSHAKE_DATA HSD;
   WiFi.macAddress(HSD.mac);
   sendTo(macaddr, (uint8_t *)&HSD, sizeof(HSD));
-  if (!waitTimeout(timeout, &radio.RecvData.newData))
+  while (!radio.RecvData.newData) // XXX 响应超时检测失效
   {
-    ESP_LOGI(TAG, "Wait for response timed out");
-    return false;
+    vTaskDelay(1);
   }
 
   memset(recv_hsd, 0, sizeof(HANDSHAKE_DATA));
@@ -228,10 +208,11 @@ esp_err_t Radio::pairNewDevice()
 void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
   radio.RecvData.len = len;
-  radio.RecvData.newData = true;
   radio.RecvData.mac = (uint8_t *)mac;
   radio.RecvData.incomingData = (uint8_t *)incomingData;
-  SEND_READY = true; // 收到数据后允许发送
+
+  xSemaphoreGive(SEND_READY); // 收到数据后允许发送
+  radio.RecvData.newData = true;
   // ESP_LOGI(TAG, "Recv on " MACSTR "", MAC2STR(mac));
   xTimerStop(ConnectTimeoutTimer, 10);
 }
@@ -244,14 +225,13 @@ void onSend(const uint8_t *mac_addr, esp_now_send_status_t status)
   //   ESP_LOGI(TAG, "Send to " MACSTR " FAIl", MAC2STR(mac_addr));
   // else
   // ESP_LOGI(TAG, "Send to " MACSTR " SUCCESS", MAC2STR(mac_addr));
-  xTimerStart(ConnectTimeoutTimer, 10);
+  // xTimerStart(ConnectTimeoutTimer, 10);
 }
 
 // 主任务
 void TaskRadioMainLoop(void *pt)
 {
-  vTaskDelay(50);              // 延迟启动循环
-  uint8_t timeout_counter = 0; // 连接超时计数器
+  vTaskDelay(50); // 延迟启动循环
 
   while (true)
   {
@@ -271,28 +251,28 @@ void TaskRadioMainLoop(void *pt)
     case RADIO_BEFORE_CONNECTED:
       ESP_LOGI(TAG, "CONNECTED :)");
       radio.status = RADIO_CONNECTED;
-      SEND_READY = true;
       if (xTimerStart(ConnectTimeoutTimer, 10) != pdPASS)
         esp_restart();
       break;
 
     case RADIO_CONNECTED:
-      // 等待发送窗口超时，视为连接断开
-      SEND_READY ? timeout_counter = 0 : timeout_counter++;
-      if (timeout_counter >= radio.timeOut)
+      // if (waitTimeout(50, &SEND_READY)) // 等待发送窗口超时，视为连接断开
+      // {
+      //   sendTo(slave.peer_addr, radio.dataToSent, sizeof(radio.dataToSent));
+      //   vTaskDelay(radio.sendGap);
+      //   SEND_READY = false;
+      //   break;
+      // }
+
+      if (xSemaphoreTake(SEND_READY, radio.timeOut) == pdTRUE)
       {
-        ESP_LOGI(TAG, "DISCONNECT with timeout");
-        radio.status = RADIO_BEFORE_DISCONNECT;
+        sendTo(slave.peer_addr, radio.dataToSent, sizeof(radio.dataToSent));
+        ESP_LOGI(TAG, "Send");
         break;
       }
 
-      if (SEND_READY)
-      {
-        SEND_READY = false;
-        sendTo(slave.peer_addr, radio.dataToSent, sizeof(radio.dataToSent));
-      }
-
-      vTaskDelay(radio.sendGap);
+      ESP_LOGI(TAG, "DISCONNECT with timeout");
+      radio.status = RADIO_BEFORE_DISCONNECT;
       break;
 
     case RADIO_BEFORE_DISCONNECT:
@@ -320,7 +300,9 @@ void Radio::radioInit()
 {
   // set wifi
   ESP_LOGI(TAG, "Init wifi");
-  WiFi.enableLongRange(false);
+  WiFi.enableLongRange(true);
+  // esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_LR);
+  // esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_LR);
 
   // 启动WIFI IN STA mode
   if (WiFi.mode(WIFI_STA))
@@ -371,6 +353,9 @@ void Radio::begin(uint8_t *data_to_sent)
       (void *)&ConnectTimeoutTimerID, // 任务id
       IfTimeoutCB                     // 回调函数
   );
+
+  // 创建信号量
+  SEND_READY = xSemaphoreCreateBinary();
 
   vehcile = &slave;
   this->dataToSent = data_to_sent;

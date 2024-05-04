@@ -191,6 +191,8 @@ void setup()
   vTaskDelay(100);
   pinMode(0, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(0), ISR, FALLING);
+
+  vTaskDelete(NULL); // 干掉 loopTask
 }
 
 void loop()
