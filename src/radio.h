@@ -20,22 +20,6 @@ typedef enum radio_status
   RADIO_DISCONNECT,
 } radio_status_t;
 
-// 常规数据处理结构
-struct Data
-{
-  int len;
-  bool newData;
-  uint8_t *mac;
-  uint8_t *incomingData;
-  Data() : newData(false){};
-
-  uint8_t *get()
-  {
-    newData = false;
-    return incomingData;
-  }
-};
-
 // AP 扫描信息
 struct AP_Info
 {
@@ -87,7 +71,6 @@ private:
 
 public:
   uint8_t *dataToSent;        // 待发送数据
-  Data RecvData;              // 接收到的数据
   esp_now_peer_info *vehcile; // 无线控制器的配对信息
   radio_status_t status;      //  无线状态
   esp_err_t pairNewDevice();  // 配对新设备
