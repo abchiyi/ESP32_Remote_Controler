@@ -156,7 +156,10 @@ esp_err_t sendCB(uint8_t *peer_addr)
 
 void ISR()
 {
-  radio.status = RADIO_PAIR_DEVICE;
+  if (radio.status == RADIO_CONNECTED)
+    radio.status = RADIO_BEFORE_DISCONNECT;
+  else
+    radio.status = RADIO_PAIR_DEVICE;
 };
 
 void setup()
@@ -190,7 +193,7 @@ void setup()
 
   vTaskDelay(100);
   pinMode(0, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(0), ISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(0), ISR, RISING);
 
   vTaskDelete(NULL); // 干掉 loopTask
 }
