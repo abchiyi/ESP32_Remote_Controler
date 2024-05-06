@@ -92,9 +92,10 @@ bool pairTo(
 }
 
 template <typename T>
-bool sendTo(mac_addr_t mac_addr, const T &data)
+bool Radio::send(const T &data)
 {
-  auto status = esp_now_send(peer_addr, data, sizeof(data));
+  auto status = esp_now_send(this->peer_info.peer_addr,
+                             (uint8_t *)&data, sizeof(data));
   String error_message;
 
   if (status == ESP_OK)
@@ -113,9 +114,9 @@ bool sendTo(mac_addr_t mac_addr, const T &data)
   }
 
   ESP_LOGI(TAG, "Send to " MACSTR " - %s",
-           error_message.c_str(), MAC2STR(peer_addr));
+           error_message.c_str(), MAC2STR(this->peer_info.peer_addr));
   return false;
-};
+}
 
 /**
  * @brief 与指定地址握手
@@ -125,9 +126,9 @@ bool handshake(mac_addr_t mac_addr)
   radio_data_t data;
   mac_addr_t newAddr; // 新地址
 
-  sendTo(mac_addr, data);
+  radio.send(data);
 
-  if (xQueueReceive(Q_RECV_DATA, &data, radio.timeOut) != pdPASS)
+  if (xQueueReceive(Q_RECV_DATA, &data, radio.timeOut * 3) != pdPASS)
   {
     ESP_LOGI(TAG, "Wait for response timed out");
     return false;
@@ -136,11 +137,13 @@ bool handshake(mac_addr_t mac_addr)
   // 当通道 0 有数据时表示响应设备将使用另一地址与主机通讯
   if (data.channel[0])
   {
+    ESP_LOGI(TAG, "add new mac");
     esp_now_del_peer(radio.peer_info.peer_addr);
     memcpy(newAddr, &data.channel[0], sizeof(mac_addr_t));
-    pairTo(newAddr, data.channel[1]);            // 从通道2读取新信道
+    pairTo(newAddr, 1);                          // 从通道2读取新信道
     return handshake(radio.peer_info.peer_addr); // 与新地址握手
   }
+
   // 对比收到的数据的发送地址与目标配对地址是否一致
   if (memcmp(mac_addr, data.mac_addr, sizeof(mac_addr_t)) == 0)
     return true;
@@ -210,12 +213,12 @@ void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
   radio_data data;
   memcpy(&data, incomingData, sizeof(data));
+  memcpy(&data.mac_addr, mac, sizeof(data.mac_addr));
 
-  if (radio.status == RADIO_DISCONNECT || radio.status == RADIO_PAIR_DEVICE)
-    if (xQueueSend(Q_RECV_DATA, &data, 10) != pdPASS)
-      ESP_LOGI(TAG, "Queue is full.");
-    else
-      ESP_LOGI(TAG, "Queue is add.");
+  if (xQueueSend(Q_RECV_DATA, &data, 10) != pdPASS)
+    ESP_LOGI(TAG, "Queue is full.");
+  // else
+  //   ESP_LOGI(TAG, "Queue is add.");
 
   xSemaphoreGive(SEND_READY); // 收到数据后允许发送
   xSemaphoreGive(NEW_DATA);
@@ -264,7 +267,7 @@ void TaskRadioMainLoop(void *pt)
     case RADIO_CONNECTED:
       if (xSemaphoreTake(SEND_READY, radio.timeOut) == pdTRUE)
       {
-        sendTo(radio.peer_info.peer_addr, radio.dataToSent);
+        // radio.send(radio.dataToSent);
         break;
       }
 
@@ -281,10 +284,11 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_DISCONNECT:
-      if (xSemaphoreTake(CAN_CONNECT_LAST, radio.timeOut) == pdTRUE)
-        if (handshake(radio.peer_info.peer_addr))
-          radio.status = RADIO_BEFORE_CONNECTED;
-      // else
+      // if (xSemaphoreTake(CAN_CONNECT_LAST, radio.timeOut) == pdTRUE)
+      //   if (handshake(radio.peer_info.peer_addr))
+      //     radio.status = RADIO_BEFORE_CONNECTED;
+      // // else
+      vTaskDelay(10);
       break;
 
     default:
@@ -297,7 +301,7 @@ void TaskRadioMainLoop(void *pt)
 }
 
 // 初始化无线
-void Radio::radioInit()
+void Radio::initRadio()
 {
   // set wifi
   ESP_LOGI(TAG, "Init wifi");
@@ -305,7 +309,7 @@ void Radio::radioInit()
   // esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_LR);
   // esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_LR);
 
-  // 启动WIFI IN STA mode
+  // 设置模式 STA
   if (WiFi.mode(WIFI_STA))
     ESP_LOGI(TAG, "WIFI Start in STA,MAC: %s, CHANNEL: %u",
              WiFi.macAddress().c_str(), WiFi.channel());
@@ -365,7 +369,7 @@ void Radio::begin(uint8_t *data_to_sent)
 
   this->dataToSent = data_to_sent;
 
-  this->radioInit();
+  this->initRadio();
   this->status = RADIO_DISCONNECT;
 
   xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 1024 * 10, NULL, 2, NULL);

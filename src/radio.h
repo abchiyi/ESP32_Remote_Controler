@@ -64,7 +64,7 @@ typedef struct radio_data
 class Radio
 {
 private:
-  void radioInit();      // 初始化无线
+  void initRadio();      // 初始化无线
   mac_addr_t __mac_addr; // 此设备mac 地址
 
 public:
@@ -74,6 +74,9 @@ public:
   esp_err_t pairNewDevice();   // 配对新设备
   uint8_t timeOut = 50;        // 通讯超时, （timeOut * sendGap) ms
   uint8_t sendGap = 5;         // 发送间隔
+
+  template <typename T>
+  bool send(const T &data);
 
   void begin(uint8_t *data_to_sent);
   void begin(uint8_t *data_to_sent, uint8_t send_timeout, uint8_t send_gap);
