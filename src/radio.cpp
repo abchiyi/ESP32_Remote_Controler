@@ -126,9 +126,9 @@ bool handshake(mac_addr_t mac_addr)
   radio_data_t data;
   mac_addr_t newAddr; // 新地址
 
-  radio.send(data);
+  radio.send(data); // todo 验证响应地址
 
-  if (xQueueReceive(Q_RECV_DATA, &data, radio.timeOut * 3) != pdPASS)
+  if (xQueueReceive(Q_RECV_DATA, &data, radio.timeOut) != pdPASS)
   {
     ESP_LOGI(TAG, "Wait for response timed out");
     return false;
@@ -216,7 +216,8 @@ void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
   memcpy(&data.mac_addr, mac, sizeof(data.mac_addr));
 
   if (xQueueSend(Q_RECV_DATA, &data, 10) != pdPASS)
-    ESP_LOGI(TAG, "Queue is full.");
+    ;
+  // ESP_LOGI(TAG, "Queue is full.");
   // else
   //   ESP_LOGI(TAG, "Queue is add.");
 
@@ -224,7 +225,7 @@ void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
   xSemaphoreGive(NEW_DATA);
 
   // ESP_LOGI(TAG, "Recv on " MACSTR "", MAC2STR(mac));
-  xTimerStop(ConnectTimeoutTimer, 10);
+  // xTimerStop(ConnectTimeoutTimer, 10);
 }
 
 // 发送回调
@@ -260,41 +261,39 @@ void TaskRadioMainLoop(void *pt)
       xSemaphoreGive(CAN_CONNECT_LAST);
       ESP_LOGI(TAG, "CONNECTED :)");
       radio.status = RADIO_CONNECTED;
-      if (xTimerStart(ConnectTimeoutTimer, 10) != pdPASS)
-        esp_restart();
+      // if (xTimerStart(ConnectTimeoutTimer, 10) != pdPASS)
+      //   esp_restart();
       break;
 
     case RADIO_CONNECTED:
       if (xSemaphoreTake(SEND_READY, radio.timeOut) == pdTRUE)
       {
-        // radio.send(radio.dataToSent);
+        radio.send(radio.dataToSent);
         break;
       }
 
+      // TODO 通讯多次超时判断连接断开
       ESP_LOGI(TAG, "DISCONNECT with timeout");
       radio.status = RADIO_BEFORE_DISCONNECT;
       break;
 
     case RADIO_BEFORE_DISCONNECT:
-      ESP_LOGI(TAG, "RADIO_BEFORE_DISCONNECT");
       xQueueReset(Q_RECV_DATA); // 断开连接清空队列
       radio.status = RADIO_DISCONNECT;
       xSemaphoreGive(CAN_CONNECT_LAST);
-
       break;
 
     case RADIO_DISCONNECT:
-      // if (xSemaphoreTake(CAN_CONNECT_LAST, radio.timeOut) == pdTRUE)
-      //   if (handshake(radio.peer_info.peer_addr))
-      //     radio.status = RADIO_BEFORE_CONNECTED;
-      // // else
-      vTaskDelay(10);
+      if (xSemaphoreTake(CAN_CONNECT_LAST, radio.timeOut) == pdTRUE)
+        if (handshake(radio.peer_info.peer_addr))
+          radio.status = RADIO_BEFORE_CONNECTED;
+        else
+          xSemaphoreGive(CAN_CONNECT_LAST);
+      vTaskDelay(radio.timeOut);
       break;
 
     default:
-      ESP_LOGI(TAG, "ERROR  status! esp_restart");
-      esp_restart();
-      vTaskDelay(5);
+      esp_system_abort("Radio status error");
       break;
     }
   }
@@ -366,8 +365,6 @@ void Radio::begin(uint8_t *data_to_sent)
   SEND_READY = xSemaphoreCreateBinary();
   NEW_DATA = xSemaphoreCreateBinary();
   CAN_CONNECT_LAST = xSemaphoreCreateBinary();
-
-  this->dataToSent = data_to_sent;
 
   this->initRadio();
   this->status = RADIO_DISCONNECT;
