@@ -72,14 +72,20 @@ public:
   esp_now_peer_info peer_info; // 配对信息
   radio_status_t status;       // 无线状态
   esp_err_t pairNewDevice();   // 配对新设备
-  uint8_t timeOut = 50;        // 通讯超时, （timeOut * sendGap) ms
-  uint8_t sendGap = 5;         // 发送间隔
 
   template <typename T>
   bool send(const T &data);
 
-  void begin(uint8_t *data_to_sent);
-  void begin(uint8_t *data_to_sent, uint8_t send_timeout, uint8_t send_gap);
+  void begin();
+  void begin(uint8_t send_timeout);
+
+  /**
+   * freeRTOS 在esp32 一个 tick 为 1ms
+   * 以下定义的超时值单位为 1ms
+   */
+  uint8_t timeout_disconnect = 120; // 超时断开连接
+  uint8_t timeout_resend = 80;      // 超时重发
+  uint8_t resend_count = 2;         // 超时重发次数
 };
 
 extern Radio radio;

@@ -17,10 +17,10 @@
 using namespace std;
 
 Radio radio;
+radio_data_t radio_data;
 
 QueueHandle_t Q_RECV_DATA = xQueueCreate(10, sizeof(radio_data_t));
 
-SemaphoreHandle_t NEW_DATA = NULL;         // 收到数据
 SemaphoreHandle_t SEND_READY = NULL;       // 允许发送
 SemaphoreHandle_t CAN_CONNECT_LAST = NULL; // 连接到最后一次通讯的地址
 
@@ -30,13 +30,38 @@ const int ConnectTimeoutTimerID = 0;
 // 连接超时控制器回调
 void IfTimeoutCB(TimerHandle_t xTimer)
 {
-  ESP_LOGI(TAG, "Wait for response timed out");
-  radio.status = RADIO_BEFORE_DISCONNECT;
-  if (xTimerStop(ConnectTimeoutTimer, 10) != pdPASS)
-    esp_system_abort("stop timer fial"); // 停止定时器失败
-  else
-    ESP_LOGI(TAG, "Timer stop");
+  int meme_free_size = esp_get_free_heap_size();
+  ESP_LOGI(TAG, "Free mem size %d", meme_free_size);
+
+  // radio.status = RADIO_BEFORE_DISCONNECT;
+  // if (xTimerStop(ConnectTimeoutTimer, 10) != pdPASS)
+  //   esp_system_abort("stop timer fial"); // 停止定时器失败
+  // else
+  //   ESP_LOGI(TAG, "Timer stop");
 }
+
+/**
+ * @brief 等待主机握手
+ * @param timeout 超时等待
+ * @param data 收到响应时接收数据将写入其中
+ */
+bool wait_response(TickType_t waitTick, radio_data_t *data)
+{
+  if (xQueueReceive(Q_RECV_DATA, data, waitTick) != pdPASS)
+  {
+    ESP_LOGI(TAG, "Wait for response timed out");
+    return false;
+  }
+  return true;
+};
+
+// 对比 mac地址是否一致
+bool checkMac(mac_addr_t mac1, mac_addr_t mac2)
+{
+  if (memcmp(mac1, mac2, sizeof(mac_addr_t)) == 0)
+    return true;
+  return false;
+};
 
 /**
  * @brief 根据 mac 地址配对到指定的设备
@@ -128,7 +153,7 @@ bool handshake(mac_addr_t mac_addr)
 
   radio.send(data); // todo 验证响应地址
 
-  if (xQueueReceive(Q_RECV_DATA, &data, radio.timeOut) != pdPASS)
+  if (xQueueReceive(Q_RECV_DATA, &data, radio.timeout_resend) != pdPASS)
   {
     ESP_LOGI(TAG, "Wait for response timed out");
     return false;
@@ -211,18 +236,15 @@ esp_err_t Radio::pairNewDevice()
 // 接收回调
 void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
-  radio_data data;
-  memcpy(&data, incomingData, sizeof(data));
-  memcpy(&data.mac_addr, mac, sizeof(data.mac_addr));
-
-  if (xQueueSend(Q_RECV_DATA, &data, 10) != pdPASS)
+  memcpy(&radio_data, incomingData, sizeof(radio_data));
+  memcpy(&radio_data.mac_addr, mac, sizeof(radio_data.mac_addr));
+  if (xQueueSend(Q_RECV_DATA, &radio_data, 10) != pdPASS)
     ;
   // ESP_LOGI(TAG, "Queue is full.");
   // else
   //   ESP_LOGI(TAG, "Queue is add.");
 
   xSemaphoreGive(SEND_READY); // 收到数据后允许发送
-  xSemaphoreGive(NEW_DATA);
 
   // ESP_LOGI(TAG, "Recv on " MACSTR "", MAC2STR(mac));
   // xTimerStop(ConnectTimeoutTimer, 10);
@@ -231,17 +253,20 @@ void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 // 发送回调
 void onSend(const uint8_t *mac_addr, esp_now_send_status_t status)
 {
-  // SEND_READY = false;
   // if (status)
   //   ESP_LOGI(TAG, "Send to " MACSTR " FAIl", MAC2STR(mac_addr));
   // else
-  // ESP_LOGI(TAG, "Send to " MACSTR " SUCCESS", MAC2STR(mac_addr));
-  // xTimerStart(ConnectTimeoutTimer, 10);
+  //   ESP_LOGI(TAG, "Send to " MACSTR " SUCCESS", MAC2STR(mac_addr));
 }
 
 // 主任务
 void TaskRadioMainLoop(void *pt)
 {
+  uint8_t resend_counter = 0;
+
+  TickType_t xLastWakeTime;
+  const TickType_t xFrequency = pdMS_TO_TICKS(8);
+
   while (true)
   {
     switch (radio.status)
@@ -260,21 +285,31 @@ void TaskRadioMainLoop(void *pt)
     case RADIO_BEFORE_CONNECTED:
       xSemaphoreGive(CAN_CONNECT_LAST);
       ESP_LOGI(TAG, "CONNECTED :)");
+      // TODO 使用资源锁，锁定要发送的数据，等待其他任务写入完毕
       radio.status = RADIO_CONNECTED;
-      // if (xTimerStart(ConnectTimeoutTimer, 10) != pdPASS)
-      //   esp_restart();
+      radio.send(radio.dataToSent); // 回传数据
+      xLastWakeTime = xTaskGetTickCount();
       break;
 
     case RADIO_CONNECTED:
-      if (xSemaphoreTake(SEND_READY, radio.timeOut) == pdTRUE)
-      {
-        radio.send(radio.dataToSent);
-        break;
-      }
+      wait_response(radio.timeout_resend, &radio_data)
+          ? resend_counter = 0 // 正常发送重置计数器
+          : resend_counter++;  // 未收到回复时 计数器+1
 
-      // TODO 通讯多次超时判断连接断开
-      ESP_LOGI(TAG, "DISCONNECT with timeout");
-      radio.status = RADIO_BEFORE_DISCONNECT;
+      // 校验是否是来自目标的数据，非目标则不响应
+      // if (checkMac(radio.peer_info.peer_addr, radio_data.mac_addr))
+      //   break;
+
+      // TODO 使用资源锁，锁定要发送的数据，等待其他任务写入完毕
+      radio.send(radio.dataToSent); // 回传数据
+
+      // 多次重发未收到响应则认为主机已断开连接
+      if (resend_counter >= radio.resend_count)
+      {
+        ESP_LOGI(TAG, "DISCONNECT with timeout");
+        radio.status = RADIO_BEFORE_DISCONNECT;
+      }
+      xTaskDelayUntil(&xLastWakeTime, xFrequency);
       break;
 
     case RADIO_BEFORE_DISCONNECT:
@@ -284,12 +319,13 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_DISCONNECT:
-      if (xSemaphoreTake(CAN_CONNECT_LAST, radio.timeOut) == pdTRUE)
-        if (handshake(radio.peer_info.peer_addr))
-          radio.status = RADIO_BEFORE_CONNECTED;
-        else
-          xSemaphoreGive(CAN_CONNECT_LAST);
-      vTaskDelay(radio.timeOut);
+      // if (xSemaphoreTake(CAN_CONNECT_LAST, radio.timeOut) == pdTRUE)
+      //   if (handshake(radio.peer_info.peer_addr))
+      //     radio.status = RADIO_BEFORE_CONNECTED;
+      //   else
+      //     xSemaphoreGive(CAN_CONNECT_LAST);
+      // vTaskDelay(radio.timeOut);
+      vTaskDelay(5);
       break;
 
     default:
@@ -346,16 +382,16 @@ void Radio::initRadio()
  * @brief 启动无线
  * @param data_to_sent 要发送的数据指针
  */
-void Radio::begin(uint8_t *data_to_sent)
+void Radio::begin()
 {
 
   // 定义连接超时控制器
   ConnectTimeoutTimer = xTimerCreate(
-      "Connect time out",             // 定时器任务名称
-      this->sendGap * this->timeOut,  // 延迟多少tick后执行回调函数
-      pdTRUE,                         // 执行一次,pdTRUE 循环执行
-      (void *)&ConnectTimeoutTimerID, // 任务id
-      IfTimeoutCB                     // 回调函数
+      "Connect time out", // 定时器任务名称
+      1000,               // 延迟多少tick后执行回调函数
+      pdTRUE,             // 执行一次,pdTRUE 循环执行
+      0,                  // 任务id
+      IfTimeoutCB         // 回调函数
   );
 
   // 写入本机的 MAC 地址
@@ -363,13 +399,12 @@ void Radio::begin(uint8_t *data_to_sent)
 
   // 创建信号量
   SEND_READY = xSemaphoreCreateBinary();
-  NEW_DATA = xSemaphoreCreateBinary();
   CAN_CONNECT_LAST = xSemaphoreCreateBinary();
 
   this->initRadio();
   this->status = RADIO_DISCONNECT;
 
-  xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 1024 * 10, NULL, 2, NULL);
+  xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 1024 * 10, NULL, 24, NULL);
 
   ESP_LOGI(TAG, "Radio started :)");
 }
@@ -380,9 +415,7 @@ void Radio::begin(uint8_t *data_to_sent)
  * @param timeout 实际超时时间为 (timeout * send_gap) ms
  * @param send_gap 要发送的数据指针 数据发送间隔
  */
-void Radio::begin(uint8_t *data_to_sent, uint8_t timeout, uint8_t send_gap)
+void Radio::begin(uint8_t timeout)
 {
-  this->timeOut = timeout;
-  this->sendGap = sendGap;
-  this->begin(data_to_sent);
+  this->timeout_resend = timeout;
 }

@@ -183,7 +183,7 @@ void setup()
 
   vTaskDelay(100);
 
-  radio.begin((uint8_t *)&controller.data);
+  radio.begin();
 
   // 设置数据层更新任务
   xTaskCreatePinnedToCore(
