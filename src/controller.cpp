@@ -2,6 +2,8 @@
 #include <XBOXONE.h>
 #include <esp_log.h>
 #include <Usb.h>
+#include <radio.h>
+#include "FreeRTOS.h"
 
 #define TAG "Controller"
 
@@ -50,7 +52,7 @@ void TaskUSB(void *pt)
   while (true)
   {
     Usb.Task();
-    vTaskDelay(1);
+    vTaskDelay(5);
   }
 }
 
@@ -72,49 +74,62 @@ void syncAnalogHat(int16_t _from, int16_t *_to)
 }
 
 // 读取xbox手柄输出值并更新到变量
-void TaskUpdate(void *pt)
+void task_main_controller(void *pt)
 {
+  radio_data_t data;                              // 待发送
+  TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
+  const TickType_t xFrequency = pdMS_TO_TICKS(8); // 设置采样率 250hz
+
   while (true)
   {
-    if (Xbox.XboxOneConnected)
+    if (radio.status == RADIO_CONNECTED && Xbox.XboxOneConnected)
     {
-      // 字母键
-      *BtnA = Xbox.getButtonPress(A);
-      *BtnB = Xbox.getButtonPress(B);
-      *BtnX = Xbox.getButtonPress(X);
-      *BtnY = Xbox.getButtonPress(Y);
-
-      // 功能键
-      *BtnStart = Xbox.getButtonPress(START);
-      // *BtnXbox = Xbox.getButtonPress(XBOX); // XXX 功能异常不使用
-      *BtnSelect = Xbox.getButtonPress(BACK);
-      *BtnShare = Xbox.getButtonPress(SYNC);
-
-      // 肩键
-      *BtnLB = Xbox.getButtonPress(L1);
-      *BtnRB = Xbox.getButtonPress(R1);
-
-      // 方向键
-      *BtnDirUp = Xbox.getButtonPress(UP);
-      *BtnDirDown = Xbox.getButtonPress(DOWN);
-      *BtnDirLeft = Xbox.getButtonPress(LEFT);
-      *BtnDirRight = Xbox.getButtonPress(RIGHT);
-
-      // 摇杆
-      syncAnalogHat(Xbox.getAnalogHat(LeftHatX), JoyLHori);
-      syncAnalogHat(Xbox.getAnalogHat(LeftHatY), JoyLVert);
-      *BtnLS = Xbox.getButtonPress(L3);
-
-      syncAnalogHat(Xbox.getAnalogHat(RightHatX), JoyRHori);
-      syncAnalogHat(Xbox.getAnalogHat(RightHatY), JoyRVert);
-      *BtnRS = Xbox.getButtonPress(R3);
-
-      // 扳机键
-      *TrigLT = Xbox.getButtonPress(L2);
-      *TrigRT = Xbox.getButtonPress(R2);
+      data.channel[0] = Xbox.getButtonPress(A);
+      radio.set_data(&data);
     }
+    xTaskDelayUntil(&xLastWakeTime, xFrequency);
 
-    vTaskDelay(10);
+    //   *TrigLT = Xbox.getButtonPress(L2);
+
+    // if (Xbox.XboxOneConnected)
+    // {
+    //   // 字母键
+    //   *BtnA = Xbox.getButtonPress(A);
+    //   *BtnB = Xbox.getButtonPress(B);
+    //   *BtnX = Xbox.getButtonPress(X);
+    //   *BtnY = Xbox.getButtonPress(Y);
+
+    //   // 功能键
+    //   *BtnStart = Xbox.getButtonPress(START);
+    //   // *BtnXbox = Xbox.getButtonPress(XBOX); // XXX 功能异常不使用
+    //   *BtnSelect = Xbox.getButtonPress(BACK);
+    //   *BtnShare = Xbox.getButtonPress(SYNC);
+
+    //   // 肩键
+    //   *BtnLB = Xbox.getButtonPress(L1);
+    //   *BtnRB = Xbox.getButtonPress(R1);
+
+    //   // 方向键
+    //   *BtnDirUp = Xbox.getButtonPress(UP);
+    //   *BtnDirDown = Xbox.getButtonPress(DOWN);
+    //   *BtnDirLeft = Xbox.getButtonPress(LEFT);
+    //   *BtnDirRight = Xbox.getButtonPress(RIGHT);
+
+    //   // 摇杆
+    //   syncAnalogHat(Xbox.getAnalogHat(LeftHatX), JoyLHori);
+    //   syncAnalogHat(Xbox.getAnalogHat(LeftHatY), JoyLVert);
+    //   *BtnLS = Xbox.getButtonPress(L3);
+
+    //   syncAnalogHat(Xbox.getAnalogHat(RightHatX), JoyRHori);
+    //   syncAnalogHat(Xbox.getAnalogHat(RightHatY), JoyRVert);
+    //   *BtnRS = Xbox.getButtonPress(R3);
+
+    //   // 扳机键
+    //   *TrigLT = Xbox.getButtonPress(L2);
+    //   *TrigRT = Xbox.getButtonPress(R2);
+    // }
+
+    xTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
 
@@ -156,10 +171,9 @@ void Controller::setPointer()
 // 启动xbox控制器
 void Controller::begin()
 {
-  setPointer();
-  delay(5);
+  // setPointer();
   xTaskCreate(TaskUSB, "taskUSB", 4096, NULL, 1, NULL);
-  xTaskCreate(TaskUpdate, "TaskUpdate", 4096, NULL, 1, NULL);
+  xTaskCreate(task_main_controller, "main_controller", 4096, NULL, 1, NULL);
 }
 
 bool Controller::getConnectStatus()

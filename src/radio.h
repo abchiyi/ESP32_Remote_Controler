@@ -79,13 +79,16 @@ public:
   void begin();
   void begin(uint8_t send_timeout);
 
+  esp_err_t get_data(radio_data_t *data); // 读取收到的数据
+  esp_err_t set_data(radio_data_t *data); // 设置要发送的数据
+
   /**
    * freeRTOS 在esp32 一个 tick 为 1ms
    * 以下定义的超时值单位为 1ms
    */
-  uint8_t timeout_disconnect = 120; // 超时断开连接
-  uint8_t timeout_resend = 80;      // 超时重发
-  uint8_t resend_count = 2;         // 超时重发次数
+  uint8_t timeout_resend = 50;      // 超时重发
+  uint8_t resend_count = 5;         // 超时重发次数
+  uint8_t timeout_disconnect = 250; // 超时断开连接
 };
 
 extern Radio radio;
