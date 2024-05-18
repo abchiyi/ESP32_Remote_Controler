@@ -6,22 +6,10 @@
 #include "FreeRTOS.h"
 
 #define TAG "Controller"
-
-bool *BtnA, *BtnB, *BtnX, *BtnY;
-bool *BtnShare, *BtnStart, *BtnSelect, *BtnXbox;
-bool *BtnLB, *BtnRB;
-bool *BtnLS, *BtnRS;
-bool *BtnDirUp, *BtnDirLeft, *BtnDirRight, *BtnDirDown;
-int16_t *JoyLHori;
-int16_t *JoyLVert;
-int16_t *JoyRHori;
-int16_t *JoyRVert;
-int16_t *TrigLT, *TrigRT;
-
 #define UsbHostShellRestPin 16
-
 USB Usb;
 XBOXONE Xbox(&Usb);
+CONTROLLER Controller;
 
 // 初始化连接手柄外设usb
 void usbInit()
@@ -46,13 +34,16 @@ void usbInit()
 }
 
 // 使用独立任务避免usb数据读取卡死
-void TaskUSB(void *pt)
+void task_update(void *pt)
 {
   usbInit();
+  TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
+  const TickType_t xFrequency = pdMS_TO_TICKS(8); // 设置采样率 250hz
   while (true)
   {
     Usb.Task();
-    vTaskDelay(5);
+    Controller.update();
+    xTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
 
@@ -70,113 +61,83 @@ void syncAnalogHat(int16_t _from, int16_t *_to)
                         ? (float_t)t_from / step
                         : 0;
 
-  *_to = toValue < -2047 ? -2047 : toValue;
-}
-
-// 读取xbox手柄输出值并更新到变量
-void task_main_controller(void *pt)
-{
-  radio_data_t data;                              // 待发送
-  TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
-  const TickType_t xFrequency = pdMS_TO_TICKS(8); // 设置采样率 250hz
-
-  while (true)
-  {
-    if (radio.status == RADIO_CONNECTED && Xbox.XboxOneConnected)
-    {
-      data.channel[0] = Xbox.getButtonPress(A);
-      radio.set_data(&data);
-    }
-    xTaskDelayUntil(&xLastWakeTime, xFrequency);
-
-    //   *TrigLT = Xbox.getButtonPress(L2);
-
-    // if (Xbox.XboxOneConnected)
-    // {
-    //   // 字母键
-    //   *BtnA = Xbox.getButtonPress(A);
-    //   *BtnB = Xbox.getButtonPress(B);
-    //   *BtnX = Xbox.getButtonPress(X);
-    //   *BtnY = Xbox.getButtonPress(Y);
-
-    //   // 功能键
-    //   *BtnStart = Xbox.getButtonPress(START);
-    //   // *BtnXbox = Xbox.getButtonPress(XBOX); // XXX 功能异常不使用
-    //   *BtnSelect = Xbox.getButtonPress(BACK);
-    //   *BtnShare = Xbox.getButtonPress(SYNC);
-
-    //   // 肩键
-    //   *BtnLB = Xbox.getButtonPress(L1);
-    //   *BtnRB = Xbox.getButtonPress(R1);
-
-    //   // 方向键
-    //   *BtnDirUp = Xbox.getButtonPress(UP);
-    //   *BtnDirDown = Xbox.getButtonPress(DOWN);
-    //   *BtnDirLeft = Xbox.getButtonPress(LEFT);
-    //   *BtnDirRight = Xbox.getButtonPress(RIGHT);
-
-    //   // 摇杆
-    //   syncAnalogHat(Xbox.getAnalogHat(LeftHatX), JoyLHori);
-    //   syncAnalogHat(Xbox.getAnalogHat(LeftHatY), JoyLVert);
-    //   *BtnLS = Xbox.getButtonPress(L3);
-
-    //   syncAnalogHat(Xbox.getAnalogHat(RightHatX), JoyRHori);
-    //   syncAnalogHat(Xbox.getAnalogHat(RightHatY), JoyRVert);
-    //   *BtnRS = Xbox.getButtonPress(R3);
-
-    //   // 扳机键
-    //   *TrigLT = Xbox.getButtonPress(L2);
-    //   *TrigRT = Xbox.getButtonPress(R2);
-    // }
-
-    xTaskDelayUntil(&xLastWakeTime, xFrequency);
-  }
-}
-
-// 设置变量引用指针
-void Controller::setPointer()
-{
-  BtnA = &data.btnA;
-  BtnB = &data.btnB;
-  BtnX = &data.btnX;
-  BtnY = &data.btnY;
-
-  BtnShare = &data.btnShare;
-  BtnStart = &data.btnStart;
-  BtnSelect = &data.btnSelect;
-  BtnXbox = &data.btnXbox;
-
-  BtnLB = &data.btnLB;
-  BtnRB = &data.btnRB;
-
-  BtnLS = &data.btnLS;
-  BtnRS = &data.btnRS;
-
-  BtnDirUp = &data.btnDirUp;
-  BtnDirLeft = &data.btnDirLeft;
-  BtnDirRight = &data.btnDirRight;
-  BtnDirDown = &data.btnDirDown;
-
-  JoyLHori = &data.joyLHori;
-  JoyLVert = &data.joyLVert;
-  JoyRHori = &data.joyRHori;
-  JoyRVert = &data.joyRVert;
-
-  TrigLT = &data.trigLT;
-  TrigRT = &data.trigRT;
-
-  Connected = &Xbox.XboxOneConnected;
+  *_to = toValue < -2048 ? -2048 : toValue;
 }
 
 // 启动xbox控制器
-void Controller::begin()
+void CONTROLLER::begin()
 {
-  // setPointer();
-  xTaskCreate(TaskUSB, "taskUSB", 4096, NULL, 1, NULL);
-  xTaskCreate(task_main_controller, "main_controller", 4096, NULL, 1, NULL);
+  xTaskCreate(task_update, "taskUSB", 4096, NULL, 1, NULL);
 }
 
-bool Controller::getConnectStatus()
+void CONTROLLER::update()
 {
-  return *Connected;
+  if (Xbox.XboxOneConnected)
+  {
+    // 字母键
+    btnA = Xbox.getButtonPress(A);
+    btnB = Xbox.getButtonPress(B);
+    btnX = Xbox.getButtonPress(X);
+    btnY = Xbox.getButtonPress(Y);
+
+    // 功能键
+    btnStart = Xbox.getButtonPress(START);
+    // btnXbox = Xbox.getButtonPress(XBOX); // XXX 功能异常不使用
+    btnSelect = Xbox.getButtonPress(BACK);
+    btnShare = Xbox.getButtonPress(SYNC);
+
+    // 肩键
+    btnLB = Xbox.getButtonPress(L1);
+    btnRB = Xbox.getButtonPress(R1);
+
+    // 方向键
+    btnDirUp = Xbox.getButtonPress(UP);
+    btnDirDown = Xbox.getButtonPress(DOWN);
+    btnDirLeft = Xbox.getButtonPress(LEFT);
+    btnDirRight = Xbox.getButtonPress(RIGHT);
+
+    // 摇杆
+    syncAnalogHat(Xbox.getAnalogHat(LeftHatX), &joyLHori);
+    syncAnalogHat(Xbox.getAnalogHat(LeftHatY), &joyLVert);
+    btnLS = Xbox.getButtonPress(L3);
+
+    syncAnalogHat(Xbox.getAnalogHat(RightHatX), &joyRHori);
+    syncAnalogHat(Xbox.getAnalogHat(RightHatY), &joyRVert);
+    btnRS = Xbox.getButtonPress(R3);
+
+    // 扳机键
+    trigLT = Xbox.getButtonPress(L2);
+    trigRT = Xbox.getButtonPress(R2);
+  }
+};
+
+// ↓this code from XboxControllerNotificationParser lib
+String CONTROLLER::toString()
+{
+  // clang-format off
+  String str = String("") +
+    "btnY: " + String(btnY) + " " +
+    "btnX: " + String(btnX) + " " +
+    "btnB: " + String(btnB) + " " +
+    "btnA: " + String(btnA) + " " +
+    "btnLB: " + String(btnLB) + " " +
+    "btnRB: " + String(btnRB) + "\n" +
+    "btnSelect: " + String(btnSelect) + " " +
+    "btnStart: " + String(btnStart) + " " +
+    "btnXbox: " + String(btnXbox) + " " +
+    "btnShare: " + String(btnShare) + " " +
+    "btnLS: " + String(btnLS) + " " +
+    "btnRS: " + String(btnRS) + "\n" +
+    "btnDirUp: " + String(btnDirUp) + " " +
+    "btnDirRight: " + String(btnDirRight) + " " +
+    "btnDirDown: " + String(btnDirDown) + " " +
+    "btnDirLeft: " + String(btnDirLeft) + "\n"
+    "joyLHori: " + String(joyLHori) + "\n" +
+    "joyLVert: " + String(joyLVert) + "\n" +
+    "joyRHori: " + String(joyRHori) + "\n" +
+    "joyRVert: " + String(joyRVert) + "\n" +
+    "trigLT: " + String(trigLT) + "\n" +
+    "trigRT: " + String(trigRT) + "\n";
+  // clang-format on
+  return str;
 }

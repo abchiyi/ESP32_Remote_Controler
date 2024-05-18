@@ -10,6 +10,10 @@
 // 控制器依赖
 #include <controller.h>
 #include <pins_arduino.h>
+
+// 车辆控制
+#include "car.h"
+
 // #include <XBOXONE.h>
 
 // 显示
@@ -37,8 +41,6 @@
 #define RES 6
 #define DC 5
 #define CS 4
-
-Controller controller;
 
 // Display display;
 
@@ -99,8 +101,8 @@ void btn_scan(WouoUI *gui)
 {
   auto ui = gui->ui;
 
-  uint8_t *btnA = (uint8_t *)&controller.data.btnA;
-  uint8_t *btnB = (uint8_t *)&controller.data.btnB;
+  uint8_t *btnA = (uint8_t *)&Controller.btnA;
+  uint8_t *btnB = (uint8_t *)&Controller.btnB;
 
   if (Xbox.getButtonClick(A))
   {
@@ -122,11 +124,11 @@ void btn_scan(WouoUI *gui)
   static bool joyDOWNLPT = false;
   static bool btnMenuLPT = false;
 
-  uint8_t *btnUp = (uint8_t *)&controller.data.btnDirUp;
-  uint8_t *btnDown = (uint8_t *)&controller.data.btnDirDown;
-  uint8_t joyLUp = controller.data.joyLVert > 300 ? 1 : 0;
-  uint8_t joyLDown = controller.data.joyLVert < -300 ? 1 : 0;
-  uint8_t btnMenu = controller.data.btnStart;
+  uint8_t *btnUp = (uint8_t *)&Controller.btnDirUp;
+  uint8_t *btnDown = (uint8_t *)&Controller.btnDirDown;
+  uint8_t joyLUp = Controller.joyLVert > 300 ? 1 : 0;
+  uint8_t joyLDown = Controller.joyLVert < -300 ? 1 : 0;
+  uint8_t btnMenu = Controller.btnStart;
 
   singleBtnScan(&wouoUI, btnUp, (uint8_t *)&btnUpLPT, BTN_ID_UP);
   singleBtnScan(&wouoUI, btnDown, (uint8_t *)&btnDownLPT, BTN_ID_DO);
@@ -148,12 +150,6 @@ void TaskDataLayerUpdate(void *pt)
   }
 }
 
-esp_err_t sendCB(uint8_t *peer_addr)
-{
-  return esp_now_send(peer_addr,
-                      (uint8_t *)&controller.data, sizeof(controller.data));
-}
-
 void ISR()
 {
   if (radio.status == RADIO_CONNECTED)
@@ -165,7 +161,7 @@ void ISR()
 void setup()
 {
   Serial.begin(115200);
-  controller.begin();
+  Controller.begin();
 
   // 注册页面
   wouoUI.addPage(P_MENU);
@@ -195,9 +191,8 @@ void setup()
   pinMode(0, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(0), ISR, RISING);
 
+  car_controll_start();
   vTaskDelete(NULL); // 干掉 loopTask
 }
 
-void loop()
-{
-}
+void loop() {}

@@ -68,7 +68,6 @@ private:
   mac_addr_t __mac_addr; // 此设备mac 地址
 
 public:
-  radio_data_t dataToSent;     // 待发送数据
   esp_now_peer_info peer_info; // 配对信息
   radio_status_t status;       // 无线状态
   esp_err_t pairNewDevice();   // 配对新设备
