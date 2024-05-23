@@ -1,12 +1,15 @@
 #include <U8g2lib.h>
 #include <EEPROM.h>
 
-// 事件id
-#define BTN_ID_UP 0      // 上翻
-#define BTN_ID_DO 1      // 下翻
-#define BTN_ID_CONFIRM 2 // 确认
-#define BTN_ID_CANCEL 3  // 返回
-#define BTN_ID_MENU 4    // 菜单
+// 按键事件
+typedef enum
+{
+  BTN_ID_UP,      // 上翻
+  BTN_ID_DO,      // 下翻
+  BTN_ID_CONFIRM, // 确认
+  BTN_ID_CANCEL,  // 返回
+  BTN_ID_MENU     // 菜单
+} key_event_t;
 
 // UI变量
 #define UI_DEPTH 256 // 页面栈深度
@@ -119,13 +122,13 @@ public:
   uint8_t index;                  // 页码
 
   // 创建页面，在页面初始化时被调用
-  virtual void create(){};
+  virtual void create() {};
 
   // 在页面渲染前被调用
-  virtual void before(){};
+  virtual void before() {};
 
   // 在离开页面时调用
-  virtual void leave(){};
+  virtual void leave() {};
 
   // 当有输入时被调用
   virtual void onUserInput(int8_t) {}

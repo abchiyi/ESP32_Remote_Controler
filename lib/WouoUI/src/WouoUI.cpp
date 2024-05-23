@@ -352,6 +352,9 @@ void WouoUI::uiUpdate()
   this->u8g2->sendBuffer();
   // ESP_LOGI(TAG, "ui.state %d, ui.index %d, ui.layer %d, ui.select[ui.layer] %d,view length[ui.index] %d", this->ui_v.state, this->ui_v.index, this->ui_v.layer, this->ui_v.select[this->ui_v.layer], ui_lenght);
 
+  TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
+  const TickType_t xFrequency = pdMS_TO_TICKS(10       );
+
   switch (this->ui.state)
   {
   case STATE_LAYER_IN:
@@ -374,6 +377,7 @@ void WouoUI::uiUpdate()
     }
     page->render();
   }
+  xTaskDelayUntil(&xLastWakeTime, xFrequency);
 }
 
 const TickType_t xFreequency = 10; // 渲染一帧间隔 /ms
