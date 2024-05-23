@@ -162,6 +162,7 @@ void setup()
 {
   Serial.begin(115200);
   Controller.begin();
+  car_controll_start();
 
   // 注册页面
   wouoUI.addPage(P_MENU);
@@ -191,7 +192,6 @@ void setup()
   pinMode(0, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(0), ISR, RISING);
 
-  car_controll_start();
   vTaskDelete(NULL); // 干掉 loopTask
 }
 

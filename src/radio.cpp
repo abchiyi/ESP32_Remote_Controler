@@ -241,6 +241,9 @@ esp_err_t Radio::pairNewDevice()
 // 接收回调
 void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
+  if (incomingData == nullptr)
+    return;
+
   memcpy(&radio_data, incomingData, sizeof(radio_data));
   memcpy(&radio_data.mac_addr, mac, sizeof(radio_data.mac_addr));
   if (xQueueSend(Q_RECV_DATA, &radio_data, 10) != pdPASS)
@@ -281,7 +284,7 @@ void onSend(const uint8_t *mac_addr, esp_now_send_status_t status)
 // 主任务
 void TaskRadioMainLoop(void *pt)
 {
-  const static TickType_t xFrequency = pdMS_TO_TICKS(15);
+  const static TickType_t xFrequency = pdMS_TO_TICKS(6);
   static TickType_t xLastWakeTime;
   static TickType_t end;
   static TickType_t start;
@@ -308,6 +311,7 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_CONNECTED:
+      // start = xTaskGetTickCount();
       if (radio.status != RADIO_CONNECTED)
         break;
       xQueueReceive(Q_DATA_SEND, &radio_data_send, 1);
@@ -315,6 +319,8 @@ void TaskRadioMainLoop(void *pt)
       if (wait_response(radio.timeout_resend, &radio_data))
         ;
       xTaskDelayUntil(&xLastWakeTime, xFrequency);
+      // end = xTaskGetTickCount();
+      // ESP_LOGI(TAG, "run %d Hz", 1000 / (end - start));
       break;
 
     case RADIO_BEFORE_DISCONNECT:
