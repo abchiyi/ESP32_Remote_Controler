@@ -141,26 +141,26 @@ public:
    * @param progress -1 ~ 1 的一个浮点数，用于确定进度条百分比
    * @param x x轴起始位置
    * @param y y轴起始位置
-   * @param height 高度
-   * @param width 宽度
+   * @param width 滑动条宽度
+   * @param length 滑动条长度
    * @param biaxial 双向摆动模式，根据输入值的正负确定摆动方向
    */
   void draw_slider_y(float progress,
-                     uint8_t x, uint8_t y, uint8_t height = 60,
-                     uint8_t width = 4, bool biaxial = false);
+                     uint8_t x, uint8_t y, uint8_t width = 4,
+                     uint8_t length = 60, bool biaxial = false);
 
   /**
    * @brief 绘制一个横向的进度条
    * @param progress -1 ~ 1 的一个浮点数，用于确定进度条百分比
    * @param x x轴起始位置
    * @param y y轴起始位置
-   * @param height 高度
-   * @param width 宽度
+   * @param width 滑动条宽度
+   * @param length 滑动条长度
    * @param biaxial 双向摆动模式，根据输入值的正负确定摆动方向
    */
   void draw_slider_x(float progress,
-                     uint8_t x, uint8_t y, uint8_t height = 4,
-                     uint8_t width = 60, bool biaxial = false);
+                     uint8_t x, uint8_t y, uint8_t width = 4,
+                     uint8_t length = 60, bool biaxial = false);
 };
 
 class ListPage : public BasePage

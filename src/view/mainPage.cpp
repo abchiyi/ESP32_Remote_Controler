@@ -4,6 +4,11 @@
 #include <radio.h>
 #include <car.h>
 
+#define slider_width 6
+#define slider_length 45
+
+#define TAG "Main page"
+
 class MainPage : public BasePage
 {
 
@@ -16,9 +21,9 @@ public:
 
   void before()
   {
+    ESP_LOGI(TAG, "init page");
     u8g2->setFont(LIST_FONT);
     u8g2->setDrawColor(2);
-    ESP_LOGI(this->name, "set u8g2 font");
   }
 
   void onUserInput(int8_t btnID)
@@ -31,34 +36,49 @@ public:
     }
   };
 
+  void render_channel_view()
+  {
+    // TODO 通道数据可配置，而非固定
+    float joy_l_x = Controller.joyLHori / 2048.0;
+    float joy_l_y = Controller.joyLVert / 2048.0;
+
+    float joy_r_x = Controller.joyRHori / 2048.0;
+    float joy_r_y = Controller.joyRVert / 2048.0;
+
+    // slider 1
+    this->draw_slider_y(joy_l_y,
+                        0, gui->DISPLAY_HEIGHT - slider_length,
+                        slider_width, slider_length,
+                        true);
+
+    // slider 2
+    this->draw_slider_x(joy_l_x,
+                        10, gui->DISPLAY_HEIGHT - slider_width,
+                        slider_width, slider_length,
+                        true);
+
+    ESP_LOGI(TAG, "%.2f", joy_l_y);
+
+    // slider 3
+    this->draw_slider_y(joy_r_y,
+                        gui->DISPLAY_WIDTH - slider_width, gui->DISPLAY_HEIGHT - slider_length,
+                        slider_width, slider_length,
+                        true);
+
+    // slider 4
+    this->draw_slider_x(joy_r_x,
+                        gui->DISPLAY_WIDTH - slider_length - 10, gui->DISPLAY_HEIGHT - slider_width,
+                        slider_width, slider_length,
+                        true);
+  };
+
   void render()
   {
-    u8g2->setCursor(0, 8);
-    u8g2->printf("%s | %s",
-                 radio.status == RADIO_CONNECTED ? "CONNECTED" : "DISCONNECT", radio.status == RADIO_PAIR_DEVICE ? "P--" : "---");
+    this->render_channel_view();
 
-    float v = Controller.joyLHori / 2048.0;  // 百分比
-    float v2 = Controller.joyLVert / 2048.0; // 百分比
-    u8g2->setCursor(0, 20);
-    u8g2->printf("X %.2f ", v);
-    u8g2->setCursor(0, 30);
-    u8g2->printf("Y %.2f", v2);
-
-    uint8_t width = 60; // 进度条宽度
-    uint8_t height = 4; // 进度条高度
-    uint8_t x = 0;      // 进度条x坐标
-    uint8_t y = 4;
-
-    this->draw_slider_x(v, 2, 64 - (height * 4 + 4), height, 61);
-    this->draw_slider_x(v, 2, 64 - (height * 3 + 3), height, 61, true);
-
-    this->draw_slider_x(v, 2, 64 - (height * 2 + 2), height, width);
-    this->draw_slider_x(v, 2, 64 - height, height, width, true);
-
-    this->draw_slider_y(v2, 70, 15, 40, 4, true);
-    this->draw_slider_y(v2, 80, 15, 41, 4, true);
-    this->draw_slider_y(v2, 90, 15, 40, 4);
-    this->draw_slider_y(v2, 100, 15, 41, 4);
+    // u8g2->setCursor(0, 8);
+    // u8g2->printf("%s | %s",
+    //              radio.status == RADIO_CONNECTED ? "CONNECTED" : "DISCONNECT", radio.status == RADIO_PAIR_DEVICE ? "P--" : "---");
 
     // auto data = get_channel_status().channel[0];
     // auto gear = (data >> 2) & 0x03;
