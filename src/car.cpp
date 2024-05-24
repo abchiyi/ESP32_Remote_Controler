@@ -106,6 +106,7 @@ void task_controll_main(void *pt)
   {
     if (radio.status == RADIO_CONNECTED && Xbox.XboxOneConnected)
     {
+      // TODO 判断接收机的工作模式以对应的模式发送控制数据
       set_channel(&data_to_send);
       radio.set_data(&data_to_send);
     }
