@@ -14,11 +14,7 @@
 // 车辆控制
 #include "car.h"
 
-// #include <XBOXONE.h>
-
 // 显示
-// #include <display.h>
-
 // gui
 #include <U8g2lib.h>
 #include <WouoUI.h>
