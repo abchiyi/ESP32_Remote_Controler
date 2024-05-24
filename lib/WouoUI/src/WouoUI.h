@@ -89,7 +89,7 @@ typedef const char *page_name_t;
 
 void animation(float *a, float *a_trg, uint8_t n);
 
-// 菜单
+// 列表页面 view
 typedef struct MENU
 {
   const char *m_select;
@@ -135,6 +135,32 @@ public:
 
   // 页面绘制函数， 必须被子类覆盖
   virtual void render() = 0;
+
+  /**
+   * @brief 绘制一个轴向的进度条
+   * @param progress -1 ~ 1 的一个浮点数，用于确定进度条百分比
+   * @param x x轴起始位置
+   * @param y y轴起始位置
+   * @param height 高度
+   * @param width 宽度
+   * @param biaxial 双向摆动模式，根据输入值的正负确定摆动方向
+   */
+  void draw_slider_y(float progress,
+                     uint8_t x, uint8_t y, uint8_t height = 60,
+                     uint8_t width = 4, bool biaxial = false);
+
+  /**
+   * @brief 绘制一个横向的进度条
+   * @param progress -1 ~ 1 的一个浮点数，用于确定进度条百分比
+   * @param x x轴起始位置
+   * @param y y轴起始位置
+   * @param height 高度
+   * @param width 宽度
+   * @param biaxial 双向摆动模式，根据输入值的正负确定摆动方向
+   */
+  void draw_slider_x(float progress,
+                     uint8_t x, uint8_t y, uint8_t height = 4,
+                     uint8_t width = 60, bool biaxial = false);
 };
 
 class ListPage : public BasePage
