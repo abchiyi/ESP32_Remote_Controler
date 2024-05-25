@@ -4,7 +4,6 @@
 
 #define MAX_CHANNEL 8 // 最大控制通道数量
 
-typedef esp_err_t (*send_cb_t)(uint8_t *);
 typedef uint8_t mac_addr_t[ESP_NOW_ETH_ALEN];
 
 typedef enum radio_status
@@ -58,6 +57,13 @@ typedef struct radio_data
   uint16_t channel[MAX_CHANNEL]; // 通道信息
 } radio_data_t;
 
+// 配置信息
+typedef struct radio_config
+{
+  mac_addr_t paired_devices[6];     // 已配对设备
+  mac_addr_t last_connected_device; // 最后连接过的设备
+} radio_config_t;
+
 /**
  * @brief 无线通讯
  */
@@ -70,7 +76,14 @@ private:
 public:
   esp_now_peer_info peer_info; // 配对信息
   radio_status_t status;       // 无线状态
-  esp_err_t pairNewDevice();   // 配对新设备
+
+  // 接收一个配置用于初始化Radio配置
+  void set_config(radio_config_t *config);
+
+  // 输出当前配置
+  void out_config(radio_config_t *config);
+
+  esp_err_t pairNewDevice(); // 配对新设备
 
   template <typename T>
   bool send(const T &data);

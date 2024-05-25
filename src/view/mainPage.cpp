@@ -57,8 +57,6 @@ public:
                         slider_width, slider_length,
                         true);
 
-    ESP_LOGI(TAG, "%.2f", joy_l_y);
-
     // slider 3
     this->draw_slider_y(joy_r_y,
                         gui->DISPLAY_WIDTH - slider_width, gui->DISPLAY_HEIGHT - slider_length,

@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <esp_log.h>
 
+// 储存
+#include "storage_config.h"
+
 // 无线依赖
 #include <esp_now.h>
 #include <esp_wifi.h>
@@ -157,6 +160,9 @@ void ISR()
 void setup()
 {
   Serial.begin(115200);
+
+  Storage_config.begin();
+
   Controller.begin();
   car_controll_start();
 

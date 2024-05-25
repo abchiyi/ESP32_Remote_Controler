@@ -6,6 +6,8 @@
 #include <esp_err.h>
 #include <cstring>
 #include <esp_mac.h>
+#include <deque>
+#include <EEPROM.h>
 
 #define TAG "Radio"
 
@@ -18,6 +20,8 @@ using namespace std;
 
 Radio radio;
 radio_data_t radio_data;
+
+radio_config RADIO_CONFIG; // 无线配置
 
 radio_data_t radio_data_recv;
 radio_data_t radio_data_send;
@@ -34,6 +38,17 @@ SemaphoreHandle_t CAN_CONNECT_LAST = NULL; // 连接到最后一次通讯的地�
 
 TimerHandle_t ConnectTimeoutTimer;
 const int ConnectTimeoutTimerID = 0;
+
+void save_config(radio_config_t config)
+{
+  EEPROM.put(0, RADIO_CONFIG);
+  EEPROM.commit();
+};
+
+void read_confg()
+{
+  EEPROM.get(0, RADIO_CONFIG);
+}
 
 // 连接超时控制器回调
 void IfTimeoutCB(TimerHandle_t xTimer)
@@ -144,6 +159,12 @@ bool Radio::send(const T &data)
     error_message = String("peer is not found");
   case ESP_ERR_ESPNOW_IF:
     error_message = String("current WiFi interface doesn't match that of peer");
+  case ESP_ERR_ESPNOW_NOT_INIT:
+    error_message = String("ESPNOW is not initialized");
+  case ESP_ERR_ESPNOW_ARG:
+    error_message = String("invalid argument");
+  case ESP_ERR_ESPNOW_INTERNAL:
+    error_message = String("internal error");
   default:
     error_message = String("Send fail");
   }
@@ -161,7 +182,10 @@ bool handshake(mac_addr_t mac_addr)
   radio_data_t data;
   mac_addr_t newAddr; // 新地址
 
-  radio.send(data); // todo 验证响应地址
+  if (!radio.send(data)) // 发送失败退出握手
+    return false;
+  // todo 验证响应地址
+
   wait_response(radio.timeout_resend, &data);
 
   // 当通道 0 有数据时表示响应设备将使用另一地址与主机通讯
@@ -228,6 +252,7 @@ esp_err_t Radio::pairNewDevice()
   ESP_LOGI(TAG, "Target AP : %s", tragetAP->toStr().c_str());
 
   //---------------- 握手 -----------------
+
   // 配对到从机 AP 地址&等待响应
   ESP_LOGI(TAG, "Pir to AP");
   pairTo(tragetAP->MAC, tragetAP->CHANNEL, WIFI_IF_STA);
@@ -235,6 +260,12 @@ esp_err_t Radio::pairNewDevice()
     return ESP_FAIL;
   ESP_LOGI(TAG, "" MACSTR " - HANDSHAKE SUCCESS",
            MAC2STR(radio.peer_info.peer_addr));
+
+  // 设置最后连接的地址
+  memcpy(&RADIO_CONFIG.last_connected_device,
+         &radio.peer_info.peer_addr,
+         sizeof(mac_addr_t));
+  save_config(RADIO_CONFIG);
   return ESP_OK;
 }
 
@@ -288,6 +319,9 @@ void TaskRadioMainLoop(void *pt)
   static TickType_t xLastWakeTime;
   static TickType_t end;
   static TickType_t start;
+
+  uint8_t counter_pair_new_fail = 0;
+
   while (true)
   {
     switch (radio.status)
@@ -296,11 +330,16 @@ void TaskRadioMainLoop(void *pt)
       // TODO 在规定时间内没有配对到设备时，发出错误提示
       if (radio.pairNewDevice() != ESP_OK)
       {
-        radio.status = RADIO_BEFORE_DISCONNECT;
-        ESP_LOGI(TAG, "Pair New Devices Fail :(");
-        break;
+        counter_pair_new_fail++;
+        if (counter_pair_new_fail >= 5)
+        {
+          radio.status = RADIO_BEFORE_DISCONNECT;
+          ESP_LOGI(TAG, "Pair New Devices Fail :(");
+          break;
+        }
       }
-      radio.status = RADIO_BEFORE_CONNECTED;
+      else
+        radio.status = RADIO_BEFORE_CONNECTED;
       break;
 
     case RADIO_BEFORE_CONNECTED:
@@ -330,11 +369,13 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_DISCONNECT:
+      ESP_LOGI(TAG, "RADIO_DISCONNECT");
       // if (xSemaphoreTake(CAN_CONNECT_LAST, radio.timeout_resend) == pdTRUE)
-      //   if (handshake(radio.peer_info.peer_addr))
-      //     radio.status = RADIO_BEFORE_CONNECTED;
-      //   else
-      //     xSemaphoreGive(CAN_CONNECT_LAST);
+      // if (handshake(radio.peer_info.peer_addr))
+      if (handshake(RADIO_CONFIG.last_connected_device))
+        radio.status = RADIO_BEFORE_CONNECTED;
+      // else
+      // xSemaphoreGive(CAN_CONNECT_LAST);
       vTaskDelay(radio.timeout_resend);
       break;
 
@@ -390,7 +431,6 @@ void Radio::initRadio()
 
 /**
  * @brief 启动无线
- * @param data_to_sent 要发送的数据指针
  */
 void Radio::begin()
 {
@@ -417,13 +457,16 @@ void Radio::begin()
   xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 1024 * 10, NULL, 24, NULL);
 
   ESP_LOGI(TAG, "Radio started :)");
+
+  ESP_LOGI(TAG, "Read eeprom");
+  EEPROM.begin(512);
+  read_confg();
+  pairTo(RADIO_CONFIG.last_connected_device, 1);
 }
 
 /**
  * @brief 启动无线
- * @param data_to_sent 要发送的数据指针
  * @param timeout 实际超时时间为 (timeout * send_gap) ms
- * @param send_gap 要发送的数据指针 数据发送间隔
  */
 void Radio::begin(uint8_t timeout)
 {
@@ -448,4 +491,21 @@ esp_err_t Radio::set_data(radio_data_t *data)
   return xQueueSend(Q_DATA_SEND, data, 5) != pdTRUE
              ? ESP_FAIL
              : ESP_OK;
+}
+
+typedef vector<int> Array8; // 定义8位数组类型
+
+void updateArray(deque<Array8> &arr, const Array8 &newData)
+{
+  arr.pop_front();        // 删除数组的第一位元素
+  arr.push_back(newData); // 添加新数据到数组的末尾
+}
+
+void Radio::set_config(radio_config_t *config)
+{
+  memcpy(&RADIO_CONFIG, config, sizeof(radio_config_t));
+}
+void Radio::out_config(radio_config_t *config)
+{
+  memcpy(config, &RADIO_CONFIG, sizeof(radio_config_t));
 }
