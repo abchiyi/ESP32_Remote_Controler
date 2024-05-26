@@ -77,12 +77,6 @@ public:
   esp_now_peer_info peer_info; // 配对信息
   radio_status_t status;       // 无线状态
 
-  // 接收一个配置用于初始化Radio配置
-  void set_config(radio_config_t *config);
-
-  // 输出当前配置
-  void out_config(radio_config_t *config);
-
   esp_err_t pairNewDevice(); // 配对新设备
 
   template <typename T>
@@ -103,4 +97,5 @@ public:
   uint8_t timeout_disconnect = 250; // 超时断开连接
 };
 
-extern Radio radio;
+extern radio_config CONFIG_RADIO;
+extern Radio RADIO;

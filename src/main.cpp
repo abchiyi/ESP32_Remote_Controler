@@ -151,17 +151,17 @@ void TaskDataLayerUpdate(void *pt)
 
 void ISR()
 {
-  if (radio.status == RADIO_CONNECTED)
-    radio.status = RADIO_BEFORE_DISCONNECT;
+  if (RADIO.status == RADIO_CONNECTED)
+    RADIO.status = RADIO_BEFORE_DISCONNECT;
   else
-    radio.status = RADIO_PAIR_DEVICE;
+    RADIO.status = RADIO_PAIR_DEVICE;
 };
 
 void setup()
 {
   Serial.begin(115200);
 
-  Storage_config.begin();
+  read_all();
 
   Controller.begin();
   car_controll_start();
@@ -182,7 +182,7 @@ void setup()
 
   vTaskDelay(100);
 
-  radio.begin();
+  RADIO.begin();
 
   // 设置数据层更新任务
   xTaskCreatePinnedToCore(
@@ -194,7 +194,11 @@ void setup()
   pinMode(0, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(0), ISR, RISING);
 
-  vTaskDelete(NULL); // 干掉 loopTask
+  // vTaskDelete(NULL); // 干掉 loopTask
 }
 
-void loop() {}
+void loop()
+{
+  vTaskDelay(1000);
+  save_all();
+}
