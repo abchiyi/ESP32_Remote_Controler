@@ -70,7 +70,6 @@ typedef struct radio_config
 class Radio
 {
 private:
-  void initRadio();      // 初始化无线
   mac_addr_t __mac_addr; // 此设备mac 地址
 
 public:

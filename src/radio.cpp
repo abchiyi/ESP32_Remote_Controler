@@ -125,42 +125,6 @@ bool pairTo(
   }
 }
 
-template <typename T>
-bool Radio::send(const T &data)
-{
-  // ESP_LOGI(TAG, "Send to " MACSTR " - pd of : %d",
-  //          MAC2STR(this->peer_info.peer_addr), &data);
-
-  auto status = esp_now_send(this->peer_info.peer_addr,
-                             (uint8_t *)&data, sizeof(data));
-  String error_message;
-
-  if (status == ESP_OK)
-    return true;
-
-  switch (status)
-  {
-  case ESP_ERR_ESPNOW_NO_MEM:
-    error_message = String("out of memory");
-  case ESP_ERR_ESPNOW_NOT_FOUND:
-    error_message = String("peer is not found");
-  case ESP_ERR_ESPNOW_IF:
-    error_message = String("current WiFi interface doesn't match that of peer");
-  case ESP_ERR_ESPNOW_NOT_INIT:
-    error_message = String("ESPNOW is not initialized");
-  case ESP_ERR_ESPNOW_ARG:
-    error_message = String("invalid argument");
-  case ESP_ERR_ESPNOW_INTERNAL:
-    error_message = String("internal error");
-  default:
-    error_message = String("Send fail");
-  }
-
-  ESP_LOGE(TAG, "Send to " MACSTR " - %s",
-           MAC2STR(this->peer_info.peer_addr), error_message.c_str());
-  return false;
-}
-
 /**
  * @brief 与指定地址握手
  */
@@ -195,60 +159,6 @@ bool handshake(mac_addr_t mac_addr)
     return false;
   }
 };
-
-/**
- * @brief 配对新设备
- * @return esp_err_t ESP_OK/ESP_FAIL
- */
-esp_err_t Radio::pairNewDevice()
-{
-  vector<ap_info> ap_infos(0);
-  int16_t scanResults = 0;
-
-  ESP_LOGI(TAG, "Start scan");
-  // 扫描1~13信道，过滤并储存所有查找到的AP信息
-  for (size_t channel_i = 1; channel_i < 14; channel_i++)
-  {
-    scanResults = WiFi.scanNetworks(0, 0, 0, 100, channel_i);
-    if (scanResults == 0) // 当前信道没有扫描到AP跳转到下一信道扫描
-      continue;
-    for (int i = 0; i < scanResults; i++)
-      // 过滤 AP,由特定字符起始则被视为一个可以配对的设备
-      if (WiFi.SSID(i).indexOf(SLAVE_KE_NAME) == 0)
-        ap_infos.emplace_back(ap_info(
-            WiFi.SSID(i),
-            WiFi.RSSI(i),
-            WiFi.channel(i),
-            WiFi.BSSID(i)));
-    vTaskDelay(1);
-    WiFi.scanDelete(); // 清除扫描信息
-  }
-
-  // 打印所有扫描到的 AP
-  for (size_t i = 0; i < ap_infos.size(); i++)
-    ESP_LOGI(TAG, "%s", ap_infos[i].toStr().c_str());
-
-  ESP_LOGI(TAG, "AP scan comp");
-
-  if (ap_infos.size() < 1) // 没有AP被扫描到
-    return ESP_FAIL;
-
-  // 查找信号最强的AP并与其配对
-  auto tragetAP =
-      &ap_infos[max_element(ap_infos.begin(), ap_infos.end()) - ap_infos.begin()];
-  ESP_LOGI(TAG, "Target AP : %s", tragetAP->toStr().c_str());
-
-  //---------------- 握手 -----------------
-
-  // 配对到从机 AP 地址&等待响应
-  ESP_LOGI(TAG, "Pir to AP");
-  pairTo(tragetAP->MAC, tragetAP->CHANNEL, WIFI_IF_STA);
-  if (!handshake(tragetAP->MAC))
-    return ESP_FAIL;
-  ESP_LOGI(TAG, "" MACSTR " - HANDSHAKE SUCCESS",
-           MAC2STR(RADIO.peer_info.peer_addr));
-  return ESP_OK;
-}
 
 // 接收回调
 void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
@@ -321,15 +231,9 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_BEFORE_CONNECTED:
-      // 设置最后连接的地址
-      memcpy(&CONFIG_RADIO.last_connected_device,
-             &RADIO.peer_info.peer_addr,
-             sizeof(mac_addr_t));
-
       ESP_LOGI(TAG, "CONNECTED :)");
       RADIO.status = RADIO_CONNECTED;
       xLastWakeTime = xTaskGetTickCount();
-
       break;
 
     case RADIO_CONNECTED:
@@ -368,8 +272,100 @@ void TaskRadioMainLoop(void *pt)
   }
 }
 
+template <typename T>
+bool Radio::send(const T &data)
+{
+  // ESP_LOGI(TAG, "Send to " MACSTR " - pd of : %d",
+  //          MAC2STR(this->peer_info.peer_addr), &data);
+
+  auto status = esp_now_send(this->peer_info.peer_addr,
+                             (uint8_t *)&data, sizeof(data));
+  String error_message;
+
+  if (status == ESP_OK)
+    return true;
+
+  switch (status)
+  {
+  case ESP_ERR_ESPNOW_NO_MEM:
+    error_message = String("out of memory");
+  case ESP_ERR_ESPNOW_NOT_FOUND:
+    error_message = String("peer is not found");
+  case ESP_ERR_ESPNOW_IF:
+    error_message = String("current WiFi interface doesn't match that of peer");
+  case ESP_ERR_ESPNOW_NOT_INIT:
+    error_message = String("ESPNOW is not initialized");
+  case ESP_ERR_ESPNOW_ARG:
+    error_message = String("invalid argument");
+  case ESP_ERR_ESPNOW_INTERNAL:
+    error_message = String("internal error");
+  default:
+    error_message = String("Send fail");
+  }
+
+  ESP_LOGE(TAG, "Send to " MACSTR " - %s",
+           MAC2STR(this->peer_info.peer_addr), error_message.c_str());
+  return false;
+}
+
+/**
+ * @brief 配对新设备
+ * @return esp_err_t ESP_OK/ESP_FAIL
+ */
+esp_err_t Radio::pairNewDevice()
+{
+  vector<ap_info> ap_infos(0);
+  int16_t scanResults = 0;
+
+  ESP_LOGI(TAG, "Start scan");
+  // 扫描1~13信道，过滤并储存所有查找到的AP信息
+  for (size_t channel_i = 1; channel_i < 14; channel_i++)
+  {
+    scanResults = WiFi.scanNetworks(0, 0, 0, 100, channel_i);
+    if (scanResults == 0) // 当前信道没有扫描到AP跳转到下一信道扫描
+      continue;
+    for (int i = 0; i < scanResults; i++)
+      // 过滤 AP,由特定字符起始则被视为一个可以配对的设备
+      if (WiFi.SSID(i).indexOf(SLAVE_KE_NAME) == 0)
+        ap_infos.emplace_back(ap_info(
+            WiFi.SSID(i),
+            WiFi.RSSI(i),
+            WiFi.channel(i),
+            WiFi.BSSID(i)));
+    vTaskDelay(1);
+    WiFi.scanDelete(); // 清除扫描信息
+  }
+
+  // 打印所有扫描到的 AP
+  for (size_t i = 0; i < ap_infos.size(); i++)
+    ESP_LOGI(TAG, "%s", ap_infos[i].toStr().c_str());
+
+  ESP_LOGI(TAG, "AP scan comp");
+
+  if (ap_infos.size() < 1) // 没有AP被扫描到
+    return ESP_FAIL;
+
+  // 查找信号最强的AP并与其配对
+  auto index = max_element(ap_infos.begin(), ap_infos.end()) - ap_infos.begin();
+  auto tragetAP = &ap_infos[index];
+  //---------------- 握手 -----------------
+
+  // 配对到从机 AP 地址&等待响应
+  ESP_LOGI(TAG, "Pir to AP: %s", tragetAP->toStr().c_str());
+
+  pairTo(tragetAP->MAC, tragetAP->CHANNEL, WIFI_IF_STA);
+  if (!handshake(tragetAP->MAC))
+    return ESP_FAIL;
+  // 设置最后连接的地址
+  memcpy(&CONFIG_RADIO.last_connected_device,
+         &RADIO.peer_info.peer_addr,
+         sizeof(mac_addr_t));
+  ESP_LOGI(TAG, "" MACSTR " - HANDSHAKE SUCCESS", MAC2STR(RADIO.peer_info.peer_addr));
+  return ESP_OK;
+}
+
 // 初始化无线
-void Radio::initRadio()
+void initRadio()
 {
   // set wifi
   ESP_LOGI(TAG, "Init wifi");
@@ -429,7 +425,7 @@ void Radio::begin()
   // 写入本机的 MAC 地址
   WiFi.macAddress(this->__mac_addr);
 
-  this->initRadio();
+  initRadio();
   this->status = RADIO_DISCONNECT;
 
   ESP_LOGI(TAG, "mac " MACSTR "", MAC2STR(CONFIG_RADIO.last_connected_device));
@@ -470,7 +466,6 @@ esp_err_t Radio::set_data(radio_data_t *data)
 }
 
 typedef vector<int> Array8; // 定义8位数组类型
-
 void updateArray(deque<Array8> &arr, const Array8 &newData)
 {
   arr.pop_front();        // 删除数组的第一位元素
