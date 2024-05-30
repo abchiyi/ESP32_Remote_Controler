@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <esp_log.h>
+#include "EEPROM.h"
 
 // 储存
 #include "storage_config.h"
@@ -30,6 +31,7 @@
 #include <view/sleep.h>
 #include <view/menu.h>
 #include <view/mainPage.h>
+#include "view/setting_devces.h"
 
 #define TAG "Main ESP32 RC"
 
@@ -81,17 +83,17 @@ void singleBtnScan(WouoUI *gui, uint8_t *s_btn, uint8_t *LPT_flag, uint8_t activ
       while (*s_btn) // 计算按压时间
       {
         btn.count++;
-        if (btn.count > ui.param[BTN_LPT])
+        if (btn.count > CONFIG_UI[BTN_LPT])
           break;
         delay(1);
       }
-      *LPT_flag = (btn.count < ui.param[BTN_LPT]) ? 0 : 1;
+      *LPT_flag = (btn.count < CONFIG_UI[BTN_LPT]) ? 0 : 1;
       gui->btnPressed = true;
     }
     else
     {
       gui->btnPressed = 1;
-      vTaskDelay(ui.param[BTN_SPT]);
+      vTaskDelay(CONFIG_UI[BTN_SPT]);
     }
   }
 }
@@ -164,7 +166,7 @@ void setup()
   read_all();
 
   Controller.begin();
-  car_controll_start();
+  // car_controll_start();
 
   // 注册页面
   wouoUI.addPage(P_MENU);
@@ -175,6 +177,7 @@ void setup()
   wouoUI.addPage(F0TOY);
   wouoUI.addPage(P_SLEEP);
   wouoUI.addPage(P_MAIN);
+  wouoUI.addPage(P_DEVICES);
 
   wouoUI.setDefaultPage(P_MAIN);
 
@@ -182,7 +185,7 @@ void setup()
 
   vTaskDelay(100);
 
-  RADIO.begin();
+  // RADIO.begin();
 
   // 设置数据层更新任务
   xTaskCreatePinnedToCore(
@@ -193,7 +196,6 @@ void setup()
   vTaskDelay(100);
   pinMode(0, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(0), ISR, RISING);
-
   // vTaskDelete(NULL); // 干掉 loopTask
 }
 

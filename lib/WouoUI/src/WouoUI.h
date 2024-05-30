@@ -1,6 +1,8 @@
 #include <U8g2lib.h>
 #include <EEPROM.h>
 
+#pragma once
+
 // 按键事件
 typedef enum
 {
@@ -60,15 +62,6 @@ struct
 
 // EEPROM变量
 #define EEPROM_CHECK 11
-
-struct
-{
-  bool init;
-  bool change;
-  int address;
-  uint8_t check;
-  uint8_t check_param[EEPROM_CHECK] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'};
-} eeprom;
 
 // 选择框变量
 #define CB_U 2
@@ -225,9 +218,11 @@ typedef struct UI_VARIABLE
   page_index_t index;         // 当前绘制页面的页码
   uint8_t state = STATE_VIEW; // 页面绘制状态
   uint8_t select[UI_DEPTH];   // list_page 当前选中的条目
-  uint8_t param[UI_PARAM];    // 储存UI参数，如列表动画时间
+  // uint8_t param[UI_PARAM];    // 储存UI参数，如列表动画时间
   BasePage *objPage[UI_DEPTH];
 } ui_variable_t;
+
+extern uint8_t CONFIG_UI[UI_PARAM]; // 储存UI参数，如列表动画时间
 
 class WouoUI
 {
@@ -276,66 +271,6 @@ public:
   void uiUpdate();
   void btnUpdate(void (*func)(WouoUI *));
 
-  uint16_t maxMuimSize = 512;
-  uint16_t usedSize;
-
-  template <typename T>
-  bool eepromReadData(BasePage *page, T &_data)
-  {
-    uint8_t length = 0;
-    uint8_t p = 0;
-    for (size_t i = 0; i < maxMuimSize; i++)
-    {
-      length = EEPROM.read(i);
-      if (length == 0 || i < p)
-      {
-        ESP_LOGI(page->name, "continue - addr:%d, length:%u P:%u", i, length, p);
-        continue;
-      }
-      else
-      {
-        ESP_LOGI(page->name,
-                 "read length - addr:%d, length:%u P:%u", i, length, p);
-        if (EEPROM.read(i + 1) == page->index)
-        {
-          ESP_LOGI(page->name,
-                   "get data - addr:%d, length:%u P:%u",
-                   i + 1, length, p);
-          EEPROM.get(i + 2, _data);
-          return true;
-        }
-        else
-        {
-          p = (length + i);
-          ESP_LOGI(page->name, "page.index Error - addr:%d, length:%u P:%u", i + 1, length, p);
-        }
-      }
-    }
-
-    return false;
-  };
-
-  template <typename T>
-  void eepromWriteData(BasePage *page, const T &_data)
-  {
-    for (size_t i = 0; i < maxMuimSize; i++)
-    {
-      EEPROM.write(i, 0);
-    };
-
-    uint8_t dataSize = sizeof(page->index) + sizeof(_data) + sizeof(dataSize);
-
-    EEPROM.write(14, dataSize);
-    EEPROM.write(15, page->index + 1);
-    EEPROM.put(16, _data);
-
-    EEPROM.write(100, dataSize);
-    EEPROM.write(101, page->index);
-    EEPROM.put(102, _data);
-
-    EEPROM.commit();
-  };
-
   struct size
   {
     uint8_t index;
@@ -343,33 +278,4 @@ public:
 
     size(uint8_t _index, uint16_t _size) : index(_index), dataSize(_size){};
   };
-
-  size *sizeRegArray[256];
-
-  template <typename T>
-  bool eepromReg(BasePage *page, const T &_data)
-  {
-    uint16_t maxMuimSize = 512;
-    static uint16_t usedSize = 0;
-
-    uint16_t dataSize = sizeof(page->index) + sizeof(_data) + sizeof(dataSize);
-    if (usedSize + dataSize <= maxMuimSize)
-    {
-      auto a = new size(page->index, dataSize);
-      usedSize += dataSize;
-      ESP_LOGI(page->name, "page index %u data size of %u", a->index, a->dataSize);
-      ESP_LOGI(page->name, "reg success usedSize of %u", usedSize);
-      return true;
-    }
-    return false;
-  }
-
-  // void eepromInit()
-  // {
-  //   EEPROM.get(0, this->usedSize);
-  // }
 };
-
-void eeprom_write_all_data(WouoUI *gui);
-
-#pragma once

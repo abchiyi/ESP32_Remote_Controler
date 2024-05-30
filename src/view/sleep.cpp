@@ -8,11 +8,10 @@ public:
   {
 
     this->u8g2->setPowerSave(1); // 关闭屏幕
-    eeprom_write_all_data(gui);
-    if (eeprom.change)
-    {
-      eeprom.change = false;
-    }
+    // if (eeprom.change)
+    // {
+    //   eeprom.change = false;
+    // }
   }
 
   void onUserInput(int8_t btnID)

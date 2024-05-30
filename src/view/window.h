@@ -46,7 +46,7 @@ private:
 
 public:
   page_name_t name = "pop window";
-  void create(){}; // 创建页面，在页面初始化时被调用
+  void create() {}; // 创建页面，在页面初始化时被调用
 
   friend void popWindow(const char[], uint8_t *, uint8_t, uint8_t, uint8_t, BasePage *);
 
@@ -63,7 +63,7 @@ public:
       this->box_w_trg = WIN_W;
       this->box_H = WIN_H;
       this->box_h = 0;
-      this->box_h_trg = this->box_H + gui->ui.param[WIN_Y_OS];
+      this->box_h_trg = this->box_H + CONFIG_UI[WIN_Y_OS];
       this->bar_x = 0;
 
       u8g2->setFont(WIN_FONT);
@@ -90,7 +90,7 @@ public:
       this->bar_x_trg = (float)(*this->value - this->min) / (float)(this->max - this->min) * (this->box_w_trg - 2 * WIN_TITLE_S);
     }
 
-    auto winAni = gui->ui.param[WIN_ANI];
+    auto winAni = CONFIG_UI[WIN_ANI];
     // 计算动画过渡值
     animation(&this->box_y, &this->box_y_trg, winAni);
     animation(&this->box_w, &this->box_w_trg, winAni);

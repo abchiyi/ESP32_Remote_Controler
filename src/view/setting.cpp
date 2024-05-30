@@ -2,6 +2,7 @@
 #include <view/window.h>
 #include <view/about.h>
 #include <view/menu.h>
+#include <view/setting_devces.h>
 
 M_SELECT Setting_view[]{
     {"[ Setting ]"},
@@ -18,6 +19,7 @@ M_SELECT Setting_view[]{
     {"- [ About ]"},
     {"= Raidio 1"},
     {"= Raidio 2"},
+    {"- Devices"},
 };
 
 uint8_t aaa = 1;
@@ -36,12 +38,12 @@ public:
   void before()
   {
     ListPage::before();
-    check_box.v = gui->ui.param;
-    gui->check_box_m_init(gui->ui.param);
-    gui->check_box_v_init(gui->ui.param);
+    check_box.v = CONFIG_UI;
+    gui->check_box_m_init(CONFIG_UI);
+    gui->check_box_v_init(CONFIG_UI);
     gui->check_box_s_init(&aaa, &bbb);
 
-    gui->eepromReg(this, gui->ui.param);
+    // gui->eepromReg(this, gui->ui.param);
     // gui->eepromWriteData(this, gui->ui.param);
     // gui->eepromReadData(this, gui->ui.param);
   }
@@ -57,31 +59,31 @@ public:
       gui->page_out_to(P_MENU);
       break;
     case 1:
-      popWindow("Disp Bri", &ui->param[DISP_BRI], 255, 0, 5, this);
+      popWindow("Disp Bri", &CONFIG_UI[DISP_BRI], 255, 0, 5, this);
       break;
     case 2:
-      popWindow("Box X OS", &ui->param[BOX_X_OS], 50, 0, 1, this);
+      popWindow("Box X OS", &CONFIG_UI[BOX_X_OS], 50, 0, 1, this);
       break;
     case 3:
-      popWindow("Box Y OS", &ui->param[BOX_Y_OS], 50, 0, 1, this);
+      popWindow("Box Y OS", &CONFIG_UI[BOX_Y_OS], 50, 0, 1, this);
       break;
     case 4:
-      popWindow("Win Y OS", &ui->param[WIN_Y_OS], 40, 0, 1, this);
+      popWindow("Win Y OS", &CONFIG_UI[WIN_Y_OS], 40, 0, 1, this);
       break;
     case 5:
-      popWindow("List Ani", &ui->param[LIST_ANI], 255, 20, 1, this);
+      popWindow("List Ani", &CONFIG_UI[LIST_ANI], 255, 20, 1, this);
       break;
     case 6:
-      popWindow("Win Ani", &ui->param[WIN_ANI], 255, 20, 1, this);
+      popWindow("Win Ani", &CONFIG_UI[WIN_ANI], 255, 20, 1, this);
       break;
     case 7:
-      popWindow("Fade Ani", &ui->param[FADE_ANI], 255, 0, 1, this);
+      popWindow("Fade Ani", &CONFIG_UI[FADE_ANI], 255, 0, 1, this);
       break;
     case 8:
-      popWindow("Btn SPT", &ui->param[BTN_SPT], 255, 0, 1, this);
+      popWindow("Btn SPT", &CONFIG_UI[BTN_SPT], 255, 0, 1, this);
       break;
     case 9:
-      popWindow("Btn LPT", &ui->param[BTN_LPT], 255, 0, 1, this);
+      popWindow("Btn LPT", &CONFIG_UI[BTN_LPT], 255, 0, 1, this);
       break;
     case 10:
       gui->check_box_m_select(COME_SCR);
@@ -94,6 +96,9 @@ public:
       break;
     case 13:
       gui->check_box_s_select(1, 13);
+      break;
+    case 14:
+      gui->page_in_to(P_DEVICES);
       break;
     }
   }

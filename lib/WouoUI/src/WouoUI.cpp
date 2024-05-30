@@ -41,6 +41,8 @@
 
 #define TAG "WouUI"
 
+uint8_t CONFIG_UI[UI_PARAM];
+
 /*********************************** 定义列表内容 ***********************************/
 
 M_SELECT edit_f0_menu[]{
@@ -52,81 +54,18 @@ M_SELECT edit_f0_menu[]{
 
 /************************************* 断电保存 *************************************/
 
-#include <EEPROM.h>
-
-// EEPROM写数据，回到睡眠时执行一遍
-void eeprom_write_all_data(WouoUI *gui)
-{
-  ESP_LOGI("eeprom", "write data");
-  eeprom.address = 0;
-  for (uint8_t i = 0; i < EEPROM_CHECK; ++i)
-  {
-    auto addr = eeprom.address + i;
-    uint8_t vale = eeprom.check_param[i];
-    EEPROM.write(addr, vale);
-    ESP_LOGI("eeprom", " addr %d, vale %d, reda %d", addr, vale, EEPROM.read(addr));
-  }
-  eeprom.address += EEPROM_CHECK;
-
-  for (uint8_t i = 0; i < UI_PARAM; ++i)
-  {
-    EEPROM.write(eeprom.address + i, gui->ui.param[i]);
-  }
-
-  // eeprom.address += UI_PARAM;
-  // for (uint8_t i = 0; i < F0_PARAM; ++i)
-  //   EEPROM.write(eeprom.address + i, f0.param[i]);
-  // // eeprom.address += F0_PARAM;
-  // EEPROM.commit();
-}
-
-// EEPROM读数据，开机初始化时执行一遍
-void eeprom_read_all_data(WouoUI *gui)
-{
-  eeprom.address = EEPROM_CHECK;
-  for (uint8_t i = 0; i < UI_PARAM; ++i)
-    gui->ui.param[i] = EEPROM.read(eeprom.address + i);
-
-  // eeprom.address += UI_PARAM;
-  // for (uint8_t i = 0; i < F0_PARAM; ++i)
-  //   f0.param[i] = EEPROM.read(eeprom.address + i);
-
-  // eeprom.address += F0_PARAM;
-}
-
-// 开机检查是否已经修改过，没修改过则跳过读配置步骤，用默认设置
 void eeprom_init(WouoUI *gui)
 {
-  EEPROM.begin(512);
-  eeprom.check = 0;
-  eeprom.address = 0;
-
-  for (uint8_t i = 0; i < EEPROM_CHECK; ++i)
-  {
-    if (EEPROM.read(eeprom.address + i) != eeprom.check_param[i])
-      eeprom.check++;
-
-    // if (eeprom.check > 1) // 允许一位误码
-    if (1) // 允许一位误码
-    {
-      gui->ui.param[DISP_BRI] = 255;
-      gui->ui.param[BOX_X_OS] = 15;
-      gui->ui.param[BOX_Y_OS] = 10;
-      gui->ui.param[WIN_Y_OS] = 30;
-      gui->ui.param[LIST_ANI] = 120;
-      gui->ui.param[WIN_ANI] = 60;
-      gui->ui.param[FADE_ANI] = 30;
-      gui->ui.param[BTN_SPT] = 20;
-      gui->ui.param[BTN_LPT] = 200;
-      gui->ui.param[COME_SCR] = 0;
-
-      ESP_LOGI("eeprom ", "check fail use default");
-      return;
-    }
-  }
-
-  ESP_LOGI("eeprom ", "data reda for eeprom");
-  eeprom_read_all_data(gui);
+  CONFIG_UI[DISP_BRI] = 255;
+  CONFIG_UI[BOX_X_OS] = 15;
+  CONFIG_UI[BOX_Y_OS] = 10;
+  CONFIG_UI[WIN_Y_OS] = 30;
+  CONFIG_UI[LIST_ANI] = 120;
+  CONFIG_UI[WIN_ANI] = 60;
+  CONFIG_UI[FADE_ANI] = 30;
+  CONFIG_UI[BTN_SPT] = 20;
+  CONFIG_UI[BTN_LPT] = 200;
+  CONFIG_UI[COME_SCR] = 0;
 }
 
 /************************************ 初始化函数 ***********************************/
@@ -164,12 +103,6 @@ void WouoUI::check_box_m_select(uint8_t param)
   check_box.m[param] = !check_box.m[param];
   // eeprom.change = true;
 }
-
-// // F0编辑页初始化
-// void edit_f0_init()
-// {
-//   check_box_v_init(f0.param);
-// }
 
 /* layer+1 以进入的形式前往指定页面 */
 void WouoUI::page_in_to(BasePage *page)
@@ -217,8 +150,8 @@ void WouoUI::layer_in()
   auto calc = [layer](uint8_t v)
   { return v * (list.box_y_trg[layer - 1] / LIST_LINE_H); };
 
-  list.box_w_trg += calc(this->ui.param[BOX_X_OS]);
-  list.box_h_trg += calc(this->ui.param[BOX_Y_OS]);
+  list.box_w_trg += calc(CONFIG_UI[BOX_X_OS]);
+  list.box_h_trg += calc(CONFIG_UI[BOX_Y_OS]);
 }
 
 // 进入更浅层级时的初始化
@@ -232,8 +165,8 @@ void WouoUI::layer_out()
   auto calc = [layer](uint8_t v)
   { return v * abs((list.box_y_trg[layer] - list.box_y_trg[layer + 1]) / LIST_LINE_H); };
 
-  list.box_w_trg += calc(this->ui.param[BOX_X_OS]);
-  list.box_h_trg += calc(this->ui.param[BOX_Y_OS]);
+  list.box_w_trg += calc(CONFIG_UI[BOX_X_OS]);
+  list.box_h_trg += calc(CONFIG_UI[BOX_Y_OS]);
 }
 
 /************************************* 动画函数 *************************************/
@@ -241,7 +174,7 @@ void WouoUI::layer_out()
 // 消失动画
 void WouoUI::fade()
 {
-  delay(this->ui.param[FADE_ANI]);
+  delay(CONFIG_UI[FADE_ANI]);
   switch (this->ui.fade)
   {
   case 1:
@@ -318,7 +251,7 @@ void WouoUI::oled_init()
   this->u8g2->setBusClock(10000000);
   this->u8g2->begin();
   this->u8g2->enableUTF8Print();
-  this->u8g2->setContrast(this->ui.param[DISP_BRI]);
+  this->u8g2->setContrast(CONFIG_UI[DISP_BRI]);
   this->ui.buf_ptr = this->u8g2->getBufferPtr();
   this->ui.buf_len = 8 * this->u8g2->getBufferTileHeight() * this->u8g2->getBufferTileWidth();
 }
@@ -385,7 +318,7 @@ TickType_t xLastWakeTime = xTaskGetTickCount();
 
 void WouoUI::begin()
 {
-  eeprom_init(this);
+  // eeprom_init(this);
   this->oled_init();
 
   // 设置屏幕刷新任务
@@ -501,24 +434,24 @@ void ListPage::onUserInput(int8_t btnID)
   switch (btnID)
   {
   case BTN_ID_UP:
-    list.box_w_trg += ui->param[BOX_X_OS]; // 伸展光标
+    list.box_w_trg += CONFIG_UI[BOX_X_OS]; // 伸展光标
     if (*select == 0)
       break;
     !*boxyTarget
         ? list.text_y_trg += LIST_LINE_H   // 下翻列表
         : *boxyTarget -= LIST_LINE_H;      // 上移光标
-    list.box_h_trg += ui->param[BOX_Y_OS]; // 光标动画
+    list.box_h_trg += CONFIG_UI[BOX_Y_OS]; // 光标动画
     *select -= 1;                          // 选中行数上移一位
     break;
 
   case BTN_ID_DO:
-    list.box_w_trg += ui->param[BOX_X_OS]; // 伸展光标
+    list.box_w_trg += CONFIG_UI[BOX_X_OS]; // 伸展光标
     if (*select == (ui_lenght - 1))
       break;
     *boxyTarget >= (gui->DISPLAY_HEIGHT - LIST_LINE_H)
         ? list.text_y_trg -= LIST_LINE_H   // 上翻列表
         : *boxyTarget += LIST_LINE_H;      // 下移光标
-    list.box_h_trg += ui->param[BOX_Y_OS]; // 光标动画
+    list.box_h_trg += CONFIG_UI[BOX_Y_OS]; // 光标动画
     *select += 1;                          // 选中行数下移一位
     break;
 
@@ -526,7 +459,7 @@ void ListPage::onUserInput(int8_t btnID)
     ESP_LOGI(TAG, "CANCEL");
     gui->ui.select[gui->ui.layer] = 0;
   case BTN_ID_CONFIRM:                     // 确认
-    list.box_w_trg += ui->param[BOX_X_OS]; // 伸展光标
+    list.box_w_trg += CONFIG_UI[BOX_X_OS]; // 伸展光标
     ESP_LOGI(TAG, "CONFIRM");
     this->router(gui->ui.select[gui->ui.layer]); // 按下确认时执行在派生类中重写的路由方法
     break;
@@ -555,14 +488,14 @@ void ListPage::render()
   }
 
   // 计算动画过渡值
-  animation(&list.text_x, 0.0f, ui_v->param[LIST_ANI]);
-  animation(&list.text_y, &list.text_y_trg, ui_v->param[LIST_ANI]);
-  animation(&list.box_y, &list.box_y_trg[ui_v->layer], ui_v->param[LIST_ANI]);
-  animation(&list.box_w, &list.box_w_trg, ui_v->param[LIST_ANI]);
-  animation(&list.box_w_trg, &list.box_content_width, ui_v->param[LIST_ANI]);
-  animation(&list.box_h, &list.box_h_trg, ui_v->param[LIST_ANI]);
-  animation(&list.box_h_trg, &list.box_H, ui_v->param[LIST_ANI]);
-  animation(&list.bar_h, &list.bar_h_trg, ui_v->param[LIST_ANI]);
+  animation(&list.text_x, 0.0f, CONFIG_UI[LIST_ANI]);
+  animation(&list.text_y, &list.text_y_trg, CONFIG_UI[LIST_ANI]);
+  animation(&list.box_y, &list.box_y_trg[ui_v->layer], CONFIG_UI[LIST_ANI]);
+  animation(&list.box_w, &list.box_w_trg, CONFIG_UI[LIST_ANI]);
+  animation(&list.box_w_trg, &list.box_content_width, CONFIG_UI[LIST_ANI]);
+  animation(&list.box_h, &list.box_h_trg, CONFIG_UI[LIST_ANI]);
+  animation(&list.box_h_trg, &list.box_H, CONFIG_UI[LIST_ANI]);
+  animation(&list.bar_h, &list.bar_h_trg, CONFIG_UI[LIST_ANI]);
 
   // 绘制列表文字和行末尾元素
   for (int i = 0; i < this->length; ++i)
@@ -570,7 +503,7 @@ void ListPage::render()
     // 绘制文本
     list.text_y_temp = list.text_y + LIST_LINE_H * i;
     list.text_w_temp = list.text_x_temp + LIST_TEXT_W;
-    list.text_x_temp = list.text_x * (!ui_v->param[COME_SCR]
+    list.text_x_temp = list.text_x * (!CONFIG_UI[COME_SCR]
                                           ? (abs(list.select - i) + 1)
                                           : (i + 1));
 

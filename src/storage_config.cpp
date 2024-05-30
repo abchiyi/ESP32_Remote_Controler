@@ -1,8 +1,12 @@
 #include "storage_config.h"
 #include "EEPROM.h"
+#include <algorithm> // 用于 std::equal
+#include <iterator>  // 用于 std::begin, std::end
+#include <tool.h>
 
-// 被管理的配置
+/** 获取配置 **/
 #include "radio.h"
+#include "WouoUI.h"
 
 #define TAG "STORAGE_CONFIG"
 
@@ -33,26 +37,34 @@ void read(sCongfig<T> &config)
 template <typename T>
 void write(sCongfig<T> &config)
 {
-  auto temp = config.ref;
+  T temp;
+  memset(temp, 0, config.size);
   EEPROM.get(config.addr_start, temp);
 
-  if (memcmp(&config.ref, &temp, config.size) != 0)
+  // 安全检查，避免对比出错
+  static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+  static_assert(std::is_standard_layout<T>::value, "T must have standard layout");
+
+  bool write_data = std::is_array_v<T>
+                        ? !areArraysEqual(temp, config.ref)
+                        : !memcmp(&temp, &config.ref, config.size) != 0;
+
+  if (write_data)
   {
-    ESP_LOGI(TAG, "NEQ");
+    ESP_LOGI(TAG, "write config - size of %d", config.size);
     EEPROM.put(config.addr_start, config.ref);
   }
-  else
-    ESP_LOGI(TAG, "EQ");
 }
 
 // configs
-auto config_radio = create_sconfig(CONFIG_RADIO);
+auto config_radio = create_sconfig(CONFIG_RADIO.last_connected_device);
+auto config_ui = create_sconfig(CONFIG_UI);
 
 void save_all()
 {
   EEPROM.begin(EEPROM_SIZE);
   write(config_radio);
-
+  write(config_ui);
   EEPROM.commit();
   EEPROM.end();
   // TODO 保存时检查与EEPROM 中的值是否一致，一致则重新写入到储存中。
@@ -61,8 +73,7 @@ void save_all()
 void read_all()
 {
   EEPROM.begin(EEPROM_SIZE);
-  ESP_LOGI(TAG, "mac " MACSTR "", MAC2STR(config_radio.ref.last_connected_device));
   read(config_radio);
-  ESP_LOGI(TAG, "mac " MACSTR "", MAC2STR(config_radio.ref.last_connected_device));
+  read(config_ui);
   EEPROM.end();
 }
