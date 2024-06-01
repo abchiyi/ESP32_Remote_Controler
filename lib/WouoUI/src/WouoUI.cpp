@@ -41,7 +41,18 @@
 
 #define TAG "WouUI"
 
-uint8_t CONFIG_UI[UI_PARAM];
+uint8_t CONFIG_UI[UI_PARAM] = {
+    255, // DISP_BRI
+    15,  // BOX_X_OS
+    10,  // BOX_Y_OS
+    30,  // WIN_Y_OS
+    120, // LIST_ANI
+    60,  // WIN_ANI
+    30,  // FADE_ANI
+    20,  // BTN_SPT
+    200, // BTN_LPT
+    0    // COME_SCR
+};
 
 /*********************************** 定义列表内容 ***********************************/
 
@@ -51,22 +62,6 @@ M_SELECT edit_f0_menu[]{
     {"~ Box Y OS"},
     {"~ Box Ani"},
 };
-
-/************************************* 断电保存 *************************************/
-
-void eeprom_init(WouoUI *gui)
-{
-  CONFIG_UI[DISP_BRI] = 255;
-  CONFIG_UI[BOX_X_OS] = 15;
-  CONFIG_UI[BOX_Y_OS] = 10;
-  CONFIG_UI[WIN_Y_OS] = 30;
-  CONFIG_UI[LIST_ANI] = 120;
-  CONFIG_UI[WIN_ANI] = 60;
-  CONFIG_UI[FADE_ANI] = 30;
-  CONFIG_UI[BTN_SPT] = 20;
-  CONFIG_UI[BTN_LPT] = 200;
-  CONFIG_UI[COME_SCR] = 0;
-}
 
 /************************************ 初始化函数 ***********************************/
 
@@ -318,7 +313,6 @@ TickType_t xLastWakeTime = xTaskGetTickCount();
 
 void WouoUI::begin()
 {
-  // eeprom_init(this);
   this->oled_init();
 
   // 设置屏幕刷新任务

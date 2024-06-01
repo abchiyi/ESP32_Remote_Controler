@@ -162,8 +162,7 @@ void ISR()
 void setup()
 {
   Serial.begin(115200);
-
-  read_all();
+  STORAGE_CONFIG.begin();
 
   Controller.begin();
   // car_controll_start();
@@ -196,11 +195,9 @@ void setup()
   vTaskDelay(100);
   pinMode(0, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(0), ISR, RISING);
-  // vTaskDelete(NULL); // 干掉 loopTask
+  vTaskDelete(NULL); // 干掉 loopTask
 }
 
 void loop()
 {
-  vTaskDelay(1000);
-  save_all();
 }
