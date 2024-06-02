@@ -279,3 +279,5 @@ public:
     size(uint8_t _index, uint16_t _size) : index(_index), dataSize(_size){};
   };
 };
+
+void cb_fn_ui(bool mode);

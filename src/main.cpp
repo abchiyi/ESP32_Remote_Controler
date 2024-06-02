@@ -3,7 +3,7 @@
 #include "EEPROM.h"
 
 // 储存
-#include "storage_config.h"
+#include <storage_config.h>
 
 // 无线依赖
 #include <esp_now.h>
@@ -162,6 +162,9 @@ void ISR()
 void setup()
 {
   Serial.begin(115200);
+
+  STORAGE_CONFIG.add(cb_fn_ui);
+
   STORAGE_CONFIG.begin();
 
   Controller.begin();

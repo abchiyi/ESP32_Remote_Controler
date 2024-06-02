@@ -38,6 +38,7 @@
 */
 #include <SPI.h>
 #include <WouoUI.h>
+#include <storage_config.h>
 
 #define TAG "WouUI"
 
@@ -52,6 +53,14 @@ uint8_t CONFIG_UI[UI_PARAM] = {
     20,  // BTN_SPT
     200, // BTN_LPT
     0    // COME_SCR
+};
+
+auto config_ui = create_sconfig(CONFIG_UI);
+
+void cb_fn_ui(bool mode)
+{
+  ESP_LOGI(TAG, "ROM %s", mode ? "R" : "W");
+  STORAGE_CONFIG.RW(config_ui, mode);
 };
 
 /*********************************** 定义列表内容 ***********************************/
@@ -313,6 +322,9 @@ TickType_t xLastWakeTime = xTaskGetTickCount();
 
 void WouoUI::begin()
 {
+
+  STORAGE_CONFIG;
+
   this->oled_init();
 
   // 设置屏幕刷新任务

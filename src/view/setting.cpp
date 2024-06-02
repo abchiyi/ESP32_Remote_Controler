@@ -3,6 +3,7 @@
 #include <view/about.h>
 #include <view/menu.h>
 #include <view/setting_devces.h>
+#include <storage_config.h>
 
 M_SELECT Setting_view[]{
     {"[ Setting ]"},
@@ -105,6 +106,7 @@ public:
 
   void leave()
   {
+    STORAGE_CONFIG.write_all();
   }
 };
 
