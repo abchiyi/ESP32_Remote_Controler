@@ -215,8 +215,9 @@ typedef struct UI_VARIABLE
 
   uint8_t fade = 1;
 
-  uint8_t layer;              // 页面嵌套层级
-  page_index_t index;         // 当前绘制页面的页码
+  uint8_t layer;            // 页面嵌套层级
+  page_index_t index;       // 当前绘制页面的页码
+  page_index_t index_targe; // 目标页面的页码
   uint8_t state = STATE_VIEW; // 页面绘制状态
   uint8_t select[UI_DEPTH];   // list_page 当前选中的条目
   // uint8_t param[UI_PARAM];    // 储存UI参数，如列表动画时间

@@ -179,7 +179,7 @@ void setup()
   Controller.begin();
 
   /** 控制输出 **/
-  car_controll_start();
+  // car_controll_start();
 
   /** GUI **/
   wouoUI.addPage(P_MENU);
@@ -196,7 +196,7 @@ void setup()
   wouoUI.begin();
 
   /** 无线 **/
-  RADIO.begin();
+  // RADIO.begin();
 
   // 设置数据层更新任务
   xTaskCreatePinnedToCore(

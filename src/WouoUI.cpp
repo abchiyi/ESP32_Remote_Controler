@@ -110,14 +110,16 @@ void WouoUI::check_box_m_select(uint8_t param)
 /* layer+1 以进入的形式前往指定页面 */
 void WouoUI::page_in_to(BasePage *page)
 {
-  this->ui.index = page->index;
+  // this->ui.index = page->index;
+  this->ui.index_targe = page->index;
   this->ui.state = STATE_LAYER_IN;
 }
 
 /* layer-1 以退出的形式前往指定页面 */
 void WouoUI::page_out_to(BasePage *page)
 {
-  this->ui.index = page->index;
+  this->ui.index_targe = page->index;
+  // this->ui.index = page->index;
   this->ui.state = STATE_LAYER_OUT;
 }
 
@@ -297,21 +299,20 @@ void WouoUI::setDefaultPage(BasePage *page)
 // 总进程
 void WouoUI::uiUpdate()
 {
-  int8_t ui_lenght = ((ListPage *)this->ui.objPage[this->ui.index])->length;
+  // int8_t ui_lenght = ((ListPage *)this->ui.objPage[this->ui.index])->length;
   this->u8g2->sendBuffer();
-  // ESP_LOGI(TAG, "ui.state %d, ui.index %d, ui.layer %d, ui.select[ui.layer] %d,view length[ui.index] %d", this->ui_v.state, this->ui_v.index, this->ui_v.layer, this->ui_v.select[this->ui_v.layer], ui_lenght);
-
-  TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
-  const TickType_t xFrequency = pdMS_TO_TICKS(10);
 
   switch (this->ui.state)
   {
   case STATE_LAYER_IN:
+    this->ui.index = this->ui.index_targe;
     layer_in();
     break;
   case STATE_LAYER_OUT:
-    layer_out();
+    // 先执行离开回调，执行完毕后切换页面
     this->ui.objPage[this->ui.index]->leave();
+    this->ui.index = this->ui.index_targe;
+    layer_out();
     break;
   case STATE_FADE:
     this->fade();
@@ -326,22 +327,17 @@ void WouoUI::uiUpdate()
     }
     page->render();
   }
-  xTaskDelayUntil(&xLastWakeTime, xFrequency);
 }
-
-const TickType_t xFreequency = 10; // 渲染一帧间隔 /ms
-TickType_t xLastWakeTime = xTaskGetTickCount();
 
 void WouoUI::begin()
 {
-
-  STORAGE_CONFIG;
-
   this->oled_init();
 
   // 设置屏幕刷新任务
   auto taskUpdate = [](void *pt)
   {
+    const TickType_t xFreequency = 10; // 渲染一帧间隔 /ms
+    TickType_t xLastWakeTime = xTaskGetTickCount();
     WouoUI *gui = (WouoUI *)pt;
     while (true)
     {

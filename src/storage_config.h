@@ -134,6 +134,7 @@ public:
   {
     for (const auto &cb : cb_func)
       cb(false);
+    EEPROM.commit();
   }
 
   void add(rw_cb cb)

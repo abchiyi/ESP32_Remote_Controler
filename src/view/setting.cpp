@@ -5,6 +5,8 @@
 #include <view/setting_devces.h>
 #include <storage_config.h>
 
+#define TAG "page setting"
+
 M_SELECT Setting_view[]{
     {"[ Setting ]"},
     {"~ Disp Bri"},
@@ -43,10 +45,6 @@ public:
     gui->check_box_m_init(config_ui.ref);
     gui->check_box_v_init(config_ui.ref);
     gui->check_box_s_init(&aaa, &bbb);
-
-    // gui->eepromReg(this, gui->ui.param);
-    // gui->eepromWriteData(this, gui->ui.param);
-    // gui->eepromReadData(this, gui->ui.param);
   }
 
   void router(uint8_t selectItmeNumber)
