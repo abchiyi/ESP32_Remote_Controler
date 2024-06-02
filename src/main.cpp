@@ -67,6 +67,13 @@ struct
 void singleBtnScan(WouoUI *gui, uint8_t *s_btn, uint8_t *LPT_flag, uint8_t active_value)
 {
   auto ui = gui->ui;
+  uint8_t btn_LPT = 255;
+  uint8_t btn_SPT = 50;
+
+  config_ui.access([&]()
+                   {
+                     btn_LPT = config_ui.ref[BTN_LPT];
+                     btn_SPT = config_ui.ref[BTN_SPT]; });
 
   if (!*s_btn && LPT_flag) // 按钮没有被按下结束程序
   {
@@ -83,17 +90,17 @@ void singleBtnScan(WouoUI *gui, uint8_t *s_btn, uint8_t *LPT_flag, uint8_t activ
       while (*s_btn) // 计算按压时间
       {
         btn.count++;
-        if (btn.count > CONFIG_UI[BTN_LPT])
+        if (btn.count > btn_LPT)
           break;
         delay(1);
       }
-      *LPT_flag = (btn.count < CONFIG_UI[BTN_LPT]) ? 0 : 1;
+      *LPT_flag = (btn.count < btn_LPT) ? 0 : 1;
       gui->btnPressed = true;
     }
     else
     {
       gui->btnPressed = 1;
-      vTaskDelay(CONFIG_UI[BTN_SPT]);
+      vTaskDelay(btn_SPT);
     }
   }
 }
@@ -163,14 +170,18 @@ void setup()
 {
   Serial.begin(115200);
 
+  /** 储存配置 **/
   STORAGE_CONFIG.add(cb_fn_ui);
 
   STORAGE_CONFIG.begin();
 
+  /** 控制器输入 **/
   Controller.begin();
-  // car_controll_start();
 
-  // 注册页面
+  /** 控制输出 **/
+  car_controll_start();
+
+  /** GUI **/
   wouoUI.addPage(P_MENU);
   wouoUI.addPage(P_EDITOR);
   wouoUI.addPage(P_SETTING);
@@ -182,12 +193,10 @@ void setup()
   wouoUI.addPage(P_DEVICES);
 
   wouoUI.setDefaultPage(P_MAIN);
-
   wouoUI.begin();
 
-  vTaskDelay(100);
-
-  // RADIO.begin();
+  /** 无线 **/
+  RADIO.begin();
 
   // 设置数据层更新任务
   xTaskCreatePinnedToCore(
@@ -195,9 +204,10 @@ void setup()
       "WouoUI datat update",
       1024 * 8, (void *)&wouoUI, 1, NULL, 0);
 
-  vTaskDelay(100);
+  // 无线扫描按钮
   pinMode(0, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(0), ISR, RISING);
+
   vTaskDelete(NULL); // 干掉 loopTask
 }
 

@@ -2,7 +2,10 @@
 #include <functional>
 #include <vector>
 #include "EEPROM.h"
-#include <tool.h>
+// #include <tool.h>
+
+#include <cstddef>   // 用于 size_t
+#include <algorithm> // 用于 std::equal
 
 typedef std::function<void(bool)> rw_cb; // 读写函数
 
@@ -73,6 +76,12 @@ class storage_config
 private:
   std::vector<rw_cb> cb_func;
 
+  template <typename T, std::size_t N>
+  bool areArraysEqual(const T (&a)[N], const T (&b)[N])
+  {
+    return std::equal(a, a + N, b);
+  };
+
 public:
   void begin(); // 启动储存服务
 
@@ -110,6 +119,7 @@ public:
 
     if (write_data)
     {
+      ESP_LOGI("ROM", "Write");
       EEPROM.put(config.addr_satrt_check, config.check);
       EEPROM.put(config.addr_start, config.ref);
     }
@@ -141,3 +151,5 @@ public:
 };
 
 extern storage_config STORAGE_CONFIG;
+
+#pragma once

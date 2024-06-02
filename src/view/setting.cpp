@@ -39,9 +39,9 @@ public:
   void before()
   {
     ListPage::before();
-    check_box.v = CONFIG_UI;
-    gui->check_box_m_init(CONFIG_UI);
-    gui->check_box_v_init(CONFIG_UI);
+    check_box.v = config_ui.ref;
+    gui->check_box_m_init(config_ui.ref);
+    gui->check_box_v_init(config_ui.ref);
     gui->check_box_s_init(&aaa, &bbb);
 
     // gui->eepromReg(this, gui->ui.param);
@@ -51,8 +51,6 @@ public:
 
   void router(uint8_t selectItmeNumber)
   {
-    UI_VARIABLE *ui = &gui->ui;
-    // 设置菜单处理函数
     switch (selectItmeNumber)
     {
     // 返回
@@ -60,31 +58,31 @@ public:
       gui->page_out_to(P_MENU);
       break;
     case 1:
-      popWindow("Disp Bri", &CONFIG_UI[DISP_BRI], 255, 0, 5, this);
+      popWindow("Disp Bri", &config_ui.ref[DISP_BRI], 255, 0, 5, this);
       break;
     case 2:
-      popWindow("Box X OS", &CONFIG_UI[BOX_X_OS], 50, 0, 1, this);
+      popWindow("Box X OS", &config_ui.ref[BOX_X_OS], 50, 0, 1, this);
       break;
     case 3:
-      popWindow("Box Y OS", &CONFIG_UI[BOX_Y_OS], 50, 0, 1, this);
+      popWindow("Box Y OS", &config_ui.ref[BOX_Y_OS], 50, 0, 1, this);
       break;
     case 4:
-      popWindow("Win Y OS", &CONFIG_UI[WIN_Y_OS], 40, 0, 1, this);
+      popWindow("Win Y OS", &config_ui.ref[WIN_Y_OS], 40, 0, 1, this);
       break;
     case 5:
-      popWindow("List Ani", &CONFIG_UI[LIST_ANI], 255, 20, 1, this);
+      popWindow("List Ani", &config_ui.ref[LIST_ANI], 255, 20, 1, this);
       break;
     case 6:
-      popWindow("Win Ani", &CONFIG_UI[WIN_ANI], 255, 20, 1, this);
+      popWindow("Win Ani", &config_ui.ref[WIN_ANI], 255, 20, 1, this);
       break;
     case 7:
-      popWindow("Fade Ani", &CONFIG_UI[FADE_ANI], 255, 0, 1, this);
+      popWindow("Fade Ani", &config_ui.ref[FADE_ANI], 255, 0, 1, this);
       break;
     case 8:
-      popWindow("Btn SPT", &CONFIG_UI[BTN_SPT], 255, 0, 1, this);
+      popWindow("Btn SPT", &config_ui.ref[BTN_SPT], 255, 0, 1, this);
       break;
     case 9:
-      popWindow("Btn LPT", &CONFIG_UI[BTN_LPT], 255, 0, 1, this);
+      popWindow("Btn LPT", &config_ui.ref[BTN_LPT], 255, 0, 1, this);
       break;
     case 10:
       gui->check_box_m_select(COME_SCR);

@@ -63,8 +63,10 @@ public:
       this->box_w_trg = WIN_W;
       this->box_H = WIN_H;
       this->box_h = 0;
-      this->box_h_trg = this->box_H + CONFIG_UI[WIN_Y_OS];
       this->bar_x = 0;
+      config_ui.access([&]()
+                       { this->box_h_trg =
+                             this->box_H + config_ui.ref[WIN_Y_OS]; });
 
       u8g2->setFont(WIN_FONT);
     }
@@ -90,7 +92,9 @@ public:
       this->bar_x_trg = (float)(*this->value - this->min) / (float)(this->max - this->min) * (this->box_w_trg - 2 * WIN_TITLE_S);
     }
 
-    auto winAni = CONFIG_UI[WIN_ANI];
+    uint8_t winAni;
+    config_ui.access([&]()
+                     { winAni = config_ui.ref[WIN_ANI]; });
     // 计算动画过渡值
     animation(&this->box_y, &this->box_y_trg, winAni);
     animation(&this->box_w, &this->box_w_trg, winAni);
@@ -120,25 +124,25 @@ public:
   {
     if (this->box_y != this->box_y_trg && this->box_y_trg == 0)
       return;
-
     this->oper_flag = true;
+
+    config_ui.access([&]()
+                     {
     switch (btnID)
     {
     case BTN_ID_UP:
       if (*this->value < this->max)
         *this->value += this->step;
-      // eeprom.change = true; // XXX EEPOM 不能储存更改后的值
       break;
     case BTN_ID_DO:
       if (*this->value > this->min)
         *this->value -= this->step;
-      // eeprom.change = true;
       break;
     case BTN_ID_CANCEL:
     case BTN_ID_CONFIRM:
       this->exit_flag = true;
       break;
-    }
+    } });
   }
 };
 

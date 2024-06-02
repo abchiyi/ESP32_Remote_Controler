@@ -21,7 +21,7 @@ void TASK_AUTO_SAVE(void *pt)
 
 void storage_config::begin()
 {
-  this->read_all();
   EEPROM.begin(EEPROM_SIZE);
+  this->read_all();
   xTaskCreate(TASK_AUTO_SAVE, "TASK_AUTO_SAVE", 1024 * 4, NULL, 1, NULL);
 }

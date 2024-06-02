@@ -1,5 +1,6 @@
 #include <U8g2lib.h>
 #include <EEPROM.h>
+#include <storage_config.h>
 
 #pragma once
 
@@ -222,8 +223,6 @@ typedef struct UI_VARIABLE
   BasePage *objPage[UI_DEPTH];
 } ui_variable_t;
 
-extern uint8_t CONFIG_UI[UI_PARAM]; // 储存UI参数，如列表动画时间
-
 class WouoUI
 {
 private:
@@ -280,4 +279,5 @@ public:
   };
 };
 
+extern ConfigHandle<uint8_t[11]> config_ui;
 void cb_fn_ui(bool mode);

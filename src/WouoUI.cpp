@@ -55,11 +55,10 @@ uint8_t CONFIG_UI[UI_PARAM] = {
     0    // COME_SCR
 };
 
-auto config_ui = create_sconfig(CONFIG_UI);
+ConfigHandle<uint8_t[11]> config_ui = create_sconfig(CONFIG_UI);
 
 void cb_fn_ui(bool mode)
 {
-  ESP_LOGI(TAG, "ROM %s", mode ? "R" : "W");
   STORAGE_CONFIG.RW(config_ui, mode);
 };
 
@@ -153,9 +152,10 @@ void WouoUI::layer_in()
   auto layer = this->ui.layer;
   auto calc = [layer](uint8_t v)
   { return v * (list.box_y_trg[layer - 1] / LIST_LINE_H); };
-
-  list.box_w_trg += calc(CONFIG_UI[BOX_X_OS]);
-  list.box_h_trg += calc(CONFIG_UI[BOX_Y_OS]);
+  config_ui.access([&]()
+                   {
+  list.box_w_trg += calc(config_ui.ref[BOX_X_OS]);
+  list.box_h_trg += calc(config_ui.ref[BOX_Y_OS]); });
 }
 
 // 进入更浅层级时的初始化
@@ -169,8 +169,10 @@ void WouoUI::layer_out()
   auto calc = [layer](uint8_t v)
   { return v * abs((list.box_y_trg[layer] - list.box_y_trg[layer + 1]) / LIST_LINE_H); };
 
-  list.box_w_trg += calc(CONFIG_UI[BOX_X_OS]);
-  list.box_h_trg += calc(CONFIG_UI[BOX_Y_OS]);
+  config_ui.access([&]()
+                   {
+  list.box_w_trg += calc(config_ui.ref[BOX_X_OS]);
+  list.box_h_trg += calc(config_ui.ref[BOX_Y_OS]); });
 }
 
 /************************************* 动画函数 *************************************/
@@ -178,7 +180,15 @@ void WouoUI::layer_out()
 // 消失动画
 void WouoUI::fade()
 {
-  delay(CONFIG_UI[FADE_ANI]);
+
+  static uint8_t fade_ani;
+  if (this->ui.fade == 1)
+  {
+    config_ui.access([&]()
+                     { fade_ani = config_ui.ref[FADE_ANI]; });
+  }
+  delay(fade_ani);
+
   switch (this->ui.fade)
   {
   case 1:
@@ -255,9 +265,11 @@ void WouoUI::oled_init()
   this->u8g2->setBusClock(10000000);
   this->u8g2->begin();
   this->u8g2->enableUTF8Print();
-  this->u8g2->setContrast(CONFIG_UI[DISP_BRI]);
+
   this->ui.buf_ptr = this->u8g2->getBufferPtr();
   this->ui.buf_len = 8 * this->u8g2->getBufferTileHeight() * this->u8g2->getBufferTileWidth();
+  config_ui.access([&]()
+                   { this->u8g2->setContrast(config_ui.ref[DISP_BRI]); });
 }
 
 static uint8_t pageIndex = 0;
@@ -437,35 +449,43 @@ void ListPage::onUserInput(int8_t btnID)
   auto boxyTarget = &list.box_y_trg[ui->layer];
   int8_t ui_lenght = ((ListPage *)ui->objPage[ui->index])->length;
 
+  uint8_t box_x_os = 10;
+  uint8_t box_y_ox = 10;
+
+  config_ui.access([&]()
+                   { 
+                    box_x_os = config_ui.ref[BOX_X_OS];
+                    box_y_ox = config_ui.ref[BOX_Y_OS]; });
+
   switch (btnID)
   {
   case BTN_ID_UP:
-    list.box_w_trg += CONFIG_UI[BOX_X_OS]; // 伸展光标
+    list.box_w_trg += box_x_os; // 伸展光标
     if (*select == 0)
       break;
     !*boxyTarget
-        ? list.text_y_trg += LIST_LINE_H   // 下翻列表
-        : *boxyTarget -= LIST_LINE_H;      // 上移光标
-    list.box_h_trg += CONFIG_UI[BOX_Y_OS]; // 光标动画
-    *select -= 1;                          // 选中行数上移一位
+        ? list.text_y_trg += LIST_LINE_H // 下翻列表
+        : *boxyTarget -= LIST_LINE_H;    // 上移光标
+    list.box_h_trg += box_y_ox;          // 光标动画
+    *select -= 1;                        // 选中行数上移一位
     break;
 
   case BTN_ID_DO:
-    list.box_w_trg += CONFIG_UI[BOX_X_OS]; // 伸展光标
+    list.box_w_trg += box_x_os; // 伸展光标
     if (*select == (ui_lenght - 1))
       break;
     *boxyTarget >= (gui->DISPLAY_HEIGHT - LIST_LINE_H)
-        ? list.text_y_trg -= LIST_LINE_H   // 上翻列表
-        : *boxyTarget += LIST_LINE_H;      // 下移光标
-    list.box_h_trg += CONFIG_UI[BOX_Y_OS]; // 光标动画
-    *select += 1;                          // 选中行数下移一位
+        ? list.text_y_trg -= LIST_LINE_H // 上翻列表
+        : *boxyTarget += LIST_LINE_H;    // 下移光标
+    list.box_h_trg += box_y_ox;          // 光标动画
+    *select += 1;                        // 选中行数下移一位
     break;
 
   case BTN_ID_CANCEL: // 返回
     ESP_LOGI(TAG, "CANCEL");
     gui->ui.select[gui->ui.layer] = 0;
-  case BTN_ID_CONFIRM:                     // 确认
-    list.box_w_trg += CONFIG_UI[BOX_X_OS]; // 伸展光标
+  case BTN_ID_CONFIRM:          // 确认
+    list.box_w_trg += box_x_os; // 伸展光标
     ESP_LOGI(TAG, "CONFIRM");
     this->router(gui->ui.select[gui->ui.layer]); // 按下确认时执行在派生类中重写的路由方法
     break;
@@ -478,6 +498,12 @@ void ListPage::onUserInput(int8_t btnID)
 void ListPage::render()
 {
   auto *ui_v = &gui->ui;
+  static uint8_t list_ani;
+  static uint8_t com_scr;
+  config_ui.access([&]()
+                   {
+                     list_ani = config_ui.ref[LIST_ANI];
+                     com_scr = config_ui.ref[COME_SCR]; });
 
   // 在每次操作后都会更新的参数
   if (ui_v->oper_flag)
@@ -494,14 +520,14 @@ void ListPage::render()
   }
 
   // 计算动画过渡值
-  animation(&list.text_x, 0.0f, CONFIG_UI[LIST_ANI]);
-  animation(&list.text_y, &list.text_y_trg, CONFIG_UI[LIST_ANI]);
-  animation(&list.box_y, &list.box_y_trg[ui_v->layer], CONFIG_UI[LIST_ANI]);
-  animation(&list.box_w, &list.box_w_trg, CONFIG_UI[LIST_ANI]);
-  animation(&list.box_w_trg, &list.box_content_width, CONFIG_UI[LIST_ANI]);
-  animation(&list.box_h, &list.box_h_trg, CONFIG_UI[LIST_ANI]);
-  animation(&list.box_h_trg, &list.box_H, CONFIG_UI[LIST_ANI]);
-  animation(&list.bar_h, &list.bar_h_trg, CONFIG_UI[LIST_ANI]);
+  animation(&list.text_x, 0.0f, list_ani);
+  animation(&list.text_y, &list.text_y_trg, list_ani);
+  animation(&list.box_y, &list.box_y_trg[ui_v->layer], list_ani);
+  animation(&list.box_w, &list.box_w_trg, list_ani);
+  animation(&list.box_w_trg, &list.box_content_width, list_ani);
+  animation(&list.box_h, &list.box_h_trg, list_ani);
+  animation(&list.box_h_trg, &list.box_H, list_ani);
+  animation(&list.bar_h, &list.bar_h_trg, list_ani);
 
   // 绘制列表文字和行末尾元素
   for (int i = 0; i < this->length; ++i)
@@ -509,7 +535,7 @@ void ListPage::render()
     // 绘制文本
     list.text_y_temp = list.text_y + LIST_LINE_H * i;
     list.text_w_temp = list.text_x_temp + LIST_TEXT_W;
-    list.text_x_temp = list.text_x * (!CONFIG_UI[COME_SCR]
+    list.text_x_temp = list.text_x * (!com_scr
                                           ? (abs(list.select - i) + 1)
                                           : (i + 1));
 
