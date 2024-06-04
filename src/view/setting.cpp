@@ -23,6 +23,7 @@ M_SELECT Setting_view[]{
     {"= Raidio 1"},
     {"= Raidio 2"},
     {"- Devices"},
+    {"- Rest"},
 };
 
 uint8_t aaa = 1;
@@ -96,6 +97,9 @@ public:
       break;
     case 14:
       gui->page_in_to(P_DEVICES);
+      break;
+    case 15:
+      STORAGE_CONFIG.clearEEPROM();
       break;
     }
   }
