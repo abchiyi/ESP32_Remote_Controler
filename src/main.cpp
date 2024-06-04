@@ -172,14 +172,16 @@ void setup()
 
   /** 储存配置 **/
   STORAGE_CONFIG.add(cb_fn_ui);
+  STORAGE_CONFIG.add(config_radio_rw_cb);
 
   STORAGE_CONFIG.begin();
+  STORAGE_CONFIG.read_all();
 
   /** 控制器输入 **/
   Controller.begin();
 
   /** 控制输出 **/
-  // car_controll_start();
+  car_controll_start();
 
   /** GUI **/
   wouoUI.addPage(P_MENU);
@@ -196,7 +198,7 @@ void setup()
   wouoUI.begin();
 
   /** 无线 **/
-  // RADIO.begin();
+  RADIO.begin();
 
   // 设置数据层更新任务
   xTaskCreatePinnedToCore(

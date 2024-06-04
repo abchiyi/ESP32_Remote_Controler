@@ -38,37 +38,30 @@ struct ConfigHandle
   }
 };
 
+extern SemaphoreHandle_t __xMutex;
+extern int16_t ADDR_START;
+
 template <typename T>
 ConfigHandle<T> create_sconfig(T &value)
 {
-  static int16_t ADDR_START = 0;
-  SemaphoreHandle_t xMutex;
-
-  if (xMutex == NULL)
-  {
-    xMutex = xSemaphoreCreateMutex();
-    if (xMutex == NULL)
-    {
-      // TODO 处理错误: 互斥锁创建失败
-    }
-  }
 
   ConfigHandle<T> config(value);
   const uint16_t check_size = sizeof(config.check);
-  config.check = config.size + check_size; // 检查码内容
-  if (xSemaphoreTake(xMutex, 100))
-  {
-    config.addr_start = ADDR_START;                            // 数据地址
-    config.addr_satrt_check = config.addr_start + config.size; // 检查码地址
+  config.check = config.size + check_size;                   // 检查码内容
+                                                             // if (xSemaphoreTake(__xMutex, 100))
+                                                             // {
+  config.addr_start = ADDR_START;                            // 数据地址
+  config.addr_satrt_check = config.addr_start + config.size; // 检查码地址
 
-    // TODO 当起始地址超过最大容量时，不在设置新的配置
-    ADDR_START += (config.size + check_size); // 更新储存起始地址
-    xSemaphoreGive(xMutex);
-    // cb_func.push_back([&](bool mode)
-    //                   { STORAGE_CONFIG.RW(config, mode); });
-    return config;
-  }
-  esp_system_abort("Config init time out");
+  // TODO 当起始地址超过最大容量时，不在设置新的配置
+  ADDR_START += (config.size + check_size); // 更新储存起始地址
+  // xSemaphoreGive(__xMutex);
+  // cb_func.push_back([&](bool mode)
+  //                   { STORAGE_CONFIG.RW(config, mode); });
+  ESP_LOGI("create_sconfig", "addr start %d", config.addr_start);
+  return config;
+  // }
+  // esp_system_abort("Config init time out");
 }
 
 class storage_config
@@ -90,40 +83,43 @@ public:
   {
     uint16_t check;
     EEPROM.get(config.addr_satrt_check, check);
-    EEPROM.get(config.addr_start, config.ref);
+
+    ESP_LOGI("read", "check %d confgi.check %d, check start %d",
+             check, config.check, config.addr_satrt_check);
 
     // 当校验码不一致时不从ROM读取，将保持配置不变
-    if (check != config.check)
+    if (check == config.check)
     {
-      // ESP_LOGI(TAG, "set in default config");
-      // ESP_LOGI(TAG, "check %d confgi.check %d, check start %d", check, config.check, config.addr_satrt_check);
-      return;
+      ESP_LOGI("read", "set in rom config");
+      EEPROM.get(config.addr_start, config.ref);
     }
-    EEPROM.get(config.addr_start, config.ref);
+    else
+      ESP_LOGI("read", "set in default config");
   }
 
   template <typename T>
   void write(ConfigHandle<T> &config)
   {
     T temp;
-    memset(temp, 0, config.size);
     EEPROM.get(config.addr_start, temp);
 
-    // 安全检查，避免对比出错
-    static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
-    static_assert(std::is_standard_layout<T>::value, "T must have standard layout");
+    // // 安全检查，避免对比出错
+    // static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+    // static_assert(std::is_standard_layout<T>::value, "T must have standard layout");
 
-    bool write_data = std::is_array_v<T>
-                          ? !areArraysEqual(temp, config.ref)
-                          : !memcmp(&temp, &config.ref, config.size) != 0;
+    // bool write_data = std::is_array_v<T>
+    //                       ? !areArraysEqual(temp, config.ref)
+    //                       : !memcmp(&temp, &config.ref, config.size) != 0;
 
-    if (write_data)
-    {
-      ESP_LOGI("ROM", "Write");
-      EEPROM.put(config.addr_satrt_check, config.check);
-      EEPROM.put(config.addr_start, config.ref);
-    }
+    // if (write_data)
+    // {
+    ESP_LOGI("ROM", "Write");
+    EEPROM.put(config.addr_satrt_check, config.check);
+    EEPROM.put(config.addr_start, config.ref);
+    // }
   }
+
+  void clearEEPROM();
 
   void read_all()
   {

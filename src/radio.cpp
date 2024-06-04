@@ -7,7 +7,6 @@
 #include <cstring>
 #include <esp_mac.h>
 #include <deque>
-#include <EEPROM.h>
 
 #define TAG "Radio"
 
@@ -23,6 +22,13 @@ Radio RADIO;
 radio_data_t radio_data;
 
 radio_config CONFIG_RADIO; // 无线配置
+
+auto config_radio = create_sconfig(CONFIG_RADIO);
+
+void config_radio_rw_cb(bool mode)
+{
+  STORAGE_CONFIG.RW(config_radio, mode);
+};
 
 radio_data_t radio_data_recv;
 radio_data_t radio_data_send;
@@ -71,6 +77,14 @@ bool checkMac(mac_addr_t mac1, mac_addr_t mac2)
     return true;
   return false;
 };
+
+bool macOK(mac_addr_t arr)
+{
+  for (int i = 0; i < sizeof(mac_addr_t); ++i)
+    if (arr[i] != 0x00 && arr[i] != 0xFF)
+      return true;
+  return false;
+}
 
 /**
  * @brief 根据 mac 地址配对到指定的设备
@@ -137,7 +151,8 @@ bool handshake(mac_addr_t mac_addr)
     return false;
   // todo 验证响应地址
 
-  wait_response(RADIO.timeout_resend, &data);
+  if (!wait_response(RADIO.timeout_resend, &data))
+    return false;
 
   // 当通道 0 有数据时表示响应设备将使用另一地址与主机通讯
   if (data.channel[0])
@@ -237,7 +252,6 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_CONNECTED:
-      // start = xTaskGetTickCount();
       if (RADIO.status != RADIO_CONNECTED)
         break;
       xQueueReceive(Q_DATA_SEND, &radio_data_send, 1);
@@ -245,23 +259,18 @@ void TaskRadioMainLoop(void *pt)
       if (wait_response(RADIO.timeout_resend, &radio_data))
         ;
       xTaskDelayUntil(&xLastWakeTime, xFrequency);
-      // end = xTaskGetTickCount();
-      // ESP_LOGI(TAG, "run %d Hz", 1000 / (end - start));
       break;
 
     case RADIO_BEFORE_DISCONNECT:
+      ESP_LOGI(TAG, "RADIO_DISCONNECT");
       xQueueReset(Q_RECV_DATA); // 断开连接清空队列
       RADIO.status = RADIO_DISCONNECT;
       break;
 
     case RADIO_DISCONNECT:
-      ESP_LOGI(TAG, "RADIO_DISCONNECT");
-      // if (xSemaphoreTake(CAN_CONNECT_LAST, radio.timeout_resend) == pdTRUE)
-      // if (handshake(radio.peer_info.peer_addr))
-      if (handshake(CONFIG_RADIO.last_connected_device))
-        RADIO.status = RADIO_BEFORE_CONNECTED;
-      // else
-      // xSemaphoreGive(CAN_CONNECT_LAST);
+      if (macOK(CONFIG_RADIO.last_connected_device))
+        if (handshake(CONFIG_RADIO.last_connected_device))
+          RADIO.status = RADIO_BEFORE_CONNECTED;
       vTaskDelay(RADIO.timeout_resend);
       break;
 
@@ -360,6 +369,8 @@ esp_err_t Radio::pairNewDevice()
   memcpy(&CONFIG_RADIO.last_connected_device,
          &RADIO.peer_info.peer_addr,
          sizeof(mac_addr_t));
+
+  STORAGE_CONFIG.write_all();
   ESP_LOGI(TAG, "" MACSTR " - HANDSHAKE SUCCESS", MAC2STR(RADIO.peer_info.peer_addr));
   return ESP_OK;
 }

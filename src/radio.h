@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <esp_now.h>
 #include <cstring>
+#include <storage_config.h>
 
 #define MAX_CHANNEL 8 // 最大控制通道数量
 
@@ -98,3 +99,5 @@ public:
 
 extern radio_config CONFIG_RADIO;
 extern Radio RADIO;
+
+void config_radio_rw_cb(bool mode);
