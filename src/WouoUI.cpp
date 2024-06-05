@@ -110,48 +110,35 @@ void WouoUI::check_box_m_select(uint8_t param)
 /* layer+1 以进入的形式前往指定页面 */
 void WouoUI::page_in_to(BasePage *page)
 {
-  // this->ui.index = page->index;
-  this->ui.index_targe = page->index;
-  this->ui.state = STATE_LAYER_IN;
+  this->index_targe = page->index;
+  this->state = STATE_LAYER_IN;
 }
 
 /* layer-1 以退出的形式前往指定页面 */
 void WouoUI::page_out_to(BasePage *page)
 {
-  this->ui.index_targe = page->index;
-  // this->ui.index = page->index;
-  this->ui.state = STATE_LAYER_OUT;
+  this->index_targe = page->index;
+  this->state = STATE_LAYER_OUT;
 }
 
 /* layer 不变 以切换形式前往页面 */
 void WouoUI::pageSwitch(BasePage *page)
 {
-  this->ui.index = page->index;
-  this->ui.state = STATE_VIEW;
-}
-
-/*
- * @brief 切换页面
- * @param page 页面指针
- * @param state 页面切换模式
- */
-void WouoUI::pageChange(BasePage *page, uint8_t state)
-{
-  this->ui.index = page->index;
-  this->ui.state = state;
+  this->index = page->index;
+  this->state = STATE_VIEW;
 }
 
 // 进入更深层级时的初始化
 void WouoUI::layer_in()
 {
-  this->ui.layer++;
-  this->ui.state = STATE_FADE;
-  this->ui.init_flag = false;
-  this->ui.select[this->ui.layer] = 0;
+  this->layer++;
+  this->state = STATE_FADE;
+  this->init_flag = false;
+  this->select[this->layer] = 0;
 
-  list.box_y_trg[this->ui.layer] = 0;
+  list.box_y_trg[this->layer] = 0;
 
-  auto layer = this->ui.layer;
+  auto layer = this->layer;
   auto calc = [layer](uint8_t v)
   { return v * (list.box_y_trg[layer - 1] / LIST_LINE_H); };
   config_ui.access([&]()
@@ -163,11 +150,11 @@ void WouoUI::layer_in()
 // 进入更浅层级时的初始化
 void WouoUI::layer_out()
 {
-  this->ui.layer--;
-  this->ui.state = STATE_FADE;
-  this->ui.init_flag = false;
+  this->layer--;
+  this->state = STATE_FADE;
+  this->init_flag = false;
 
-  auto layer = this->ui.layer;
+  auto layer = this->layer;
   auto calc = [layer](uint8_t v)
   { return v * abs((list.box_y_trg[layer] - list.box_y_trg[layer + 1]) / LIST_LINE_H); };
 
@@ -182,43 +169,44 @@ void WouoUI::layer_out()
 // 消失动画
 void WouoUI::fade()
 {
-
   static uint8_t fade_ani;
-  if (this->ui.fade == 1)
+  static uint8_t fade = 1;
+
+  if (fade == 1)
   {
     config_ui.access([&]()
                      { fade_ani = config_ui.ref[FADE_ANI]; });
   }
   delay(fade_ani);
 
-  switch (this->ui.fade)
+  switch (fade)
   {
   case 1:
-    for (uint16_t i = 0; i < this->ui.buf_len; ++i)
+    for (uint16_t i = 0; i < this->buf_len; ++i)
       if (i % 2 != 0)
-        this->ui.buf_ptr[i] = this->ui.buf_ptr[i] & 0xAA;
+        this->buf_ptr[i] = this->buf_ptr[i] & 0xAA;
     break;
   case 2:
-    for (uint16_t i = 0; i < this->ui.buf_len; ++i)
+    for (uint16_t i = 0; i < this->buf_len; ++i)
       if (i % 2 != 0)
-        this->ui.buf_ptr[i] = this->ui.buf_ptr[i] & 0x00;
+        this->buf_ptr[i] = this->buf_ptr[i] & 0x00;
     break;
   case 3:
-    for (uint16_t i = 0; i < this->ui.buf_len; ++i)
+    for (uint16_t i = 0; i < this->buf_len; ++i)
       if (i % 2 == 0)
-        this->ui.buf_ptr[i] = this->ui.buf_ptr[i] & 0x55;
+        this->buf_ptr[i] = this->buf_ptr[i] & 0x55;
     break;
   case 4:
-    for (uint16_t i = 0; i < this->ui.buf_len; ++i)
+    for (uint16_t i = 0; i < this->buf_len; ++i)
       if (i % 2 == 0)
-        this->ui.buf_ptr[i] = this->ui.buf_ptr[i] & 0x00;
+        this->buf_ptr[i] = this->buf_ptr[i] & 0x00;
     break;
   default:
-    this->ui.state = STATE_VIEW;
-    this->ui.fade = 0;
+    this->state = STATE_VIEW;
+    fade = 0;
     break;
   }
-  this->ui.fade++;
+  fade++;
 }
 
 // 渐近动画
@@ -268,8 +256,9 @@ void WouoUI::oled_init()
   this->u8g2->begin();
   this->u8g2->enableUTF8Print();
 
-  this->ui.buf_ptr = this->u8g2->getBufferPtr();
-  this->ui.buf_len = 8 * this->u8g2->getBufferTileHeight() * this->u8g2->getBufferTileWidth();
+  this->buf_ptr = this->u8g2->getBufferPtr();
+  this->buf_len =
+      8 * this->u8g2->getBufferTileHeight() * this->u8g2->getBufferTileWidth();
   config_ui.access([&]()
                    { this->u8g2->setContrast(config_ui.ref[DISP_BRI]); });
 }
@@ -281,18 +270,18 @@ void WouoUI::oled_init()
 void WouoUI::addPage(BasePage *page)
 {
   static uint8_t pageIndex = 0;
-  page->u8g2 = this->u8g2;              // u8g2 指针
-  page->gui = this;                     // 设置gui引用
-  pageIndex++;                          // 页码+1
-  page->index = pageIndex;              // 设置页码
-  page->create();                       // 初始化页面
-  this->ui.objPage[page->index] = page; // 储存页面指针
+  page->u8g2 = this->u8g2;           // u8g2 指针
+  page->gui = this;                  // 设置gui引用
+  pageIndex++;                       // 页码+1
+  page->index = pageIndex;           // 设置页码
+  page->create();                    // 初始化页面
+  this->objPage[page->index] = page; // 储存页面
 };
 
 // 设置默认页面
 void WouoUI::setDefaultPage(BasePage *page)
 {
-  this->ui.index = page->index;
+  this->index = page->index;
 }
 
 // 总进程
@@ -300,27 +289,27 @@ void WouoUI::uiUpdate()
 {
   this->u8g2->sendBuffer();
 
-  switch (this->ui.state)
+  switch (this->state)
   {
   case STATE_LAYER_IN:
-    this->ui.index = this->ui.index_targe;
+    this->index = this->index_targe;
     layer_in();
     break;
   case STATE_LAYER_OUT:
     // 先执行离开回调，执行完毕后切换页面
-    this->ui.objPage[this->ui.index]->leave();
-    this->ui.index = this->ui.index_targe;
+    this->objPage[this->index]->leave();
+    this->index = this->index_targe;
     layer_out();
     break;
   case STATE_FADE:
     this->fade();
     break;
   case STATE_VIEW:
-    auto page = this->ui.objPage[this->ui.index];
+    auto page = this->objPage[this->index];
     this->u8g2->clearBuffer();
-    if (!this->ui.init_flag)
+    if (!this->init_flag)
     {
-      this->ui.init_flag = true;
+      this->init_flag = true;
       page->before();
     }
     page->render();
@@ -362,7 +351,7 @@ void WouoUI::btnUpdate(void (*func)(WouoUI *))
   if (this->btnPressed) // 当有按键按下时触发input函数
   {
     this->btnPressed = false;
-    this->ui.objPage[this->ui.index]->onUserInput(this->btnID);
+    this->objPage[this->index]->onUserInput(this->btnID);
   }
 }
 
@@ -444,10 +433,10 @@ void BasePage::draw_slider_x(float progress,
 // 处理按钮事件
 void ListPage::onUserInput(int8_t btnID)
 {
-  auto ui = &gui->ui;
-  auto select = &ui->select[ui->layer];
-  auto boxyTarget = &list.box_y_trg[ui->layer];
-  int8_t ui_lenght = ((ListPage *)ui->objPage[ui->index])->view.size();
+  // auto ui = &gui->ui;
+  auto select = &gui->select[gui->layer];
+  auto boxyTarget = &list.box_y_trg[gui->layer];
+  int8_t ui_lenght = ((ListPage *)gui->objPage[gui->index])->view.size();
 
   uint8_t box_x_os = 10;
   uint8_t box_y_ox = 10;
@@ -458,7 +447,7 @@ void ListPage::onUserInput(int8_t btnID)
                     box_y_ox = config_ui.ref[BOX_Y_OS]; });
 
   // 当前选中的行行数（内存地址）
-  auto *select_index = &gui->ui.select[gui->ui.layer];
+  auto *select_index = &gui->select[gui->layer];
 
   switch (btnID)
   {
@@ -495,13 +484,12 @@ void ListPage::onUserInput(int8_t btnID)
       this->view[*select_index].cb_fn(gui);
     break;
   }
-  ui->oper_flag = true;
+  gui->oper_flag = true;
 }
 
 // 列表页面渲染函数
 void ListPage::render()
 {
-  auto *ui_v = &gui->ui;
   auto length = this->view.size();
   static uint8_t list_ani;
   static uint8_t com_scr;
@@ -511,23 +499,23 @@ void ListPage::render()
                      com_scr = config_ui.ref[COME_SCR]; });
 
   // 在每次操作后都会更新的参数
-  if (ui_v->oper_flag)
+  if (gui->oper_flag)
   {
-    ui_v->oper_flag = false;
+    gui->oper_flag = false;
 
     // 获取选中文本的宽度
-    auto box_content_text = view[ui_v->select[ui_v->layer]].m_select;
+    auto box_content_text = view[gui->select[gui->layer]].m_select;
     list.box_content_width = u8g2->getUTF8Width(box_content_text) + LIST_TEXT_S * 2;
 
     // 计算滚动条长度
-    list.bar_h_trg = ceil(ui_v->select[ui_v->layer] *
+    list.bar_h_trg = ceil(gui->select[gui->layer] *
                           ((float)gui->DISPLAY_HEIGHT / (length - 1)));
   }
 
   // 计算动画过渡值
   animation(&list.text_x, 0.0f, list_ani);
   animation(&list.text_y, &list.text_y_trg, list_ani);
-  animation(&list.box_y, &list.box_y_trg[ui_v->layer], list_ani);
+  animation(&list.box_y, &list.box_y_trg[gui->layer], list_ani);
   animation(&list.box_w, &list.box_w_trg, list_ani);
   animation(&list.box_w_trg, &list.box_content_width, list_ani);
   animation(&list.box_h, &list.box_h_trg, list_ani);
@@ -574,13 +562,12 @@ void ListPage::render()
 
 void ListPage::before()
 {
-  auto *ui_v = &gui->ui;
-
-  ui_v->oper_flag = true;
+  gui->oper_flag = true;
   ESP_LOGI(name, "ui init");
-  list.select = ui_v->select[ui_v->layer];
+  list.select = gui->select[gui->layer];
   list.text_x = -gui->DISPLAY_WIDTH;
-  list.text_y = list.box_y_trg[ui_v->layer] - LIST_LINE_H * ui_v->select[ui_v->layer];
+  list.text_y =
+      list.box_y_trg[gui->layer] - LIST_LINE_H * gui->select[gui->layer];
   list.text_y_trg = list.text_y;
   list.box_H = LIST_LINE_H;
 

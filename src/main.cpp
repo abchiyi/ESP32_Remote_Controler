@@ -65,7 +65,6 @@ struct
 
 void singleBtnScan(WouoUI *gui, uint8_t *s_btn, uint8_t *LPT_flag, uint8_t active_value)
 {
-  auto ui = gui->ui;
   uint8_t btn_LPT = 255;
   uint8_t btn_SPT = 50;
 
@@ -106,8 +105,6 @@ void singleBtnScan(WouoUI *gui, uint8_t *s_btn, uint8_t *LPT_flag, uint8_t activ
 
 void btn_scan(WouoUI *gui)
 {
-  auto ui = gui->ui;
-
   uint8_t *btnA = (uint8_t *)&Controller.btnA;
   uint8_t *btnB = (uint8_t *)&Controller.btnB;
 

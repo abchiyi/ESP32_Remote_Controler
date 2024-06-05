@@ -6,8 +6,7 @@
 
 #pragma once
 
-// 按键事件
-typedef enum
+typedef enum key_event
 {
   BTN_ID_UP,      // 上翻
   BTN_ID_DO,      // 下翻
@@ -78,9 +77,7 @@ struct
   uint8_t *s;
   uint8_t *s_p;
 } check_box;
-
 class WouoUI;
-typedef uint8_t page_index_t;
 typedef const char *page_name_t;
 
 void animation(float *a, float *a_trg, uint8_t n);
@@ -200,29 +197,13 @@ public:
   virtual void before();
 };
 
-typedef struct UI_VARIABLE
-{
-  bool init_flag;
-  bool oper_flag;
-
-  uint16_t buf_len;
-  uint8_t *buf_ptr;
-
-  uint8_t fade = 1;
-
-  uint8_t layer;              // 页面嵌套层级
-  page_index_t index;         // 当前绘制页面的页码
-  page_index_t index_targe;   // 目标页面的页码
-  uint8_t state = STATE_VIEW; // 页面绘制状态
-  uint8_t select[UI_DEPTH];   // list_page 当前选中的条目
-  // uint8_t param[UI_PARAM];    // 储存UI参数，如列表动画时间
-  BasePage *objPage[UI_DEPTH];
-} ui_variable_t;
-
 class WouoUI
 {
 private:
   U8G2 *u8g2;
+
+  uint16_t buf_len;
+  uint8_t *buf_ptr;
 
   void layer_in();
   void oled_init();
@@ -231,6 +212,7 @@ private:
   void fade();
   void layer_out();
 
+  uint8_t state = STATE_VIEW; // 页面绘制状态
 public:
   WouoUI(U8G2 *u8g2) : u8g2(u8g2)
   {
@@ -242,7 +224,14 @@ public:
   uint16_t DISPLAY_HEIGHT; // 屏幕高度 pix
   uint16_t DISPLAY_WIDTH;  // 屏幕宽度 pix
 
-  UI_VARIABLE ui; // 储存ui变量
+  BasePage *objPage[UI_DEPTH]; // 所有已注册的页面
+  uint8_t select[UI_DEPTH];    // list_page 当前选中的条目
+  uint8_t layer;               // 页面嵌套层级
+  uint8_t index;               // 当前页面的页码
+  uint8_t index_targe;         // 目标页面的页码
+
+  bool init_flag;
+  bool oper_flag;
 
   void check_box_v_init(uint8_t *);
   void check_box_m_init(uint8_t *);
