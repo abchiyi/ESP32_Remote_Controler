@@ -459,8 +459,6 @@ void ListPage::onUserInput(int8_t btnID)
 
   // 当前选中的行行数（内存地址）
   auto *select_index = &gui->ui.select[gui->ui.layer];
-  // 被选中的 view unit
-  const LIST_VIEW_UNIT view_unit = this->view[*select_index];
 
   switch (btnID)
   {
@@ -493,11 +491,10 @@ void ListPage::onUserInput(int8_t btnID)
     list.box_w_trg += box_x_os; // 伸展光标
     ESP_LOGI(TAG, "CONFIRM");
     // 执行与 view uint 绑定的回调函数，通常是页面跳转
-    if (view_unit.cb_fn != nullptr)
-      view_unit.cb_fn(gui);
+    if (this->view[*select_index].cb_fn)
+      this->view[*select_index].cb_fn(gui);
     break;
   }
-
   ui->oper_flag = true;
 }
 
