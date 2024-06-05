@@ -23,13 +23,13 @@
 #include <U8g2lib.h>
 #include <WouoUI.h>
 // page
-#include <view/fidgetToy.h>
-#include <view/setting.h>
-#include <view/editor.h>
-#include <view/window.h>
-#include <view/about.h>
-#include <view/sleep.h>
-#include <view/menu.h>
+// #include <view/fidgetToy.h>
+// #include <view/setting.h>
+// #include <view/editor.h>
+// #include <view/window.h>
+// #include <view/about.h>
+// #include <view/sleep.h>
+// #include <view/menu.h>
 #include <view/mainPage.h>
 #include "view/setting_devces.h"
 
@@ -46,8 +46,7 @@
 // Display display;
 
 U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, CS, DC, RES);
-
-WouoUI wouoUI(&u8g2);
+WouoUI WOUO_UI(&u8g2); // 定义gui对象
 
 // 按键变量
 struct
@@ -138,13 +137,13 @@ void btn_scan(WouoUI *gui)
   uint8_t joyLDown = Controller.joyLVert < -300 ? 1 : 0;
   uint8_t btnMenu = Controller.btnStart;
 
-  singleBtnScan(&wouoUI, btnUp, (uint8_t *)&btnUpLPT, BTN_ID_UP);
-  singleBtnScan(&wouoUI, btnDown, (uint8_t *)&btnDownLPT, BTN_ID_DO);
+  singleBtnScan(&WOUO_UI, btnUp, (uint8_t *)&btnUpLPT, BTN_ID_UP);
+  singleBtnScan(&WOUO_UI, btnDown, (uint8_t *)&btnDownLPT, BTN_ID_DO);
 
-  singleBtnScan(&wouoUI, &joyLUp, (uint8_t *)&joyUPLPT, BTN_ID_UP);
-  singleBtnScan(&wouoUI, &joyLDown, (uint8_t *)&joyDOWNLPT, BTN_ID_DO);
+  singleBtnScan(&WOUO_UI, &joyLUp, (uint8_t *)&joyUPLPT, BTN_ID_UP);
+  singleBtnScan(&WOUO_UI, &joyLDown, (uint8_t *)&joyDOWNLPT, BTN_ID_DO);
 
-  singleBtnScan(&wouoUI, &btnMenu, (uint8_t *)&btnMenuLPT, BTN_ID_MENU);
+  singleBtnScan(&WOUO_UI, &btnMenu, (uint8_t *)&btnMenuLPT, BTN_ID_MENU);
 }
 
 // 数据层处理任务
@@ -152,8 +151,8 @@ void TaskDataLayerUpdate(void *pt)
 {
   while (true)
   {
-    wouoUI.btnUpdate(btn_scan);
-    if (!wouoUI.btnPressed) // 没有按钮被触发时执行
+    WOUO_UI.btnUpdate(btn_scan);
+    if (!WOUO_UI.btnPressed) // 没有按钮被触发时执行
       vTaskDelay(1);
   }
 }
@@ -184,27 +183,25 @@ void setup()
   car_controll_start();
 
   /** GUI **/
-  wouoUI.addPage(P_MENU);
-  wouoUI.addPage(P_EDITOR);
-  wouoUI.addPage(P_SETTING);
-  wouoUI.addPage(P_WINDOW);
-  wouoUI.addPage(P_ABOUT);
-  wouoUI.addPage(F0TOY);
-  wouoUI.addPage(P_SLEEP);
-  wouoUI.addPage(P_MAIN);
-  wouoUI.addPage(P_DEVICES);
+  // wouoUI.addPage(P_MENU);
+  // wouoUI.addPage(P_EDITOR);
+  // wouoUI.addPage(P_SETTING);
+  // wouoUI.addPage(P_WINDOW);
+  // wouoUI.addPage(P_ABOUT);
+  // wouoUI.addPage(F0TOY);
+  // wouoUI.addPage(P_SLEEP);
+  WOUO_UI.addPage(P_MAIN);
+  WOUO_UI.addPage(P_DEVICES);
 
-  wouoUI.setDefaultPage(P_MAIN);
-  wouoUI.begin();
+  WOUO_UI.setDefaultPage(P_MAIN);
+  WOUO_UI.begin(&u8g2);
 
   /** 无线 **/
   RADIO.begin();
 
   // 设置数据层更新任务
-  xTaskCreatePinnedToCore(
-      TaskDataLayerUpdate,
-      "WouoUI datat update",
-      1024 * 8, (void *)&wouoUI, 1, NULL, 0);
+  xTaskCreatePinnedToCore(TaskDataLayerUpdate, "WouoUI datat update",
+                          1024 * 8, NULL, 1, NULL, 0);
 
   // 无线扫描按钮
   pinMode(0, INPUT_PULLUP);

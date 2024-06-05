@@ -1,7 +1,7 @@
 #include <view/about.h>
 #include <view/setting.h>
 
-M_SELECT about_menu[]{
+LIST_VIEW about_menu{
     {"[ WoW-UI ]"},
     {"- Version: v1.0"},
     {"- Creator: RQNG"},

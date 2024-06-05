@@ -2,7 +2,7 @@
 #include <view/menu.h>
 #include <esp_log.h>
 
-M_SELECT Editor_view[]{
+LIST_VIEW Editor_view{
     {"[ Editor ]"},
     {"- Edit Fidget Toy"},
 };

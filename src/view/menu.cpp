@@ -6,7 +6,7 @@
 #include <view/mainPage.h>
 
 #include <esp_log.h>
-M_SELECT Menu_view[]{
+LIST_VIEW Menu_view{
     {"[ Main ]"},
     {"- F0toy"},
     {"- Editor"},

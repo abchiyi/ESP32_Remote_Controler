@@ -1,6 +1,8 @@
 #include <U8g2lib.h>
 #include <EEPROM.h>
 #include <storage_config.h>
+#include <vector>
+#include <functional>
 
 #pragma once
 
@@ -83,11 +85,15 @@ typedef const char *page_name_t;
 
 void animation(float *a, float *a_trg, uint8_t n);
 
-// 列表页面 view
-typedef struct MENU
+// list view unit
+struct LIST_VIEW_UNIT
 {
   const char *m_select;
-} M_SELECT;
+  std::function<void(WouoUI *)> cb_fn = nullptr;
+};
+
+// list view 类型
+typedef std::vector<LIST_VIEW_UNIT> LIST_VIEW;
 
 // UI 变量索引
 enum
@@ -180,27 +186,16 @@ protected:
     u8g2->drawBox(list.text_w_temp + CB_D + 1, CB_U + CB_D + 1 + list.text_y_temp, CB_W - (CB_D + 1) * 2, CB_H - (CB_D + 1) * 2);
   };
 
-  const uint8_t listItemLength = sizeof(M_SELECT);
-
   template <typename T, size_t N>
-  void setPageView(const char *pageName, T (&view)[N])
-  {
-    this->name = pageName;
-    this->length = N;
-    this->view = view;
-    ESP_LOGI(this->name, "set page lenght - view_length: %d", this->length, this->length);
+  void setPageView(const char *pageName, T (&view)[N]) {
   };
 
 public:
-  M_SELECT *view;           // 列表视图
-  uint8_t length = 0;       // 列表视图长度
+  LIST_VIEW &view;          // 列表视图
   void render();            // 渲染函数
   void onUserInput(int8_t); // ListPage 类特定的按键处理函数
 
-  /*
-   * @brief 接收当前选中的条目索引作为参数，并执行在派生类中重写后的动作
-   */
-  virtual void router(uint8_t) = 0;
+  ListPage(LIST_VIEW &view) : view(view){};
 
   virtual void before();
 };
@@ -215,9 +210,9 @@ typedef struct UI_VARIABLE
 
   uint8_t fade = 1;
 
-  uint8_t layer;            // 页面嵌套层级
-  page_index_t index;       // 当前绘制页面的页码
-  page_index_t index_targe; // 目标页面的页码
+  uint8_t layer;              // 页面嵌套层级
+  page_index_t index;         // 当前绘制页面的页码
+  page_index_t index_targe;   // 目标页面的页码
   uint8_t state = STATE_VIEW; // 页面绘制状态
   uint8_t select[UI_DEPTH];   // list_page 当前选中的条目
   // uint8_t param[UI_PARAM];    // 储存UI参数，如列表动画时间
@@ -267,7 +262,7 @@ public:
   void setDefaultPage(BasePage *);
 
   void addPage(BasePage *);
-  void begin();
+  void begin(U8G2 *u8g2);
   void uiUpdate();
   void btnUpdate(void (*func)(WouoUI *));
 

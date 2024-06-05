@@ -64,7 +64,7 @@ void cb_fn_ui(bool mode)
 
 /*********************************** 定义列表内容 ***********************************/
 
-M_SELECT edit_f0_menu[]{
+LIST_VIEW edit_f0_menu{
     {"[ Edit Fidget Toy ]"},
     {"~ Box X OS"},
     {"~ Box Y OS"},
@@ -274,14 +274,13 @@ void WouoUI::oled_init()
                    { this->u8g2->setContrast(config_ui.ref[DISP_BRI]); });
 }
 
-static uint8_t pageIndex = 0;
-
 /*
  * @brief 添加对象式页面
  * @param page 页面指针
  */
 void WouoUI::addPage(BasePage *page)
 {
+  static uint8_t pageIndex = 0;
   page->u8g2 = this->u8g2;              // u8g2 指针
   page->gui = this;                     // 设置gui引用
   pageIndex++;                          // 页码+1
@@ -299,7 +298,6 @@ void WouoUI::setDefaultPage(BasePage *page)
 // 总进程
 void WouoUI::uiUpdate()
 {
-  // int8_t ui_lenght = ((ListPage *)this->ui.objPage[this->ui.index])->length;
   this->u8g2->sendBuffer();
 
   switch (this->ui.state)
@@ -329,8 +327,14 @@ void WouoUI::uiUpdate()
   }
 }
 
-void WouoUI::begin()
+void WouoUI::begin(U8G2 *u8g2)
 {
+  // 设置屏幕指针
+  this->u8g2 = u8g2;
+  // 获取屏幕宽高
+  this->DISPLAY_WIDTH = u8g2->getWidth();
+  this->DISPLAY_HEIGHT = u8g2->getHeight();
+
   this->oled_init();
 
   // 设置屏幕刷新任务
@@ -443,7 +447,7 @@ void ListPage::onUserInput(int8_t btnID)
   auto ui = &gui->ui;
   auto select = &ui->select[ui->layer];
   auto boxyTarget = &list.box_y_trg[ui->layer];
-  int8_t ui_lenght = ((ListPage *)ui->objPage[ui->index])->length;
+  int8_t ui_lenght = ((ListPage *)ui->objPage[ui->index])->view.size();
 
   uint8_t box_x_os = 10;
   uint8_t box_y_ox = 10;
@@ -452,6 +456,11 @@ void ListPage::onUserInput(int8_t btnID)
                    { 
                     box_x_os = config_ui.ref[BOX_X_OS];
                     box_y_ox = config_ui.ref[BOX_Y_OS]; });
+
+  // 当前选中的行行数（内存地址）
+  auto *select_index = &gui->ui.select[gui->ui.layer];
+  // 被选中的 view unit
+  const LIST_VIEW_UNIT view_unit = this->view[*select_index];
 
   switch (btnID)
   {
@@ -479,11 +488,13 @@ void ListPage::onUserInput(int8_t btnID)
 
   case BTN_ID_CANCEL: // 返回
     ESP_LOGI(TAG, "CANCEL");
-    gui->ui.select[gui->ui.layer] = 0;
+    *select_index = 0;
   case BTN_ID_CONFIRM:          // 确认
     list.box_w_trg += box_x_os; // 伸展光标
     ESP_LOGI(TAG, "CONFIRM");
-    this->router(gui->ui.select[gui->ui.layer]); // 按下确认时执行在派生类中重写的路由方法
+    // 执行与 view uint 绑定的回调函数，通常是页面跳转
+    if (view_unit.cb_fn != nullptr)
+      view_unit.cb_fn(gui);
     break;
   }
 
@@ -494,6 +505,7 @@ void ListPage::onUserInput(int8_t btnID)
 void ListPage::render()
 {
   auto *ui_v = &gui->ui;
+  auto length = this->view.size();
   static uint8_t list_ani;
   static uint8_t com_scr;
   config_ui.access([&]()
@@ -512,7 +524,7 @@ void ListPage::render()
 
     // 计算滚动条长度
     list.bar_h_trg = ceil(ui_v->select[ui_v->layer] *
-                          ((float)gui->DISPLAY_HEIGHT / (this->length - 1)));
+                          ((float)gui->DISPLAY_HEIGHT / (length - 1)));
   }
 
   // 计算动画过渡值
@@ -526,7 +538,7 @@ void ListPage::render()
   animation(&list.bar_h, &list.bar_h_trg, list_ani);
 
   // 绘制列表文字和行末尾元素
-  for (int i = 0; i < this->length; ++i)
+  for (int i = 0; i < length; ++i)
   {
     // 绘制文本
     list.text_y_temp = list.text_y + LIST_LINE_H * i;

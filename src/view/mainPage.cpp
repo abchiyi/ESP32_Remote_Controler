@@ -1,8 +1,9 @@
 #include <view/mainPage.h>
-#include <view/menu.h>
+// #include <view/menu.h>
 #include <controller.h>
 #include <radio.h>
 #include <car.h>
+#include <view/setting_devces.h>
 
 #define slider_width 6
 #define slider_length 45
@@ -31,7 +32,8 @@ public:
     switch (btnID)
     {
     case BTN_ID_MENU:
-      gui->page_in_to(P_MENU);
+      // gui->page_in_to(P_MENU);
+      gui->page_in_to(P_DEVICES);
       break;
     }
   };

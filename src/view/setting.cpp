@@ -7,7 +7,7 @@
 
 #define TAG "page setting"
 
-M_SELECT Setting_view[]{
+LIST_VIEW Setting_view{
     {"[ Setting ]"},
     {"~ Disp Bri"},
     {"~ Box X OS"},
@@ -36,7 +36,6 @@ public:
   void create()
   {
     this->setPageView("setting", Setting_view);
-    // gui->eepromInit(this);
   }
 
   void before()
