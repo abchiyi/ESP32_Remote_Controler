@@ -33,37 +33,6 @@ typedef enum key_event
 #define LIST_TEXT_S 4               // 边距
 #define LIST_BAR_W 3                // 滚动条宽度
 #define LIST_BOX_R 0.5f             // 光标圆角
-struct
-{
-  uint8_t select;
-
-  int16_t text_x_temp; // 文本横轴起始点
-  int16_t text_y_temp; // 文本纵轴起始点
-  int16_t text_w_temp; // 末尾元素横轴起始点
-
-  float text_x;
-  float text_x_trg;
-
-  float text_y;
-  float text_y_trg;
-
-  float box_y;
-  float box_y_trg[UI_DEPTH];
-
-  float box_content_width; // 当前选中文本宽度
-  float box_w;
-  float box_w_trg;
-
-  float box_H;
-  float box_h;
-  float box_h_trg;
-
-  float bar_h = 0.0;     // 滚动条目实际长度
-  float bar_h_trg = 0.0; // 滚动条目标长度
-} list;
-
-// EEPROM变量
-#define EEPROM_CHECK 11
 
 // 选择框变量
 #define CB_U 2
@@ -115,6 +84,17 @@ public:
   U8G2 *u8g2;
   WouoUI *gui; // wouoUI 指针
 
+  /***** 光标 *****/
+
+  uint8_t select = 0; // 光标状态（选中第几行）
+
+  float box_y_trg; // 光标纵轴目标坐标(为每个页面储存一个独立的光标位置)
+
+  static float box_y; // 光标纵轴坐标
+
+  static float box_w_trg;
+  static float box_h_trg;
+
   page_name_t name = "Base page"; // 页面名称
   uint8_t index;                  // 页码
 
@@ -163,25 +143,16 @@ public:
 class ListPage : public BasePage
 {
 protected:
-  // 绘制行末尾元素
-  // 数值
-  void list_draw_val(int n)
-  {
-    u8g2->setCursor(list.text_w_temp, LIST_TEXT_H + LIST_TEXT_S + list.text_y_temp);
-    u8g2->print(check_box.v[n - 1]);
-  };
+  float bar_h = 0.0;     // 滚动条目实际长度
+  float bar_h_trg = 0.0; // 滚动条目标长度
 
-  // 外框
-  void list_draw_cbf()
-  {
-    u8g2->drawRFrame(list.text_w_temp, CB_U + list.text_y_temp, CB_W, CB_H, 0.5f);
-  };
+  static float text_x;
+  static float text_x_trg;
 
-  // 点
-  void list_draw_cbd()
-  {
-    u8g2->drawBox(list.text_w_temp + CB_D + 1, CB_U + CB_D + 1 + list.text_y_temp, CB_W - (CB_D + 1) * 2, CB_H - (CB_D + 1) * 2);
-  };
+  static float text_y;
+  static float text_y_trg;
+
+  float box_H;
 
   template <typename T, size_t N>
   void setPageView(const char *pageName, T (&view)[N]) {
@@ -225,7 +196,6 @@ public:
   uint16_t DISPLAY_WIDTH;  // 屏幕宽度 pix
 
   BasePage *objPage[UI_DEPTH]; // 所有已注册的页面
-  uint8_t select[UI_DEPTH];    // list_page 当前选中的条目
   uint8_t layer;               // 页面嵌套层级
   uint8_t index;               // 当前页面的页码
   uint8_t index_targe;         // 目标页面的页码
@@ -246,14 +216,22 @@ public:
   void page_out_to(BasePage *);
   void pageSwitch(BasePage *);
 
-  void pageChange(BasePage *, uint8_t);
-
   void setDefaultPage(BasePage *);
 
   void addPage(BasePage *);
   void begin(U8G2 *u8g2);
   void uiUpdate();
   void btnUpdate(void (*func)(WouoUI *));
+
+  auto getPage()
+  {
+    return this->objPage[this->index];
+  }
+
+  auto getPage(uint8_t index)
+  {
+    return this->objPage[index];
+  }
 
   struct size
   {

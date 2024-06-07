@@ -27,7 +27,7 @@
 // #include <view/setting.h>
 // #include <view/editor.h>
 // #include <view/window.h>
-// #include <view/about.h>
+#include <view/about.h>
 // #include <view/sleep.h>
 // #include <view/menu.h>
 #include <view/mainPage.h>
@@ -184,9 +184,9 @@ void setup()
   // wouoUI.addPage(P_EDITOR);
   // wouoUI.addPage(P_SETTING);
   // wouoUI.addPage(P_WINDOW);
-  // wouoUI.addPage(P_ABOUT);
   // wouoUI.addPage(F0TOY);
   // wouoUI.addPage(P_SLEEP);
+  WOUO_UI.addPage(P_ABOUT);
   WOUO_UI.addPage(P_MAIN);
   WOUO_UI.addPage(P_DEVICES);
 
