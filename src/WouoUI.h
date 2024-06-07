@@ -88,10 +88,7 @@ public:
 
   uint8_t select = 0; // 光标状态（选中第几行）
 
-  float box_y_trg; // 光标纵轴目标坐标(为每个页面储存一个独立的光标位置)
-
-  static float box_y; // 光标纵轴坐标
-
+  float box_y_trg;    // 光标纵轴目标坐标(为每个页面储存一个独立的光标位置)
   static float box_w_trg;
   static float box_h_trg;
 
@@ -151,8 +148,6 @@ protected:
 
   static float text_y;
   static float text_y_trg;
-
-  float box_H;
 
   template <typename T, size_t N>
   void setPageView(const char *pageName, T (&view)[N]) {
@@ -223,23 +218,22 @@ public:
   void uiUpdate();
   void btnUpdate(void (*func)(WouoUI *));
 
-  auto getPage()
-  {
-    return this->objPage[this->index];
-  }
-
+  /*
+   * @brief 根据页码获取页面对象
+   * @param index 页码
+   */
   auto getPage(uint8_t index)
   {
     return this->objPage[index];
   }
 
-  struct size
+  /*
+   * @brief 根据页码获取页面对象
+   */
+  auto getPage()
   {
-    uint8_t index;
-    uint16_t dataSize;
-
-    size(uint8_t _index, uint16_t _size) : index(_index), dataSize(_size){};
-  };
+    return this->objPage[this->index];
+  }
 };
 
 extern ConfigHandle<uint8_t[11]> config_ui;

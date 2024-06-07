@@ -42,7 +42,6 @@
 
 #define TAG "WouUI"
 
-float BasePage::box_y = 0.0;
 float BasePage::box_w_trg = 0.0;
 float BasePage::box_h_trg = 0.0;
 
@@ -517,10 +516,6 @@ void ListPage::render()
   static int16_t text_y_temp; // 文本纵轴起始坐标
   static int16_t text_w_temp; // 文本起始起始坐标
 
-  static float box_content_width; // 当前选中文本宽度
-  static float box_w;
-  static float box_h;
-
   static uint8_t list_ani;
   static uint8_t com_scr;
 
@@ -553,64 +548,87 @@ void ListPage::render()
   // {
   //   gui->oper_flag = false;
 
-  // 获取选中文本的宽度
-  auto box_content_text = view[gui->getPage()->select].m_select;
-  box_content_width = u8g2->getUTF8Width(box_content_text) + LIST_TEXT_S * 2;
-
-  // 计算滚动条长度
-  this->bar_h_trg = ceil(gui->getPage()->select *
-                         ((float)gui->DISPLAY_HEIGHT / (length - 1)));
   // }
 
-  // 计算动画过渡值
-  animation(&text_x, 0.0f, list_ani);
-  animation(&text_y, &text_y_trg, list_ani);
-
-  animation(&page->box_y, &page->box_y_trg, list_ani);
-  animation(&box_w, &box_w_trg, list_ani);
-  animation(&box_w_trg, &box_content_width, list_ani);
-  animation(&box_h, &box_h_trg, list_ani);
-  animation(&box_h_trg, &box_H, list_ani);
-
-  animation(&this->bar_h, &this->bar_h_trg, list_ani);
-
-  // 绘制列表文字和行末尾元素
-  for (int i = 0; i < length; ++i)
+  auto render_cursor = [&]()
   {
-    // 绘制文本
-    text_y_temp = text_y + LIST_LINE_H * i;
-    text_w_temp = text_x_temp + LIST_TEXT_W;
-    text_x_temp = text_x * (!com_scr
-                                ? (abs(gui->getPage()->select - i) + 1)
-                                : (i + 1));
+    static float box_HEIGTH_MIN = LIST_LINE_H;
+    static float box_HEIGHT;
+    static float box_WIDTH_MIN;
+    static float box_WIDTH;
+    static float box_y; // 纵轴坐标
 
-    u8g2->setCursor(text_x_temp + LIST_TEXT_S, LIST_TEXT_S + LIST_TEXT_H + text_y_temp);
-    u8g2->print(view[i].m_select);
+    // 获取选中文本的宽度
+    box_WIDTH_MIN =
+        u8g2->getUTF8Width(view[select].m_select) + LIST_TEXT_S * 2;
 
-    //  绘制末尾元素
-    switch (view[i].m_select[0])
+    // 计算光标坐标
+    animation(&box_y, &box_y_trg, list_ani);
+    // 计算光标宽度
+    animation(&box_WIDTH, &box_w_trg, list_ani);
+    animation(&box_w_trg, &box_WIDTH_MIN, list_ani);
+    // 计算光标高度
+    animation(&box_HEIGHT, &box_h_trg, list_ani);
+    animation(&box_h_trg, &box_HEIGTH_MIN, list_ani);
+
+    // 绘制光标
+    u8g2->drawRBox(
+        0,                                      // X （光标左侧紧贴屏幕边缘）
+        box_y - (box_HEIGHT - LIST_LINE_H) / 2, // Y
+        box_WIDTH,
+        box_HEIGHT,
+        LIST_BOX_R);
+  };
+
+  auto render_list = [&]()
+  {
+    animation(&text_x, 0.0f, list_ani);
+    animation(&text_y, &text_y_trg, list_ani);
+
+    // 绘制列表文字和行末尾元素
+    for (int i = 0; i < length; ++i)
     {
-    case '~':
-      list_draw_val(i);
-      break;
-    case '+':
-      list_draw_cbf();
-      if (check_box.m[i - 1] == 1)
-        list_draw_cbd();
-      break;
-    case '=':
-      list_draw_cbf();
-      if (*check_box.s_p == i)
-        list_draw_cbd();
-      break;
+      // 绘制文本
+      text_y_temp = text_y + LIST_LINE_H * i;
+      text_w_temp = text_x_temp + LIST_TEXT_W;
+      text_x_temp = text_x * (!com_scr
+                                  ? (abs(gui->getPage()->select - i) + 1)
+                                  : (i + 1));
+
+      u8g2->setCursor(text_x_temp + LIST_TEXT_S, LIST_TEXT_S + LIST_TEXT_H + text_y_temp);
+      u8g2->print(view[i].m_select);
+
+      //  绘制末尾元素
+      switch (view[i].m_select[0])
+      {
+      case '~':
+        list_draw_val(i);
+        break;
+      case '+':
+        list_draw_cbf();
+        if (check_box.m[i - 1] == 1)
+          list_draw_cbd();
+        break;
+      case '=':
+        list_draw_cbf();
+        if (*check_box.s_p == i)
+          list_draw_cbd();
+        break;
+      }
     }
-  }
+  };
 
-  // 绘制进度条和选择框
-  u8g2->drawBox(gui->DISPLAY_WIDTH - LIST_BAR_W, 0, LIST_BAR_W, this->bar_h);
+  auto render_bar = [&]()
+  {
+    this->bar_h_trg = ceil(gui->getPage()->select *
+                           ((float)gui->DISPLAY_HEIGHT / (length - 1)));
+    animation(&this->bar_h, &this->bar_h_trg, list_ani);
+    u8g2->drawBox(gui->DISPLAY_WIDTH - LIST_BAR_W, 0, LIST_BAR_W, this->bar_h);
+  };
 
-  // 光标
-  u8g2->drawRBox(0, page->box_y - (box_h - LIST_LINE_H) / 2, box_w, box_h, LIST_BOX_R);
+  render_bar();
+  render_list();
+  render_cursor();
 };
 
 void ListPage::before()
@@ -623,7 +641,7 @@ void ListPage::before()
   text_y = this->box_y_trg - LIST_LINE_H * this->select;
   text_y_trg = text_y;
 
-  box_H = LIST_LINE_H;
+  // box_H = LIST_LINE_H;
 
   u8g2->setFont(LIST_FONT);
   u8g2->setDrawColor(2);
