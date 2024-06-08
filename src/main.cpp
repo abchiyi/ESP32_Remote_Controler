@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <variant>
 #include <esp_log.h>
 #include "EEPROM.h"
 
@@ -24,12 +25,12 @@
 #include <WouoUI.h>
 // page
 // #include <view/fidgetToy.h>
-// #include <view/setting.h>
 // #include <view/editor.h>
 // #include <view/window.h>
-#include <view/about.h>
 // #include <view/sleep.h>
-// #include <view/menu.h>
+#include <view/setting.h>
+#include <view/about.h>
+#include <view/menu.h>
 #include <view/mainPage.h>
 #include "view/setting_devces.h"
 
@@ -180,15 +181,20 @@ void setup()
   car_controll_start();
 
   /** GUI **/
-  // wouoUI.addPage(P_MENU);
   // wouoUI.addPage(P_EDITOR);
   // wouoUI.addPage(P_SETTING);
   // wouoUI.addPage(P_WINDOW);
   // wouoUI.addPage(F0TOY);
   // wouoUI.addPage(P_SLEEP);
-  WOUO_UI.addPage(P_ABOUT);
-  WOUO_UI.addPage(P_MAIN);
-  WOUO_UI.addPage(P_DEVICES);
+
+  std::vector<BasePage *> pages = {
+      P_MAIN,
+      P_MENU,
+      P_ABOUT,
+      P_DEVICES,
+      P_SETTING};
+  for (auto &page : pages)
+    WOUO_UI.addPage(page);
 
   WOUO_UI.setDefaultPage(P_MAIN);
   WOUO_UI.begin(&u8g2);

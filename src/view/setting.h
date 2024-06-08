@@ -1,3 +1,3 @@
 #include <WouoUI.h>
 
-extern ListPage *P_SETTING;
+extern BasePage *P_SETTING;

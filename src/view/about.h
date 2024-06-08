@@ -1,3 +1,3 @@
 #include <WouoUI.h>
 
-extern ListPage *P_ABOUT;
+extern BasePage *P_ABOUT;

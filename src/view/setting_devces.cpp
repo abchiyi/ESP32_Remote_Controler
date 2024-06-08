@@ -2,21 +2,7 @@
 #include "WouoUI.h"
 #include "view/mainPage.h"
 
-// auto a = [&](WouoUI *gui)
-// {
-//     ESP_LOGI("gui test", "test view cb_fn");
-// };
-
-LIST_VIEW Setting_devces_view{
-    {"[ Device ]",
-     [&](WouoUI *ui)
-     {
-         ui->page_out_to(P_MAIN);
-     }},
-
-    {"- Add new Device"},    // TODO 二级菜单
-    {"- All paired device"}, // TODO 二级菜单
-};
+LIST_VIEW Setting_devces_view;
 
 class L_DEVICES : public ListPage
 {
@@ -28,10 +14,14 @@ public:
     void before()
     {
         ListPage::before();
-        Setting_devces_view.push_back({"- test uint 3"});
+
+        Setting_devces_view = {
+            {"[ Device ]", create_page_jump_fn(PAGE_OUT, P_MAIN)},
+            {"- Add new Device"},
+        };
     };
 
     L_DEVICES(LIST_VIEW &_view) : ListPage(_view){};
 };
 
-ListPage *P_DEVICES = new L_DEVICES(Setting_devces_view);
+BasePage *P_DEVICES = new L_DEVICES(Setting_devces_view);

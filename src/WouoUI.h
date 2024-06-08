@@ -51,11 +51,13 @@ typedef const char *page_name_t;
 
 void animation(float *a, float *a_trg, uint8_t n);
 
+typedef std::function<void(WouoUI *)> view_cb_t;
+
 // list view unit
 struct LIST_VIEW_UNIT
 {
   const char *m_select;
-  std::function<void(WouoUI *)> cb_fn = nullptr;
+  view_cb_t cb_fn = nullptr;
 };
 
 // list view 类型
@@ -76,6 +78,12 @@ enum
   COME_SCR,
 };
 
+typedef enum Page_Jump_Mode
+{
+  PAGE_IN,
+  PAGE_OUT,
+} page_jump_mode_t;
+
 class BasePage
 {
   friend class WouoUI; // 允许 WouoUI 访问受保护的变量
@@ -88,7 +96,7 @@ public:
 
   uint8_t select = 0; // 光标状态（选中第几行）
 
-  float box_y_trg;    // 光标纵轴目标坐标(为每个页面储存一个独立的光标位置)
+  float box_y_trg = 0.0; // 光标纵轴目标坐标(为每个页面储存一个独立的光标位置)
   static float box_w_trg;
   static float box_h_trg;
 
@@ -178,8 +186,8 @@ private:
   void fade();
   void layer_out();
 
-  uint8_t state = STATE_VIEW; // 页面绘制状态
 public:
+  uint8_t state = STATE_VIEW; // 页面绘制状态
   WouoUI(U8G2 *u8g2) : u8g2(u8g2)
   {
     // 获取屏幕宽高
@@ -238,3 +246,11 @@ public:
 
 extern ConfigHandle<uint8_t[11]> config_ui;
 void cb_fn_ui(bool mode);
+
+/**
+ * @brief 简化跳转回调函数写法，
+ * 对于只需要执行跳转动作的选项可以使用此函数生成跳转函数
+ * @param mode 决定页码跳转模式
+ * @param page 目标页面
+ */
+view_cb_t create_page_jump_fn(page_jump_mode_t mode, BasePage *&page);

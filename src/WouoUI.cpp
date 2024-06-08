@@ -71,6 +71,14 @@ void cb_fn_ui(bool mode)
   STORAGE_CONFIG.RW(config_ui, mode);
 };
 
+view_cb_t create_page_jump_fn(page_jump_mode_t mode, BasePage *&page)
+{
+  return [&](WouoUI *ui)
+  {
+    mode == PAGE_IN ? ui->page_in_to(page) : ui->page_out_to(page);
+  };
+};
+
 /*********************************** 定义列表内容 ***********************************/
 
 LIST_VIEW edit_f0_menu{
@@ -158,11 +166,6 @@ void WouoUI::layer_in()
                      page->box_w_trg += calc(config_ui.ref[BOX_X_OS]);
                      page->box_h_trg += calc(config_ui.ref[BOX_Y_OS]); });
 
-  ESP_LOGI(TAG, "page->box_y_trg %.2f, w %.2f ,h %.2f ",
-           page->box_y_trg,
-           calc(config_ui.ref[BOX_X_OS]),
-           calc(config_ui.ref[BOX_Y_OS]));
-
   this->index = this->index_targe;
 }
 
@@ -186,7 +189,7 @@ void WouoUI::layer_out()
   page_target->box_w_trg += calc(config_ui.ref[BOX_X_OS]);
   page_target->box_h_trg += calc(config_ui.ref[BOX_Y_OS]); });
 
-  this->objPage[this->index]->leave();
+  page->leave();
   this->index = this->index_targe;
 }
 
@@ -327,7 +330,7 @@ void WouoUI::uiUpdate()
     this->fade();
     break;
   case STATE_VIEW:
-    auto page = this->objPage[this->index];
+    auto page = this->getPage();
     this->u8g2->clearBuffer();
     if (!this->init_flag)
     {
@@ -373,7 +376,7 @@ void WouoUI::btnUpdate(void (*func)(WouoUI *))
   if (this->btnPressed) // 当有按键按下时触发input函数
   {
     this->btnPressed = false;
-    this->objPage[this->index]->onUserInput(this->btnID);
+    this->getPage()->onUserInput(this->btnID);
   }
 }
 
@@ -455,52 +458,49 @@ void BasePage::draw_slider_x(float progress,
 // 处理按钮事件
 void ListPage::onUserInput(int8_t btnID)
 {
-  auto select = &gui->getPage()->select;
-  auto boxyTarget = &gui->getPage()->box_y_trg;
-
-  int8_t ui_lenght = ((ListPage *)gui->objPage[gui->index])->view.size();
+  int8_t ui_lenght = ((ListPage *)gui->getPage())->view.size();
 
   uint8_t box_x_os = 10;
   uint8_t box_y_ox = 10;
 
   config_ui.access([&]()
-                   { 
-                    box_x_os = config_ui.ref[BOX_X_OS];
-                    box_y_ox = config_ui.ref[BOX_Y_OS]; });
+                   {
+    box_x_os = config_ui.ref[BOX_X_OS];
+    box_y_ox = config_ui.ref[BOX_Y_OS]; });
 
   switch (btnID)
   {
   case BTN_ID_UP:
     box_w_trg += box_x_os; // 伸展光标
-    if (*select == 0)
+    if (select == 0)
       break;
-    !*boxyTarget
-        ? text_y_trg += LIST_LINE_H   // 下翻列表
-        : *boxyTarget -= LIST_LINE_H; // 上移光标
-    box_h_trg += box_y_ox;            // 光标动画
-    *select -= 1;                     // 选中行数上移一位
+    !box_y_trg
+        ? text_y_trg += LIST_LINE_H // 下翻列表
+        : box_y_trg -= LIST_LINE_H; // 上移光标
+    box_h_trg += box_y_ox;          // 光标动画
+    select -= 1;                    // 选中行数上移一位
     break;
 
   case BTN_ID_DO:
     box_w_trg += box_x_os; // 伸展光标
-    if (*select == (ui_lenght - 1))
+    if (select == (ui_lenght - 1))
       break;
-    *boxyTarget >= (gui->DISPLAY_HEIGHT - LIST_LINE_H)
-        ? text_y_trg -= LIST_LINE_H   // 上翻列表
-        : *boxyTarget += LIST_LINE_H; // 下移光标
-    box_h_trg += box_y_ox;            // 光标动画
-    *select += 1;                     // 选中行数下移一位
+    box_y_trg >= (gui->DISPLAY_HEIGHT - LIST_LINE_H)
+        ? text_y_trg -= LIST_LINE_H // 上翻列表
+        : box_y_trg += LIST_LINE_H; // 下移光标
+    box_h_trg += box_y_ox;          // 光标动画
+    select += 1;                    // 选中行数下移一位
     break;
 
   case BTN_ID_CANCEL: // 返回
     ESP_LOGI(TAG, "CANCEL");
-    *select = 0;
+    select = 0;
   case BTN_ID_CONFIRM:     // 确认
     box_w_trg += box_x_os; // 伸展光标
     ESP_LOGI(TAG, "CONFIRM");
     // 执行与 view uint 绑定的回调函数，通常是页面跳转
-    if (this->view[*select].cb_fn)
-      this->view[*select].cb_fn(gui);
+    if (this->view[select].cb_fn)
+      this->view[select].cb_fn(gui);
     break;
   }
   gui->oper_flag = true;
@@ -553,10 +553,10 @@ void ListPage::render()
   auto render_cursor = [&]()
   {
     static float box_HEIGTH_MIN = LIST_LINE_H;
-    static float box_HEIGHT;
-    static float box_WIDTH_MIN;
-    static float box_WIDTH;
-    static float box_y; // 纵轴坐标
+    static float box_HEIGHT = 0.0;
+    static float box_WIDTH_MIN = 0.0;
+    static float box_WIDTH = 0.0;
+    static float box_y = 0.0; // 纵轴坐标
 
     // 获取选中文本的宽度
     box_WIDTH_MIN =
@@ -640,8 +640,6 @@ void ListPage::before()
   text_x = -gui->DISPLAY_WIDTH;
   text_y = this->box_y_trg - LIST_LINE_H * this->select;
   text_y_trg = text_y;
-
-  // box_H = LIST_LINE_H;
 
   u8g2->setFont(LIST_FONT);
   u8g2->setDrawColor(2);

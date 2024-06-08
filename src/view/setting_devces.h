@@ -1,4 +1,4 @@
 
 #include "WouoUI.h"
 
-extern ListPage *P_DEVICES;
+extern BasePage *P_DEVICES;
