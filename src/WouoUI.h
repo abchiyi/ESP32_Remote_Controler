@@ -64,7 +64,7 @@ struct LIST_VIEW_UNIT
 typedef std::vector<LIST_VIEW_UNIT> LIST_VIEW;
 
 // UI 变量索引
-enum
+typedef  enum ui_param
 {
   DISP_BRI,
   BOX_X_OS,
@@ -76,7 +76,7 @@ enum
   BTN_SPT,
   BTN_LPT,
   COME_SCR,
-};
+} ui_param_t;
 
 typedef enum Page_Jump_Mode
 {

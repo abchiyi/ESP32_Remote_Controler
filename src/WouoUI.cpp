@@ -73,7 +73,7 @@ void cb_fn_ui(bool mode)
 
 view_cb_t create_page_jump_fn(page_jump_mode_t mode, BasePage *&page)
 {
-  return [&](WouoUI *ui)
+  return [=](WouoUI *ui)
   {
     mode == PAGE_IN ? ui->page_in_to(page) : ui->page_out_to(page);
   };

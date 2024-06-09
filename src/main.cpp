@@ -26,8 +26,8 @@
 // page
 // #include <view/fidgetToy.h>
 // #include <view/editor.h>
-// #include <view/window.h>
 // #include <view/sleep.h>
+#include <view/window.h>
 #include <view/setting.h>
 #include <view/about.h>
 #include <view/menu.h>
@@ -191,6 +191,7 @@ void setup()
       P_MAIN,
       P_MENU,
       P_ABOUT,
+      P_WINDOW,
       P_DEVICES,
       P_SETTING};
   for (auto &page : pages)
