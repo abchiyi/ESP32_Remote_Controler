@@ -73,7 +73,7 @@ void cb_fn_ui(bool mode)
 
 view_cb_t create_page_jump_fn(page_jump_mode_t mode, BasePage *&page)
 {
-  return [=](WouoUI *ui)
+  return [&, mode](WouoUI *ui)
   {
     mode == PAGE_IN ? ui->page_in_to(page) : ui->page_out_to(page);
   };
@@ -90,55 +90,21 @@ LIST_VIEW edit_f0_menu{
 
 /************************************ 初始化函数 ***********************************/
 
-// 单选框初始化
-void WouoUI::check_box_s_init(uint8_t *param, uint8_t *param_p)
-{
-  check_box.s = param;
-  check_box.s_p = param_p;
-}
-
-// 多选框初始化
-void WouoUI::check_box_m_init(uint8_t *param)
-{
-  check_box.m = param;
-}
-
-// 数值初始化
-void WouoUI::check_box_v_init(uint8_t *param)
-{
-  check_box.v = param;
-}
-
-// 单选框处理函数
-void WouoUI::check_box_s_select(uint8_t val, uint8_t pos)
-{
-  *check_box.s = val;
-  *check_box.s_p = pos;
-  // eeprom.change = true; // TODO EERPROM 失效
-}
-
-// 多选框处理函数
-void WouoUI::check_box_m_select(uint8_t param)
-{
-  check_box.m[param] = !check_box.m[param];
-  // eeprom.change = true;
-}
-
-/* layer+1 以进入的形式前往指定页面 */
+/* 以进入的形式前往指定页面 */
 void WouoUI::page_in_to(BasePage *page)
 {
   this->index_targe = page->index;
   this->state = STATE_LAYER_IN;
 }
 
-/* layer-1 以退出的形式前往指定页面 */
+/* 以退出的形式前往指定页面 */
 void WouoUI::page_out_to(BasePage *page)
 {
   this->index_targe = page->index;
   this->state = STATE_LAYER_OUT;
 }
 
-/* layer 不变 以切换形式前往页面 */
+/* 以切换形式前往页面 */
 void WouoUI::pageSwitch(BasePage *page)
 {
   this->index = page->index;
@@ -148,7 +114,6 @@ void WouoUI::pageSwitch(BasePage *page)
 // 进入更深层级时的初始化
 void WouoUI::layer_in()
 {
-  this->layer++;
   this->state = STATE_FADE;
   this->init_flag = false;
 
@@ -175,7 +140,6 @@ void WouoUI::layer_out()
   auto page = this->getPage();                   // 当前页面
   auto page_target = this->getPage(index_targe); // 目标页面
 
-  this->layer--;
   this->state = STATE_FADE;
   this->init_flag = false;
 
@@ -513,30 +477,9 @@ void ListPage::render()
   auto page = gui->getPage();
 
   static int16_t text_x_temp; // 文本横轴起始坐标
-  static int16_t text_y_temp; // 文本纵轴起始坐标
-  static int16_t text_w_temp; // 文本起始起始坐标
 
   static uint8_t list_ani;
   static uint8_t com_scr;
-
-  // 绘制行末尾数值
-  auto list_draw_val = [&](int n)
-  {
-    u8g2->setCursor(text_w_temp, LIST_TEXT_H + LIST_TEXT_S + text_y_temp);
-    u8g2->print(check_box.v[n - 1]);
-  };
-
-  // 外框
-  auto list_draw_cbf = [&]()
-  {
-    u8g2->drawRFrame(text_w_temp, CB_U + text_y_temp, CB_W, CB_H, 0.5f);
-  };
-
-  // 点
-  auto list_draw_cbd = [&]()
-  {
-    u8g2->drawBox(text_w_temp + CB_D + 1, CB_U + CB_D + 1 + text_y_temp, CB_W - (CB_D + 1) * 2, CB_H - (CB_D + 1) * 2);
-  };
 
   config_ui.access([&]()
                    {
@@ -585,36 +528,42 @@ void ListPage::render()
     animation(&text_x, 0.0f, list_ani);
     animation(&text_y, &text_y_trg, list_ani);
 
+    /**
+     * 绘制末尾元素
+     * 文本第一个字符作为绘制模式控制符号
+     * '~' 末尾绘制变量
+     * '+' 末尾绘多选框
+     * '-' 不绘制元素
+     * '=' 末尾绘制单选框
+     */
+    auto render_end_element = [&](uint index)
+    {
+      switch (view[index].m_select[0])
+      {
+      case '~':
+        // list_draw_val(index - 1);
+        break;
+      case '+':
+        break;
+      case '=':
+        break;
+      }
+    };
+
     // 绘制列表文字和行末尾元素
     for (int i = 0; i < length; ++i)
     {
       // 绘制文本
       text_y_temp = text_y + LIST_LINE_H * i;
+      text_x_temp = text_x * (!com_scr ? (abs(gui->getPage()->select - i) + 1)
+                                       : (i + 1));
       text_w_temp = text_x_temp + LIST_TEXT_W;
-      text_x_temp = text_x * (!com_scr
-                                  ? (abs(gui->getPage()->select - i) + 1)
-                                  : (i + 1));
 
       u8g2->setCursor(text_x_temp + LIST_TEXT_S, LIST_TEXT_S + LIST_TEXT_H + text_y_temp);
       u8g2->print(view[i].m_select);
-
-      //  绘制末尾元素
-      switch (view[i].m_select[0])
-      {
-      case '~':
-        list_draw_val(i);
-        break;
-      case '+':
-        list_draw_cbf();
-        if (check_box.m[i - 1] == 1)
-          list_draw_cbd();
-        break;
-      case '=':
-        list_draw_cbf();
-        if (*check_box.s_p == i)
-          list_draw_cbd();
-        break;
-      }
+      if (view[i].render_end)
+        view[i].render_end(gui);
+      // render_end_element(i);
     }
   };
 

@@ -34,37 +34,59 @@ typedef enum key_event
 #define LIST_BAR_W 3                // 滚动条宽度
 #define LIST_BOX_R 0.5f             // 光标圆角
 
-// 选择框变量
-#define CB_U 2
-#define CB_W 12
-#define CB_H 12
-#define CB_D 2
-struct
+// 页面跳转模式
+typedef enum Page_Jump_Mode
 {
-  uint8_t *v;
-  uint8_t *m;
-  uint8_t *s;
-  uint8_t *s_p;
-} check_box;
+  PAGE_IN,
+  PAGE_OUT,
+} page_jump_mode_t;
+
 class WouoUI;
+
 typedef const char *page_name_t;
+typedef std::function<void(WouoUI *)> view_cb_t;
 
 void animation(float *a, float *a_trg, uint8_t n);
-
-typedef std::function<void(WouoUI *)> view_cb_t;
 
 // list view unit
 struct LIST_VIEW_UNIT
 {
   const char *m_select;
   view_cb_t cb_fn = nullptr;
+  view_cb_t render_end = nullptr;
 };
 
 // list view 类型
 typedef std::vector<LIST_VIEW_UNIT> LIST_VIEW;
 
+typedef struct check_box_handle
+{
+  uint8_t *target_val; // 目标变量值
+  uint8_t value;       // checkbox 包含值
+  view_cb_t check()    // 选中复选框
+  {
+    return [=](WouoUI *ui)
+    {
+      *target_val = !*target_val;
+    };
+  };
+
+  view_cb_t chekc_radio()
+  {
+    return [=](WouoUI *ui)
+    {
+      *target_val = value;
+    };
+  }
+  void init(uint8_t *t, uint8_t v = 1)
+  {
+    this->target_val = t;
+    this->value = v;
+  };
+} check_box_handle_t;
+
 // UI 变量索引
-typedef  enum ui_param
+typedef enum
 {
   DISP_BRI,
   BOX_X_OS,
@@ -77,12 +99,6 @@ typedef  enum ui_param
   BTN_LPT,
   COME_SCR,
 } ui_param_t;
-
-typedef enum Page_Jump_Mode
-{
-  PAGE_IN,
-  PAGE_OUT,
-} page_jump_mode_t;
 
 class BasePage
 {
@@ -153,12 +169,50 @@ protected:
 
   static float text_x;
   static float text_x_trg;
-
   static float text_y;
   static float text_y_trg;
 
-  template <typename T, size_t N>
-  void setPageView(const char *pageName, T (&view)[N]) {
+  int16_t text_y_temp; // 文本纵轴起始坐标
+  int16_t text_w_temp; // 文本起始起始坐标
+
+  // private:
+  view_cb_t create_render_checxbox(check_box_handle &cbh)
+  {
+    // 选择框变量
+    static const uint8_t CB_U = 2;
+    static const uint8_t CB_W = 12;
+    static const uint8_t CB_H = 12;
+    static const uint8_t CB_D = 2;
+
+    // 外框
+    static auto list_draw_cbf = [&]()
+    {
+      u8g2->drawRFrame(text_w_temp, CB_U + text_y_temp, CB_W, CB_H, 0.5f);
+    };
+
+    // 点
+    static auto list_draw_cbd = [&]()
+    {
+      u8g2->drawBox(text_w_temp + CB_D + 1, CB_U + CB_D + 1 + text_y_temp, CB_W - (CB_D + 1) * 2, CB_H - (CB_D + 1) * 2);
+    };
+
+    return [=](WouoUI *ui)
+    {
+      list_draw_cbf();
+      if (*cbh.target_val == cbh.value)
+        list_draw_cbd();
+    };
+  };
+
+  // 绘制行末尾数值
+  template <typename T>
+  view_cb_t create_render_content(T *content)
+  {
+    return [=](WouoUI *ui)
+    {
+      u8g2->setCursor(text_w_temp, LIST_TEXT_H + LIST_TEXT_S + text_y_temp);
+      u8g2->print(*content);
+    };
   };
 
 public:
@@ -195,11 +249,9 @@ public:
     this->DISPLAY_HEIGHT = u8g2->getHeight();
   };
 
-  uint16_t DISPLAY_HEIGHT; // 屏幕高度 pix
-  uint16_t DISPLAY_WIDTH;  // 屏幕宽度 pix
-
+  uint16_t DISPLAY_HEIGHT;     // 屏幕高度 pix
+  uint16_t DISPLAY_WIDTH;      // 屏幕宽度 pix
   BasePage *objPage[UI_DEPTH]; // 所有已注册的页面
-  uint8_t layer;               // 页面嵌套层级
   uint8_t index;               // 当前页面的页码
   uint8_t index_targe;         // 目标页面的页码
 

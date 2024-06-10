@@ -9,12 +9,14 @@
 
 LIST_VIEW Setting_view;
 
-uint8_t aaa = 1;
-uint8_t bbb = 13;
-
 class L_SETTING : public ListPage
 {
 private:
+  check_box_handle_t com_scr_c;
+  uint8_t radio_v = 1;
+  check_box_handle_t radio_1;
+  check_box_handle_t radio_2;
+
   // 获取 ui 变量地址
   auto get(ui_param_t index)
   {
@@ -31,46 +33,69 @@ private:
   };
 
 public:
-  void
-  create()
+  void create()
   {
+    com_scr_c.init(&config_ui.ref[COME_SCR]);
+    radio_1.init(&radio_v, 1);
+    radio_2.init(&radio_v, 2);
+
     Setting_view = {
         {"[ Setting ]", create_page_jump_fn(PAGE_OUT, P_MENU)},
-        {"~ Disp Bri", pop_fn("Disp Bri", get(DISP_BRI), 255, 0, 5)},
-        {"~ Box X OS", pop_fn("Box X OS", get(BOX_X_OS), 50, 0, 1)},
-        {"~ Box Y OS", pop_fn("Box Y OS", get(BOX_Y_OS), 50, 0, 1)},
-        {"~ Win Y OS", pop_fn("Win Y OS", get(WIN_Y_OS), 40, 0, 1)},
-        {"~ List Ani", pop_fn("List Ani", get(LIST_ANI), 255, 20, 1)},
-        {"~ Win Ani", pop_fn("Win Ani", get(WIN_ANI), 255, 20, 1)},
-        {"~ Fade Ani", pop_fn("Fade Ani", get(FADE_ANI), 255, 0, 1)},
-        {"~ Btn SPT", pop_fn("Btn SPT", get(BTN_SPT), 255, 0, 1)},
-        {"~ Btn LPT", pop_fn("Btn LPT", get(BTN_LPT), 255, 0, 1)},
-        {"+ Come Fm Scr", [&](WouoUI *ui)
-         {
-           ui->check_box_m_select(COME_SCR);
-         }},
-        {"- [ About ]", create_page_jump_fn(PAGE_IN, P_ABOUT)},
-        {"= Raidio 1", [&](WouoUI *ui)
-         {
-           ui->check_box_s_select(0, 12);
-         }},
-        {"= Raidio 2", [&](WouoUI *ui)
-         {
-           ui->check_box_s_select(1, 13);
-         }},
+
+        {"~ Disp Bri",
+         pop_fn("Disp Bri", get(DISP_BRI), 255, 0, 5),
+         create_render_content(get(DISP_BRI))},
+
+        {"~ Box X OS",
+         pop_fn("Box X OS", get(BOX_X_OS), 50, 0, 1),
+         create_render_content(get(BOX_X_OS))},
+
+        {"~ Box Y OS",
+         pop_fn("Box Y OS", get(BOX_Y_OS), 50, 0, 1),
+         create_render_content(get(BOX_Y_OS))},
+
+        {"~ Win Y OS",
+         pop_fn("Win Y OS", get(WIN_Y_OS), 40, 0, 1),
+         create_render_content(get(WIN_Y_OS))},
+
+        {"~ List Ani",
+         pop_fn("List Ani", get(LIST_ANI), 255, 20, 1),
+         create_render_content(get(LIST_ANI))},
+
+        {"~ Win Ani",
+         pop_fn("Win Ani", get(WIN_ANI), 255, 20, 1),
+         create_render_content(get(WIN_ANI))},
+
+        {"~ Fade Ani",
+         pop_fn("Fade Ani", get(FADE_ANI), 255, 0, 1),
+         create_render_content(get(FADE_ANI))},
+
+        {"~ Btn SPT",
+         pop_fn("Btn SPT", get(BTN_SPT), 255, 0, 1),
+         create_render_content(get(BTN_SPT))},
+
+        {"~ Btn LPT",
+         pop_fn("Btn LPT", get(BTN_LPT), 255, 0, 1),
+         create_render_content(get(BTN_LPT))},
+
+        {"+ Come Fm Scr",
+         com_scr_c.check(),
+         create_render_checxbox(com_scr_c)},
+
+        {"= Raidio 1",
+         radio_1.chekc_radio(),
+         create_render_checxbox(radio_1)},
+
+        {"= Raidio 2",
+         radio_2.chekc_radio(),
+         create_render_checxbox(radio_2)},
+
         {"- Rest", [&](WouoUI *ui)
          { STORAGE_CONFIG.clearEEPROM(); }},
+
+        {"- [ About ]", create_page_jump_fn(PAGE_IN, P_ABOUT)},
     };
   };
-
-  void before()
-  {
-    ListPage::before();
-    check_box.v = config_ui.ref;
-    gui->check_box_m_init(config_ui.ref);
-    gui->check_box_v_init(config_ui.ref);
-    gui->check_box_s_init(&aaa, &bbb);
-  }
 
   void leave()
   {
