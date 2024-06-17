@@ -26,19 +26,18 @@ public:
       break;
     case BTN_ID_CANCEL:
       gui->page_in_to(P_MENU);
-      list.box_y = 0;
-      list.box_w = 0;
-      list.box_w_trg = 0;
-      list.box_h = 0;
-      list.box_h_trg = 0;
-      list.bar_h = 0;
+      // list.box_y = 0;
+      // list.box_w = 0;
+      // list.box_w_trg = 0;
+      // list.box_h = 0;
+      // list.box_h_trg = 0;
+      // list.bar_h = 0;
       u8g2->setPowerSave(0);
       break;
     }
   }
 
-  void
-  render()
+  void render()
   {
   } // 睡眠页不需要显示内容
 };

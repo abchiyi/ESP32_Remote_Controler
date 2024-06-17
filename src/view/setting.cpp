@@ -39,7 +39,7 @@ public:
     radio_1.init(&radio_v, 1);
     radio_2.init(&radio_v, 2);
 
-    Setting_view = {
+    this->view = {
         {"[ Setting ]", create_page_jump_fn(PAGE_OUT, P_MENU)},
 
         {"~ Disp Bri",

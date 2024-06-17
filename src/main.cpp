@@ -24,15 +24,14 @@
 #include <U8g2lib.h>
 #include <WouoUI.h>
 // page
-// #include <view/fidgetToy.h>
-// #include <view/editor.h>
-// #include <view/sleep.h>
-#include <view/window.h>
+#include "view/setting_devces.h"
+#include <view/fidgetToy.h>
+#include <view/mainPage.h>
 #include <view/setting.h>
+#include <view/window.h>
+#include <view/sleep.h>
 #include <view/about.h>
 #include <view/menu.h>
-#include <view/mainPage.h>
-#include "view/setting_devces.h"
 
 #define TAG "Main ESP32 RC"
 
@@ -44,8 +43,7 @@
 #define DC 5
 #define CS 4
 
-// Display display;
-
+// Screen
 U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, CS, DC, RES);
 WouoUI WOUO_UI(&u8g2); // 定义gui对象
 
@@ -181,13 +179,8 @@ void setup()
   car_controll_start();
 
   /** GUI **/
-  // wouoUI.addPage(P_EDITOR);
-  // wouoUI.addPage(P_SETTING);
-  // wouoUI.addPage(P_WINDOW);
-  // wouoUI.addPage(F0TOY);
-  // wouoUI.addPage(P_SLEEP);
-
   std::vector<BasePage *> pages = {
+      F0TOY,
       P_MAIN,
       P_MENU,
       P_ABOUT,

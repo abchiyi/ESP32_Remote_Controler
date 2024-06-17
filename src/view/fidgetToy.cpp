@@ -16,24 +16,9 @@ enum
   F0_Y_OS,
   F0_ANI
 };
-struct DD
+struct
 {
-  float box_x;
-  float box_x_trg;
-
-  float box_y;
-  float box_y_trg;
-
-  float box_W = F0_BOX_W;
-  float box_w;
-  float box_w_trg;
-
-  float box_H = F0_BOX_H;
-  float box_h;
-  float box_h_trg;
-
   int8_t select;
-
   uint8_t param[F0_PARAM];
 } f0;
 
@@ -42,6 +27,11 @@ class F0toy : public BasePage
 
 public:
   uint8_t pos[F0_POS_N][2];
+
+  void create() {
+
+  };
+
   void before()
   {
     pos[0][0] = 0;
@@ -56,25 +46,23 @@ public:
     pos[3][0] = 0;
     pos[3][1] = gui->DISPLAY_HEIGHT - F0_BOX_H;
 
-    auto *ui = &this->gui->ui;
+    CURSOR.transition = config_ui.ref[LIST_ANI];
+    CURSOR.min_width = F0_BOX_W;
+    CURSOR.min_height = F0_BOX_H;
+    CURSOR.round_corner = 1;
 
     // 功能初始化
     f0.param[F0_X_OS] = 40;
     f0.param[F0_Y_OS] = 40;
     f0.param[F0_ANI] = 100;
 
-    // 进场时元素从屏幕外入场
-    f0.box_x = -F0_BOX_W;
-    f0.box_y = -F0_BOX_H;
-    ui->oper_flag = true;
-
     // 进场时元素移动到初始位置
-    f0.box_x_trg = 0;
-    f0.box_y_trg = 0;
 
-    // 进场时元素效果
-    f0.box_w_trg += f0.param[F0_X_OS];
-    f0.box_h_trg += f0.param[F0_Y_OS];
+    setCursorOS(f0.param[F0_X_OS], f0.param[F0_Y_OS]);
+    cursor_position_x = 0;
+    cursor_position_y = 0;
+
+    gui->oper_flag = true;
 
     // 其它初始化
     u8g2->setDrawColor(1);
@@ -83,7 +71,7 @@ public:
   void onUserInput(int8_t btnID)
   {
     ESP_LOGI(this->name, "F0toy");
-    gui->ui.oper_flag = true;
+    gui->oper_flag = true;
     switch (btnID)
     {
     case BTN_ID_UP:
@@ -101,34 +89,24 @@ public:
       this->gui->page_out_to(P_MENU);
       break;
     }
-    f0.box_x_trg = pos[f0.select][F0_BOX_X];
-    f0.box_y_trg = pos[f0.select][F0_BOX_Y];
-  }
+
+    cursor_position_x = pos[f0.select][F0_BOX_X];
+    cursor_position_y = pos[f0.select][F0_BOX_Y];
+    }
 
   void render()
   {
-    auto *ui = &this->gui->ui;
-
     // 在每次操作后都会更新的参数
-    if (ui->oper_flag)
+    if (gui->oper_flag)
     {
-      ui->oper_flag = false;
-      if (f0.box_x != f0.box_x_trg)
-        f0.box_w_trg += f0.param[F0_X_OS];
-      if (f0.box_y != f0.box_y_trg)
-        f0.box_h_trg += f0.param[F0_Y_OS];
+      gui->oper_flag = false;
+      // if (CURSOR.x != box_x_trg)
+      //   box_w_trg += f0.param[F0_X_OS];
+      // if (CURSOR.y != box_y_trg)
+      //   box_h_trg += f0.param[F0_Y_OS];
     }
 
-    // 计算动画过渡值
-    animation(&f0.box_x, &f0.box_x_trg, f0.param[F0_ANI]);
-    animation(&f0.box_y, &f0.box_y_trg, f0.param[F0_ANI]);
-    animation(&f0.box_w, &f0.box_w_trg, f0.param[F0_ANI]);
-    animation(&f0.box_w_trg, &f0.box_W, f0.param[F0_ANI]);
-    animation(&f0.box_h, &f0.box_h_trg, f0.param[F0_ANI]);
-    animation(&f0.box_h_trg, &f0.box_H, f0.param[F0_ANI]);
-
-    // 绘制元素
-    u8g2->drawRBox((int16_t)f0.box_x, (int16_t)f0.box_y, f0.box_w, f0.box_h, F0_BOX_R);
+    draw_cursor();
   };
 };
 

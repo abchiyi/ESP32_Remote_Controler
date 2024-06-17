@@ -3,6 +3,7 @@
 #include <storage_config.h>
 #include <vector>
 #include <functional>
+#include "UI_element.h"
 
 #pragma once
 
@@ -103,18 +104,37 @@ typedef enum
 class BasePage
 {
   friend class WouoUI; // 允许 WouoUI 访问受保护的变量
+private:
 protected:
+  static BOX CURSOR;
+
+  // 绘制 CURSOR 并计算动画过渡参数
+  void draw_cursor()
+  {
+    CURSOR.x = cursor_position_x;
+    CURSOR.y = cursor_position_y;
+
+    animation(&CURSOR.width, &CURSOR.min_width, CURSOR.transition);
+    animation(&CURSOR.height, &CURSOR.min_height, CURSOR.transition);
+
+    CURSOR.draw(*u8g2);
+  };
+
+  // CURSOR 扩展动画, 对 cursor 的目标值做自＋
+  void setCursorOS(uint width_os = 0, uint height_os = 0)
+  {
+    CURSOR.width += width_os;
+    CURSOR.height += height_os;
+  }
+
 public:
   U8G2 *u8g2;
   WouoUI *gui; // wouoUI 指针
 
   /***** 光标 *****/
-
-  uint8_t select = 0; // 光标状态（选中第几行）
-
-  float box_y_trg = 0.0; // 光标纵轴目标坐标(为每个页面储存一个独立的光标位置)
-  static float box_w_trg;
-  static float box_h_trg;
+  uint8_t select = 0;            // 光标状态（选中第几行）
+  float cursor_position_y = 0.0; // 光标坐标 y
+  float cursor_position_x = 0.0; // 光标坐标 x
 
   page_name_t name = "Base page"; // 页面名称
   uint8_t index;                  // 页码
@@ -257,12 +277,6 @@ public:
 
   bool init_flag;
   bool oper_flag;
-
-  void check_box_v_init(uint8_t *);
-  void check_box_m_init(uint8_t *);
-  void check_box_s_init(uint8_t *param, uint8_t *param_p);
-  void check_box_s_select(uint8_t val, uint8_t pos);
-  void check_box_m_select(uint8_t param);
 
   volatile bool btnPressed = false; // 按键事件处理标志
   volatile int8_t btnID;            // 按键事件触发时在这里读取按钮ID

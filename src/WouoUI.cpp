@@ -42,8 +42,7 @@
 
 #define TAG "WouUI"
 
-float BasePage::box_w_trg = 0.0;
-float BasePage::box_h_trg = 0.0;
+BOX BasePage::CURSOR; // 声明静态 box 对象;
 
 float ListPage::text_y;
 float ListPage::text_x;
@@ -79,17 +78,6 @@ view_cb_t create_page_jump_fn(page_jump_mode_t mode, BasePage *&page)
   };
 };
 
-/*********************************** 定义列表内容 ***********************************/
-
-LIST_VIEW edit_f0_menu{
-    {"[ Edit Fidget Toy ]"},
-    {"~ Box X OS"},
-    {"~ Box Y OS"},
-    {"~ Box Ani"},
-};
-
-/************************************ 初始化函数 ***********************************/
-
 /* 以进入的形式前往指定页面 */
 void WouoUI::page_in_to(BasePage *page)
 {
@@ -121,15 +109,14 @@ void WouoUI::layer_in()
   auto page_target = this->getPage(index_targe); // 目标页面
 
   page_target->select = 0;
-  page_target->box_y_trg = 0;
+  page_target->cursor_position_y = 0;
 
   auto calc = [&](uint8_t v)
-  { return v * (page->box_y_trg / LIST_LINE_H); };
+  { return v * (page->cursor_position_y / LIST_LINE_H); };
 
-  config_ui.access([&]()
-                   {
-                     page->box_w_trg += calc(config_ui.ref[BOX_X_OS]);
-                     page->box_h_trg += calc(config_ui.ref[BOX_Y_OS]); });
+  // XXX 同质代码合并
+  page->CURSOR.width += calc(config_ui.ref[BOX_X_OS]);
+  page->CURSOR.height += calc(config_ui.ref[BOX_Y_OS]);
 
   this->index = this->index_targe;
 }
@@ -145,13 +132,12 @@ void WouoUI::layer_out()
 
   auto calc = [&](uint8_t v)
   {
-    return v * abs((page_target->box_y_trg - page->box_y_trg) / LIST_LINE_H);
+    return v * abs((page_target->cursor_position_y - page->cursor_position_y) / LIST_LINE_H);
   };
 
-  config_ui.access([&]()
-                   {
-  page_target->box_w_trg += calc(config_ui.ref[BOX_X_OS]);
-  page_target->box_h_trg += calc(config_ui.ref[BOX_Y_OS]); });
+  // XXX 同质代码合并
+  page_target->CURSOR.width += calc(config_ui.ref[BOX_X_OS]);
+  page_target->CURSOR.height += calc(config_ui.ref[BOX_Y_OS]);
 
   page->leave();
   this->index = this->index_targe;
@@ -205,6 +191,9 @@ void WouoUI::fade()
 // 渐近动画
 void animation(float *a, float *a_trg, uint8_t n)
 {
+  if (!n)
+    *a = *a_trg;
+
   if (*a != *a_trg)
   {
     if (fabs(*a - *a_trg) < 0.15f)
@@ -214,33 +203,10 @@ void animation(float *a, float *a_trg, uint8_t n)
   }
 }
 
-// 渐近动画
 void animation(float *a, float a_trg, uint8_t n)
 {
   animation(a, &a_trg, n);
 }
-
-/************************************* 显示函数 *************************************/
-// // 编辑解压玩具菜单
-// void edit_f0_proc()
-// {
-//   switch (ui.select[ui.layer])
-//   {
-//   case 0:
-//     ui.index = M_EDITOR;
-//     ui.state = STATE_S_LAYER_OUT;
-//     break;
-//   case 1:
-//     win_init("F0 X OS", &f0.param[F0_X_OS], 100, 0, 1, ui.index, edit_f0_menu);
-//     break;
-//   case 2:
-//     win_init("F0 Y OS", &f0.param[F0_Y_OS], 100, 0, 1, ui.index, edit_f0_menu);
-//     break;
-//   case 3:
-//     win_init("F0 Ani", &f0.param[F0_ANI], 255, 0, 1, ui.index, edit_f0_menu);
-//     break;
-//   }
-// }
 
 // OLED初始化函数
 void WouoUI::oled_init()
@@ -435,36 +401,41 @@ void ListPage::onUserInput(int8_t btnID)
   switch (btnID)
   {
   case BTN_ID_UP:
-    box_w_trg += box_x_os; // 伸展光标
-    if (select == 0)
-      break;
-    !box_y_trg
-        ? text_y_trg += LIST_LINE_H // 下翻列表
-        : box_y_trg -= LIST_LINE_H; // 上移光标
-    box_h_trg += box_y_ox;          // 光标动画
-    select -= 1;                    // 选中行数上移一位
+    if (select != 0)
+    {
+      setCursorOS(box_x_os, box_y_ox);
+      select -= 1;                           // 选中行数上移一位
+      cursor_position_y                      // 当光标未到达屏幕顶部时
+          ? cursor_position_y -= LIST_LINE_H // 上移光标
+          : text_y_trg += LIST_LINE_H;       // 下翻列表
+    }
+    else
+      setCursorOS(box_x_os);
     break;
 
   case BTN_ID_DO:
-    box_w_trg += box_x_os; // 伸展光标
-    if (select == (ui_lenght - 1))
-      break;
-    box_y_trg >= (gui->DISPLAY_HEIGHT - LIST_LINE_H)
-        ? text_y_trg -= LIST_LINE_H // 上翻列表
-        : box_y_trg += LIST_LINE_H; // 下移光标
-    box_h_trg += box_y_ox;          // 光标动画
-    select += 1;                    // 选中行数下移一位
+    if (select != (ui_lenght - 1))
+    {
+      setCursorOS(box_x_os, box_y_ox);
+      select += 1; // 选中行数下移一位
+      // 光标到达屏幕底部
+      cursor_position_y >= (gui->DISPLAY_HEIGHT - LIST_LINE_H)
+          ? text_y_trg -= LIST_LINE_H         // 上翻列表
+          : cursor_position_y += LIST_LINE_H; // 下移光标
+    }
+    else
+      setCursorOS(box_x_os);
     break;
 
   case BTN_ID_CANCEL: // 返回
     ESP_LOGI(TAG, "CANCEL");
     select = 0;
-  case BTN_ID_CONFIRM:     // 确认
-    box_w_trg += box_x_os; // 伸展光标
+  case BTN_ID_CONFIRM: // 确认
     ESP_LOGI(TAG, "CONFIRM");
     // 执行与 view uint 绑定的回调函数，通常是页面跳转
     if (this->view[select].cb_fn)
       this->view[select].cb_fn(gui);
+    setCursorOS(box_x_os);
     break;
   }
   gui->oper_flag = true;
@@ -493,34 +464,12 @@ void ListPage::render()
 
   // }
 
+  // 绘制光标
   auto render_cursor = [&]()
   {
-    static float box_HEIGTH_MIN = LIST_LINE_H;
-    static float box_HEIGHT = 0.0;
-    static float box_WIDTH_MIN = 0.0;
-    static float box_WIDTH = 0.0;
-    static float box_y = 0.0; // 纵轴坐标
-
-    // 获取选中文本的宽度
-    box_WIDTH_MIN =
+    CURSOR.min_width =
         u8g2->getUTF8Width(view[select].m_select) + LIST_TEXT_S * 2;
-
-    // 计算光标坐标
-    animation(&box_y, &box_y_trg, list_ani);
-    // 计算光标宽度
-    animation(&box_WIDTH, &box_w_trg, list_ani);
-    animation(&box_w_trg, &box_WIDTH_MIN, list_ani);
-    // 计算光标高度
-    animation(&box_HEIGHT, &box_h_trg, list_ani);
-    animation(&box_h_trg, &box_HEIGTH_MIN, list_ani);
-
-    // 绘制光标
-    u8g2->drawRBox(
-        0,                                      // X （光标左侧紧贴屏幕边缘）
-        box_y - (box_HEIGHT - LIST_LINE_H) / 2, // Y
-        box_WIDTH,
-        box_HEIGHT,
-        LIST_BOX_R);
+    this->draw_cursor();
   };
 
   auto render_list = [&]()
@@ -582,13 +531,16 @@ void ListPage::render()
 
 void ListPage::before()
 {
-  ESP_LOGI(TAG, "ListPage before");
-
   gui->oper_flag = true;
-  ESP_LOGI(name, "ui init");
   text_x = -gui->DISPLAY_WIDTH;
-  text_y = this->box_y_trg - LIST_LINE_H * this->select;
+  text_y = cursor_position_y - LIST_LINE_H * select;
   text_y_trg = text_y;
+
+  // CURSOR
+  CURSOR.x = 0;
+  CURSOR.round_corner = 2;
+  CURSOR.min_height = LIST_LINE_H;
+  CURSOR.transition = config_ui.ref[LIST_ANI];
 
   u8g2->setFont(LIST_FONT);
   u8g2->setDrawColor(2);
