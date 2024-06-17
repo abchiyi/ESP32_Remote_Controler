@@ -49,26 +49,34 @@ public:
 
     // slider 1
     this->draw_slider_y(joy_l_y,
-                        0, gui->DISPLAY_HEIGHT - slider_length,
-                        slider_width, slider_length,
+                        0,
+                        gui->DISPLAY_HEIGHT - slider_length - slider_width - 4,
+                        slider_width,
+                        slider_length,
                         true);
 
     // slider 2
-    this->draw_slider_x(joy_l_x,
-                        10, gui->DISPLAY_HEIGHT - slider_width,
-                        slider_width, slider_length,
+    this->draw_slider_y(joy_r_y,
+                        gui->DISPLAY_WIDTH - slider_width,
+                        gui->DISPLAY_HEIGHT - slider_length - slider_width - 4,
+                        slider_width,
+                        slider_length,
                         true);
 
     // slider 3
-    this->draw_slider_y(joy_r_y,
-                        gui->DISPLAY_WIDTH - slider_width, gui->DISPLAY_HEIGHT - slider_length,
-                        slider_width, slider_length,
+    this->draw_slider_x(joy_l_x,
+                        0,
+                        gui->DISPLAY_HEIGHT - slider_width,
+                        slider_width,
+                        slider_length,
                         true);
 
     // slider 4
     this->draw_slider_x(joy_r_x,
-                        gui->DISPLAY_WIDTH - slider_length - 10, gui->DISPLAY_HEIGHT - slider_width,
-                        slider_width, slider_length,
+                        gui->DISPLAY_WIDTH - slider_length,
+                        gui->DISPLAY_HEIGHT - slider_width,
+                        slider_width,
+                        slider_length,
                         true);
   };
 
@@ -76,20 +84,12 @@ public:
   {
     this->render_channel_view();
 
-    // u8g2->setCursor(0, 8);
-    // u8g2->printf("%s | %s",
-    //              radio.status == RADIO_CONNECTED ? "CONNECTED" : "DISCONNECT", radio.status == RADIO_PAIR_DEVICE ? "P--" : "---");
-
-    // auto data = get_channel_status().channel[0];
-    // auto gear = (data >> 2) & 0x03;
-    // auto brake = data & 0x03;
-    // auto value = (data >> 4);
-
-    // auto gear_char = gear == 0   ? "R"
-    //                  : gear == 1 ? "D"
-    //                              : "N";
-    // u8g2->printf("%S BRAKE-%s | %d", gear_char, brake ? "ON " : "OFF", value);
-  };
+    // 连接状态
+    u8g2->setCursor((gui->DISPLAY_WIDTH - 6 * 5) / 2, gui->DISPLAY_HEIGHT);
+    u8g2->print(RADIO.status == RADIO_CONNECTED
+                    ? "< = >"
+                    : "< x >");
+    };
 };
 
 BasePage *P_MAIN = new MainPage;

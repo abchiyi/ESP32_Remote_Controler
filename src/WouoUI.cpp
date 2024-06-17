@@ -538,7 +538,7 @@ void ListPage::before()
 
   // CURSOR
   CURSOR.x = 0;
-  CURSOR.round_corner = 2;
+  CURSOR.round_corner = 0.5;
   CURSOR.min_height = LIST_LINE_H;
   CURSOR.transition = config_ui.ref[LIST_ANI];
 

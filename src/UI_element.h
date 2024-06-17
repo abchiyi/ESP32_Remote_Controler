@@ -41,7 +41,7 @@ public:
 
 struct BOX : ELEMENT
 {
-  int round_corner = 0;
+  float round_corner = 0;
 
   void draw(U8G2 &u8g2)
   {
