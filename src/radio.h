@@ -2,10 +2,13 @@
 #include <esp_now.h>
 #include <cstring>
 #include <storage_config.h>
+#include <vector>
+#include <array>
 
-#define MAX_CHANNEL 8 // 最大控制通道数量
+#define MAX_CHANNEL 8         // 最大控制通道数量
+#define MAX_DEVICES_NUMBER 10 // 最大储存已配对设备
 
-typedef uint8_t mac_addr_t[ESP_NOW_ETH_ALEN];
+typedef std::array<unsigned char, ESP_NOW_ETH_ALEN> mac_t; // MAC 地址
 
 typedef enum radio_status
 {
@@ -29,7 +32,7 @@ typedef struct ap_info
   int8_t RSSI;
   String SSID;
   uint8_t CHANNEL;
-  mac_addr_t MAC;
+  mac_t MAC;
 
   bool operator<(const ap_info &obj) { return RSSI < obj.RSSI; };
 
@@ -39,7 +42,7 @@ typedef struct ap_info
     SSID = ssid;
     RSSI = rssi;
     CHANNEL = channel;
-    memcpy(MAC, (const void *)mac, ESP_NOW_ETH_ALEN);
+    memcpy(&MAC, (const void *)mac, ESP_NOW_ETH_ALEN);
   };
 
   String toStr()
@@ -54,15 +57,15 @@ typedef struct ap_info
 // 通讯结构体
 typedef struct radio_data
 {
-  mac_addr_t mac_addr;           // 发送者地址
+  mac_t mac_addr;                // 发送者地址
   uint16_t channel[MAX_CHANNEL]; // 通道信息
 } radio_data_t;
 
 // 配置信息
 typedef struct radio_config
 {
-  mac_addr_t paired_devices[6];     // 已配对设备
-  mac_addr_t last_connected_device; // 最后连接过的设备
+  std::vector<mac_t> paired_devices; // 连接设备列表
+  mac_t last_connected_device;       // 最后连接过的设备
 } radio_config_t;
 
 /**
@@ -71,7 +74,7 @@ typedef struct radio_config
 class Radio
 {
 private:
-  mac_addr_t __mac_addr; // 此设备mac 地址
+  mac_t __mac_addr; // 此设备mac 地址
 
 public:
   esp_now_peer_info peer_info; // 配对信息

@@ -71,19 +71,17 @@ bool wait_response(TickType_t waitTick, radio_data_t *data)
 };
 
 // 对比 mac地址是否一致
-bool checkMac(mac_addr_t mac1, mac_addr_t mac2)
+bool areMacsEqual(const mac_t &mac1, const mac_t &mac2)
 {
-  if (memcmp(mac1, mac2, sizeof(mac_addr_t)) == 0)
-    return true;
-  return false;
-};
+  return mac1 == mac2;
+}
 
-bool macOK(mac_addr_t arr)
+// 检查mac是否有效
+bool macOK(const mac_t &arr)
 {
-  for (int i = 0; i < sizeof(mac_addr_t); ++i)
-    if (arr[i] != 0x00 && arr[i] != 0xFF)
-      return true;
-  return false;
+  return std::any_of(arr.begin(), arr.end(),
+                     [](uint8_t byte)
+                     { return byte != 0x00 && byte != 0xFF; });
 }
 
 /**
@@ -93,24 +91,22 @@ bool macOK(mac_addr_t arr)
  * @param ifidx 要使用的wifi接口用于收发数据
  */
 bool pairTo(
-    mac_addr_t macaddr,
+    const mac_t &macaddr,
     uint8_t channel,
     wifi_interface_t ifidx = WIFI_IF_STA)
 {
-  // ESP_LOGI(TAG, "Pair to " MACSTR "", MAC2STR(macaddr));
-  auto peer_info = &RADIO.peer_info;
-  memset(peer_info, 0, sizeof(esp_now_peer_info_t)); // 清空对象
-  memcpy(peer_info->peer_addr, macaddr, ESP_NOW_ETH_ALEN);
-  peer_info->channel = channel;
-  peer_info->encrypt = false;
-  peer_info->ifidx = ifidx;
+  ESP_LOGI(TAG, "Pair to " MACSTR "", MAC2STR(macaddr));
+  esp_now_peer_info_t peer_info;
+  memcpy(peer_info.peer_addr, macaddr.data(), ESP_NOW_ETH_ALEN);
+  peer_info.channel = channel;
+  peer_info.encrypt = false;
+  peer_info.ifidx = ifidx;
 
-  esp_err_t addStatus = esp_now_add_peer(peer_info);
-
-  switch (addStatus)
+  switch (esp_now_add_peer(&peer_info))
   {
   case ESP_OK:
-    // ESP_LOGI(TAG, "Pair success");
+    RADIO.peer_info = peer_info;
+    ESP_LOGI(TAG, "Pair success");
     return true;
 
   case ESP_ERR_ESPNOW_EXIST:
@@ -141,11 +137,12 @@ bool pairTo(
 
 /**
  * @brief 与指定地址握手
+ * @param mac_addr 目标地址
  */
-bool handshake(mac_addr_t mac_addr)
+bool handshake(mac_t mac_addr)
 {
   radio_data_t data;
-  mac_addr_t newAddr; // 新地址
+  mac_t newAddr; // 新地址
 
   if (!RADIO.send(data)) // 发送失败退出握手
     return false;
@@ -158,14 +155,25 @@ bool handshake(mac_addr_t mac_addr)
   if (data.channel[0])
   {
     ESP_LOGI(TAG, "add new mac");
-    esp_now_del_peer(RADIO.peer_info.peer_addr);
-    memcpy(newAddr, &data.channel[0], sizeof(mac_addr_t));
-    pairTo(newAddr, 1);                          // 从通道2读取新信道
-    return handshake(RADIO.peer_info.peer_addr); // 与新地址握手
+    if (esp_now_del_peer(RADIO.peer_info.peer_addr) != ESP_OK)
+    {
+      ESP_LOGE(TAG, "Failed to delete old peer");
+      return false;
+    }
+    memcpy(newAddr.data(), &data.channel[0], newAddr.size());
+
+    // XXX 信道固定
+    if (!pairTo(newAddr, 1)) // 从通道2读取新信道
+    {
+      ESP_LOGE(TAG, "Failed to pair with new address");
+      return false;
+    }
+
+    return handshake(newAddr); // 与新地址握手
   }
 
   // 对比收到的数据的发送地址与目标配对地址是否一致
-  if (memcmp(mac_addr, data.mac_addr, sizeof(mac_addr_t)) == 0)
+  if (areMacsEqual(mac_addr, data.mac_addr))
     return true;
   else
   {
@@ -368,7 +376,7 @@ esp_err_t Radio::pairNewDevice()
   // 设置最后连接的地址
   memcpy(&CONFIG_RADIO.last_connected_device,
          &RADIO.peer_info.peer_addr,
-         sizeof(mac_addr_t));
+         sizeof(mac_t));
 
   STORAGE_CONFIG.write_all();
   ESP_LOGI(TAG, "" MACSTR " - HANDSHAKE SUCCESS", MAC2STR(RADIO.peer_info.peer_addr));
@@ -434,7 +442,7 @@ void Radio::begin()
   );
 
   // 写入本机的 MAC 地址
-  WiFi.macAddress(this->__mac_addr);
+  WiFi.macAddress(this->__mac_addr.data());
 
   initRadio();
   this->status = RADIO_DISCONNECT;

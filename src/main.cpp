@@ -167,7 +167,7 @@ void setup()
 
   /** 储存配置 **/
   STORAGE_CONFIG.add(cb_fn_ui);
-  STORAGE_CONFIG.add(config_radio_rw_cb);
+  // STORAGE_CONFIG.add(config_radio_rw_cb);
 
   STORAGE_CONFIG.begin();
   STORAGE_CONFIG.read_all();
