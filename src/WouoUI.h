@@ -52,7 +52,7 @@ void animation(float *a, float *a_trg, uint8_t n);
 // list view unit
 struct LIST_VIEW_UNIT
 {
-  const char *m_select;
+  std::string m_select; // 使用 std::string 替代 const char*
   view_cb_t cb_fn = nullptr;
   view_cb_t render_end = nullptr;
 };
@@ -194,6 +194,18 @@ protected:
 
   int16_t text_y_temp; // 文本纵轴起始坐标
   int16_t text_w_temp; // 文本起始起始坐标
+
+  /**
+   * @brief 向上移动光标，当光标移动到屏幕顶部，且列表未到达顶部则向下卷动列表
+   * @param step 执行一次移动光标多少行
+   */
+  void cursorMoveUP(uint step = 1);
+
+  /**
+   * @brief 向下移动光标，当光标移动到屏幕底部，且列表未到达顶底则向上卷动列表
+   * @param step 执行一次移动光标多少行
+   */
+  void cursorMoveDOWN(uint step = 1);
 
   // private:
   view_cb_t create_render_checxbox(check_box_handle &cbh)

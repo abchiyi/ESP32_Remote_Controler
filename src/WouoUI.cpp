@@ -39,6 +39,7 @@
 #include <SPI.h>
 #include <WouoUI.h>
 #include <storage_config.h>
+#include <cstdlib> // 或者 #include <stdlib.h>
 
 #define TAG "WouUI"
 
@@ -388,57 +389,30 @@ void BasePage::draw_slider_x(float progress,
 // 处理按钮事件
 void ListPage::onUserInput(int8_t btnID)
 {
-  int8_t ui_lenght = ((ListPage *)gui->getPage())->view.size();
-
-  uint8_t box_x_os = 10;
-  uint8_t box_y_ox = 10;
-
-  config_ui.access([&]()
-                   {
-    box_x_os = config_ui.ref[BOX_X_OS];
-    box_y_ox = config_ui.ref[BOX_Y_OS]; });
-
+  gui->oper_flag = true;
   switch (btnID)
   {
   case BTN_ID_UP:
-    if (select != 0)
-    {
-      setCursorOS(box_x_os, box_y_ox);
-      select -= 1;                           // 选中行数上移一位
-      cursor_position_y                      // 当光标未到达屏幕顶部时
-          ? cursor_position_y -= LIST_LINE_H // 上移光标
-          : text_y_trg += LIST_LINE_H;       // 下翻列表
-    }
-    else
-      setCursorOS(box_x_os);
+    ESP_LOGD(TAG, "MOVE_UP");
+    cursorMoveUP(); // 光标向上移动一行
     break;
 
   case BTN_ID_DO:
-    if (select != (ui_lenght - 1))
-    {
-      setCursorOS(box_x_os, box_y_ox);
-      select += 1; // 选中行数下移一位
-      // 光标到达屏幕底部
-      cursor_position_y >= (gui->DISPLAY_HEIGHT - LIST_LINE_H)
-          ? text_y_trg -= LIST_LINE_H         // 上翻列表
-          : cursor_position_y += LIST_LINE_H; // 下移光标
-    }
-    else
-      setCursorOS(box_x_os);
+    ESP_LOGD(TAG, "MOVE_DOWN");
+    cursorMoveDOWN(); // 光标向上移动一行
     break;
 
   case BTN_ID_CANCEL: // 返回
-    ESP_LOGI(TAG, "CANCEL");
+    ESP_LOGD(TAG, "CANCEL");
     select = 0;
   case BTN_ID_CONFIRM: // 确认
-    ESP_LOGI(TAG, "CONFIRM");
+    ESP_LOGD(TAG, "CONFIRM");
     // 执行与 view uint 绑定的回调函数，通常是页面跳转
     if (this->view[select].cb_fn)
       this->view[select].cb_fn(gui);
-    setCursorOS(box_x_os);
+    setCursorOS(config_ui.ref[BOX_X_OS]);
     break;
   }
-  gui->oper_flag = true;
 }
 
 // 列表页面渲染函数
@@ -467,8 +441,16 @@ void ListPage::render()
   // 绘制光标
   auto render_cursor = [&]()
   {
+    /**
+     * 检查光标位置是否正确
+     * 当光标越界时，移动到列表的末尾
+     */
+    auto viewSize = view.size() - 1;
+    if (select > viewSize && viewSize != 0)
+      cursorMoveUP(select - viewSize);
+
     CURSOR.min_width =
-        u8g2->getUTF8Width(view[select].m_select) + LIST_TEXT_S * 2;
+        u8g2->getUTF8Width(view[select].m_select.c_str()) + LIST_TEXT_S * 2;
     this->draw_cursor();
   };
 
@@ -509,7 +491,7 @@ void ListPage::render()
       text_w_temp = text_x_temp + LIST_TEXT_W;
 
       u8g2->setCursor(text_x_temp + LIST_TEXT_S, LIST_TEXT_S + LIST_TEXT_H + text_y_temp);
-      u8g2->print(view[i].m_select);
+      u8g2->print(view[i].m_select.c_str());
       if (view[i].render_end)
         view[i].render_end(gui);
       // render_end_element(i);
@@ -544,4 +526,61 @@ void ListPage::before()
 
   u8g2->setFont(LIST_FONT);
   u8g2->setDrawColor(2);
-}
+};
+
+void ListPage::cursorMoveDOWN(uint step)
+{
+  uint8_t box_x_os = config_ui.ref[BOX_X_OS];
+
+  auto move = [&]()
+  {
+    if (select != (((ListPage *)gui->getPage())->view.size() - 1))
+    {
+      setCursorOS(box_x_os, config_ui.ref[BOX_Y_OS]); // 光标轮廓扩大
+      select += 1;                                    // 选中行数下移一位
+      // 光标到达屏幕底部
+      cursor_position_y >= (gui->DISPLAY_HEIGHT - LIST_LINE_H)
+          ? text_y_trg -= LIST_LINE_H         // 上翻列表
+          : cursor_position_y += LIST_LINE_H; // 下移光标
+    }
+    else
+      setCursorOS(box_x_os); // 光标横向扩大
+
+    ESP_LOGD("TAG", "step %d, select %d, pos_Y %.2f text_y %.2f",
+             step, select, cursor_position_y, text_y_trg);
+  };
+
+  if (step < 2)
+    move();
+  else
+    for (size_t i = 0; i < step; i++)
+      move();
+};
+
+void ListPage::cursorMoveUP(uint step)
+{
+  uint8_t box_x_os = config_ui.ref[BOX_X_OS];
+
+  auto move = [&]()
+  {
+    if (select != 0)
+    {
+      setCursorOS(box_x_os, config_ui.ref[BOX_Y_OS]); // 光标轮廓扩大
+      select -= 1;                                    // 选中行数上移一位
+      cursor_position_y                               // 当光标未到达屏幕顶部时
+          ? cursor_position_y -= LIST_LINE_H          // 上移光标
+          : text_y_trg += LIST_LINE_H;                // 下翻列表
+    }
+    else
+      setCursorOS(box_x_os); // 光标横向扩大
+
+    ESP_LOGD("TAG", "step %d, select %d, pos_Y %.2f text_y %.2f",
+             step, select, cursor_position_y, text_y_trg);
+  };
+
+  if (step < 2)
+    move();
+  else
+    for (size_t i = 0; i < step; i++)
+      move();
+};
