@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <esp_now.h>
 #include <cstring>
-#include <storage_config.h>
 #include <vector>
 #include <array>
 
@@ -36,7 +35,7 @@ typedef struct ap_info
 
   bool operator<(const ap_info &obj) { return RSSI < obj.RSSI; };
 
-  ap_info(){};
+  ap_info() {};
   ap_info(String ssid, int8_t rssi, int8_t channel, uint8_t *mac)
   {
     SSID = ssid;
@@ -61,12 +60,8 @@ typedef struct radio_data
   uint16_t channel[MAX_CHANNEL]; // 通道信息
 } radio_data_t;
 
-// 配置信息
-typedef struct radio_config
-{
-  std::vector<mac_t> paired_devices; // 连接设备列表
-  mac_t last_connected_device;       // 最后连接过的设备
-} radio_config_t;
+// 检查mac是否有效
+bool macOK(const mac_t &arr);
 
 /**
  * @brief 无线通讯
@@ -76,7 +71,44 @@ class Radio
 private:
   mac_t __mac_addr; // 此设备mac 地址
 
+  std::array<mac_t, 6> paired_devices;
+
 public:
+  auto clear()
+  {
+    paired_devices.fill({
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+    });
+  }
+
+  mac_t last_connected_device; // 最后连接过的设备
+  // 获取一个有效mac地址的序列
+  auto get_copy()
+  {
+    std::vector<mac_t> temp;
+    for (auto mac : paired_devices)
+      if (macOK(mac))
+        temp.push_back(mac);
+
+    return temp;
+  };
+
+  // 将mac添加到末尾，并删除首位
+  void push_back(mac_t mac)
+  {
+    for (size_t i = 0; i < paired_devices.size() - 1; i++)
+      paired_devices[i] = paired_devices[i + 1];
+    paired_devices[5] = mac;
+  };
+
+  void config_clear();
+  void confgi_save();
+
   esp_now_peer_info peer_info; // 配对信息
   radio_status_t status;       // 无线状态
 
@@ -100,7 +132,4 @@ public:
   uint8_t timeout_disconnect = 250; // 超时断开连接
 };
 
-extern radio_config CONFIG_RADIO;
 extern Radio RADIO;
-
-void config_radio_rw_cb(bool mode);

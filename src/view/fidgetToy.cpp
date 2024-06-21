@@ -46,7 +46,7 @@ public:
     pos[3][0] = 0;
     pos[3][1] = gui->DISPLAY_HEIGHT - F0_BOX_H;
 
-    CURSOR.transition = config_ui.ref[LIST_ANI];
+    CURSOR.transition = CONFIG_UI[LIST_ANI];
     CURSOR.min_width = F0_BOX_W;
     CURSOR.min_height = F0_BOX_H;
     CURSOR.round_corner = 1;
@@ -92,7 +92,7 @@ public:
 
     cursor_position_x = pos[f0.select][F0_BOX_X];
     cursor_position_y = pos[f0.select][F0_BOX_Y];
-    }
+  }
 
   void render()
   {

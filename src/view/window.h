@@ -64,9 +64,7 @@ public:
       this->box_H = WIN_H;
       this->box_h = 0;
       this->bar_x = 0;
-      config_ui.access([&]()
-                       { this->box_h_trg =
-                             this->box_H + config_ui.ref[WIN_Y_OS]; });
+      this->box_h_trg = this->box_H + CONFIG_UI[WIN_Y_OS];
 
       u8g2->setFont(WIN_FONT);
     }
@@ -92,9 +90,7 @@ public:
       this->bar_x_trg = (float)(*this->value - this->min) / (float)(this->max - this->min) * (this->box_w_trg - 2 * WIN_TITLE_S);
     }
 
-    uint8_t winAni;
-    config_ui.access([&]()
-                     { winAni = config_ui.ref[WIN_ANI]; });
+    uint8_t winAni = CONFIG_UI[WIN_ANI];
     // 计算动画过渡值
     animation(&this->box_y, &this->box_y_trg, winAni);
     animation(&this->box_w, &this->box_w_trg, winAni);
@@ -126,8 +122,6 @@ public:
       return;
     this->oper_flag = true;
 
-    config_ui.access([&]()
-                     {
     switch (btnID)
     {
     case BTN_ID_UP:
@@ -142,7 +136,7 @@ public:
     case BTN_ID_CONFIRM:
       this->exit_flag = true;
       break;
-    } });
+    }
   }
 };
 

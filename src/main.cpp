@@ -3,9 +3,6 @@
 #include <esp_log.h>
 #include "EEPROM.h"
 
-// 储存
-#include <storage_config.h>
-
 // 无线依赖
 #include <esp_now.h>
 #include <esp_wifi.h>
@@ -67,10 +64,8 @@ void singleBtnScan(WouoUI *gui, uint8_t *s_btn, uint8_t *LPT_flag, uint8_t activ
   uint8_t btn_LPT = 255;
   uint8_t btn_SPT = 50;
 
-  config_ui.access([&]()
-                   {
-                     btn_LPT = config_ui.ref[BTN_LPT];
-                     btn_SPT = config_ui.ref[BTN_SPT]; });
+  btn_LPT = CONFIG_UI[BTN_LPT];
+  btn_SPT = CONFIG_UI[BTN_SPT];
 
   if (!*s_btn && LPT_flag) // 按钮没有被按下结束程序
   {
@@ -164,13 +159,6 @@ void ISR()
 void setup()
 {
   Serial.begin(115200);
-
-  /** 储存配置 **/
-  STORAGE_CONFIG.add(cb_fn_ui);
-  // STORAGE_CONFIG.add(config_radio_rw_cb);
-
-  STORAGE_CONFIG.begin();
-  STORAGE_CONFIG.read_all();
 
   /** 控制器输入 **/
   Controller.begin();

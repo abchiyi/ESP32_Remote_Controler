@@ -1,6 +1,5 @@
 #include <U8g2lib.h>
 #include <EEPROM.h>
-#include <storage_config.h>
 #include <vector>
 #include <functional>
 #include "UI_element.h"
@@ -252,7 +251,7 @@ public:
   void render();            // 渲染函数
   void onUserInput(int8_t); // ListPage 类特定的按键处理函数
 
-  ListPage(LIST_VIEW &view) : view(view){};
+  ListPage(LIST_VIEW &view) : view(view) {};
 
   virtual void before();
 };
@@ -322,9 +321,6 @@ public:
   }
 };
 
-extern ConfigHandle<uint8_t[11]> config_ui;
-void cb_fn_ui(bool mode);
-
 /**
  * @brief 简化跳转回调函数写法，
  * 对于只需要执行跳转动作的选项可以使用此函数生成跳转函数
@@ -332,3 +328,5 @@ void cb_fn_ui(bool mode);
  * @param page 目标页面
  */
 view_cb_t create_page_jump_fn(page_jump_mode_t mode, BasePage *&page);
+
+extern uint8_t CONFIG_UI[UI_PARAM];

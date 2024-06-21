@@ -3,7 +3,8 @@
 #include <view/about.h>
 #include <view/menu.h>
 #include <view/setting_devces.h>
-#include <storage_config.h>
+#include "tool.h"
+#include "radio.h"
 
 #define TAG "page setting"
 
@@ -20,7 +21,7 @@ private:
   // 获取 ui 变量地址
   auto get(ui_param_t index)
   {
-    return &config_ui.ref[index];
+    return &CONFIG_UI[index];
   }
 
   // 创建弹窗回调
@@ -35,7 +36,7 @@ private:
 public:
   void create()
   {
-    com_scr_c.init(&config_ui.ref[COME_SCR]);
+    com_scr_c.init(&CONFIG_UI[COME_SCR]);
     radio_1.init(&radio_v, 1);
     radio_2.init(&radio_v, 2);
 
@@ -91,7 +92,9 @@ public:
          create_render_checxbox(radio_2)},
 
         {"- Rest", [&](WouoUI *ui)
-         { STORAGE_CONFIG.clearEEPROM(); }},
+         {
+           RADIO.config_clear();
+         }},
 
         {"- [ About ]", create_page_jump_fn(PAGE_IN, P_ABOUT)},
     };
@@ -99,10 +102,11 @@ public:
 
   void leave()
   {
-    STORAGE_CONFIG.write_all();
+    // TODO 执行需要保存配置的对象的 save_config 方法
+    // STORAGE_CONFIG.write_all();
   }
 
-  L_SETTING(LIST_VIEW &_view) : ListPage(_view){};
+  L_SETTING(LIST_VIEW &_view) : ListPage(_view) {};
 };
 
 BasePage *P_SETTING = new L_SETTING(Setting_view);

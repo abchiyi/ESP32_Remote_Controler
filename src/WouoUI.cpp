@@ -38,7 +38,6 @@
 */
 #include <SPI.h>
 #include <WouoUI.h>
-#include <storage_config.h>
 #include <cstdlib> // 或者 #include <stdlib.h>
 
 #define TAG "WouUI"
@@ -61,14 +60,6 @@ uint8_t CONFIG_UI[UI_PARAM] = {
     20,  // BTN_SPT
     200, // BTN_LPT
     0    // COME_SCR
-};
-
-// GUI 基本参数
-ConfigHandle<uint8_t[11]> config_ui = create_sconfig(CONFIG_UI);
-
-void cb_fn_ui(bool mode)
-{
-  STORAGE_CONFIG.RW(config_ui, mode);
 };
 
 view_cb_t create_page_jump_fn(page_jump_mode_t mode, BasePage *&page)
@@ -115,9 +106,8 @@ void WouoUI::layer_in()
   auto calc = [&](uint8_t v)
   { return v * (page->cursor_position_y / LIST_LINE_H); };
 
-  // XXX 同质代码合并
-  page->CURSOR.width += calc(config_ui.ref[BOX_X_OS]);
-  page->CURSOR.height += calc(config_ui.ref[BOX_Y_OS]);
+  page->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
+                    calc(CONFIG_UI[BOX_Y_OS]));
 
   this->index = this->index_targe;
 }
@@ -135,10 +125,8 @@ void WouoUI::layer_out()
   {
     return v * abs((page_target->cursor_position_y - page->cursor_position_y) / LIST_LINE_H);
   };
-
-  // XXX 同质代码合并
-  page_target->CURSOR.width += calc(config_ui.ref[BOX_X_OS]);
-  page_target->CURSOR.height += calc(config_ui.ref[BOX_Y_OS]);
+  page_target->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
+                           calc(CONFIG_UI[BOX_Y_OS]));
 
   page->leave();
   this->index = this->index_targe;
@@ -153,10 +141,8 @@ void WouoUI::fade()
   static uint8_t fade = 1;
 
   if (fade == 1)
-  {
-    config_ui.access([&]()
-                     { fade_ani = config_ui.ref[FADE_ANI]; });
-  }
+    fade_ani = CONFIG_UI[FADE_ANI];
+
   delay(fade_ani);
 
   switch (fade)
@@ -219,8 +205,7 @@ void WouoUI::oled_init()
   this->buf_ptr = this->u8g2->getBufferPtr();
   this->buf_len =
       8 * this->u8g2->getBufferTileHeight() * this->u8g2->getBufferTileWidth();
-  config_ui.access([&]()
-                   { this->u8g2->setContrast(config_ui.ref[DISP_BRI]); });
+  this->u8g2->setContrast(CONFIG_UI[DISP_BRI]);
 }
 
 /*
@@ -410,7 +395,7 @@ void ListPage::onUserInput(int8_t btnID)
     // 执行与 view uint 绑定的回调函数，通常是页面跳转
     if (this->view[select].cb_fn)
       this->view[select].cb_fn(gui);
-    setCursorOS(config_ui.ref[BOX_X_OS]);
+    setCursorOS(CONFIG_UI[BOX_X_OS]);
     break;
   }
 }
@@ -423,13 +408,8 @@ void ListPage::render()
 
   static int16_t text_x_temp; // 文本横轴起始坐标
 
-  static uint8_t list_ani;
-  static uint8_t com_scr;
-
-  config_ui.access([&]()
-                   {
-                     list_ani = config_ui.ref[LIST_ANI];
-                     com_scr = config_ui.ref[COME_SCR]; });
+  static uint8_t list_ani = CONFIG_UI[LIST_ANI];
+  static uint8_t com_scr = CONFIG_UI[COME_SCR];
 
   // 在每次操作后都会更新的参数
   // if (gui->oper_flag)
@@ -469,6 +449,7 @@ void ListPage::render()
      */
     auto render_end_element = [&](uint index)
     {
+      // XXX 移除
       switch (view[index].m_select[0])
       {
       case '~':
@@ -522,7 +503,7 @@ void ListPage::before()
   CURSOR.x = 0;
   CURSOR.round_corner = 0.5;
   CURSOR.min_height = LIST_LINE_H;
-  CURSOR.transition = config_ui.ref[LIST_ANI];
+  CURSOR.transition = CONFIG_UI[LIST_ANI];
 
   u8g2->setFont(LIST_FONT);
   u8g2->setDrawColor(2);
@@ -530,18 +511,18 @@ void ListPage::before()
 
 void ListPage::cursorMoveDOWN(uint step)
 {
-  uint8_t box_x_os = config_ui.ref[BOX_X_OS];
+  uint8_t box_x_os = CONFIG_UI[BOX_X_OS];
 
   auto move = [&]()
   {
     if (select != (((ListPage *)gui->getPage())->view.size() - 1))
     {
-      setCursorOS(box_x_os, config_ui.ref[BOX_Y_OS]); // 光标轮廓扩大
-      select += 1;                                    // 选中行数下移一位
+      setCursorOS(box_x_os, CONFIG_UI[BOX_Y_OS]); // 光标轮廓扩大
+      select += 1;                                // 选中行数下移一位
       // 光标到达屏幕底部
-      cursor_position_y >= (gui->DISPLAY_HEIGHT - LIST_LINE_H)
-          ? text_y_trg -= LIST_LINE_H         // 上翻列表
-          : cursor_position_y += LIST_LINE_H; // 下移光标
+      cursor_position_y < (gui->DISPLAY_HEIGHT - LIST_LINE_H)
+          ? cursor_position_y += LIST_LINE_H // 下移光标
+          : text_y_trg -= LIST_LINE_H;       // 上翻列表
     }
     else
       setCursorOS(box_x_os); // 光标横向扩大
@@ -559,17 +540,17 @@ void ListPage::cursorMoveDOWN(uint step)
 
 void ListPage::cursorMoveUP(uint step)
 {
-  uint8_t box_x_os = config_ui.ref[BOX_X_OS];
+  uint8_t box_x_os = CONFIG_UI[BOX_X_OS];
 
   auto move = [&]()
   {
     if (select != 0)
     {
-      setCursorOS(box_x_os, config_ui.ref[BOX_Y_OS]); // 光标轮廓扩大
-      select -= 1;                                    // 选中行数上移一位
-      cursor_position_y                               // 当光标未到达屏幕顶部时
-          ? cursor_position_y -= LIST_LINE_H          // 上移光标
-          : text_y_trg += LIST_LINE_H;                // 下翻列表
+      setCursorOS(box_x_os, CONFIG_UI[BOX_Y_OS]); // 光标轮廓扩大
+      select -= 1;                                // 选中行数上移一位
+      cursor_position_y                           // 当光标未到达屏幕顶部时
+          ? cursor_position_y -= LIST_LINE_H      // 上移光标
+          : text_y_trg += LIST_LINE_H;            // 下翻列表
     }
     else
       setCursorOS(box_x_os); // 光标横向扩大
