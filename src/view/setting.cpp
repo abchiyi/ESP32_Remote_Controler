@@ -25,11 +25,11 @@ private:
   }
 
   // 创建弹窗回调
-  view_cb_t pop_fn(const char title[], uint8_t *value, uint8_t max, uint8_t min, uint8_t step)
+  view_fn_t pop_fn(const char title[], uint8_t *value, uint8_t max, uint8_t min, uint8_t step)
   {
     return [=](WouoUI *ui)
     {
-      popWindow(title, value, max, min, step, P_SETTING);
+      // popWindow(title, value, max, min, step, P_SETTING);
     };
   };
 
@@ -41,7 +41,7 @@ public:
     radio_2.init(&radio_v, 2);
 
     this->view = {
-        {"[ Setting ]", create_page_jump_fn(PAGE_OUT, P_MENU)},
+        {"[ Setting ]", create_page_jump_fn(PAGE_OUT, create_page_menu)},
 
         {"~ Disp Bri",
          pop_fn("Disp Bri", get(DISP_BRI), 255, 0, 5),
@@ -96,7 +96,10 @@ public:
            RADIO.config_clear();
          }},
 
-        {"- [ About ]", create_page_jump_fn(PAGE_IN, P_ABOUT)},
+        {"- [ About ]", [&](WouoUI *ui)
+         {
+           ui->page_in_to(create_page_about);
+         }},
     };
   };
 
@@ -109,4 +112,7 @@ public:
   L_SETTING(LIST_VIEW &_view) : ListPage(_view) {};
 };
 
-BasePage *P_SETTING = new L_SETTING(Setting_view);
+BasePage *create_page_setting()
+{
+  return new L_SETTING(Setting_view);
+}

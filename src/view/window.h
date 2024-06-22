@@ -50,38 +50,54 @@ public:
 
   friend void popWindow(const char[], uint8_t *, uint8_t, uint8_t, uint8_t, BasePage *);
 
+  void before()
+  {
+    // this->init_flag = true;
+    // this->oper_flag = true;
+    this->box_y = 0;
+    this->box_y_trg = (gui->DISPLAY_HEIGHT - WIN_H) / 2;
+    this->box_w = gui->DISPLAY_WIDTH;
+    this->box_w_trg = WIN_W;
+    this->box_H = WIN_H;
+    this->box_h = 0;
+    this->bar_x = 0;
+    this->box_h_trg = this->box_H + CONFIG_UI[WIN_Y_OS];
+
+    u8g2->setFont(WIN_FONT);
+  }
+
   void render()
   {
-    // 在进场时更新的参数
-    if (!this->init_flag)
-    {
-      this->init_flag = true;
-      this->oper_flag = true;
-      this->box_y = 0;
-      this->box_y_trg = (gui->DISPLAY_HEIGHT - WIN_H) / 2;
-      this->box_w = gui->DISPLAY_WIDTH;
-      this->box_w_trg = WIN_W;
-      this->box_H = WIN_H;
-      this->box_h = 0;
-      this->bar_x = 0;
-      this->box_h_trg = this->box_H + CONFIG_UI[WIN_Y_OS];
+    // // 在进场时更新的参数
+    // if (!this->init_flag)
+    // {
+    //   this->init_flag = true;
+    //   this->oper_flag = true;
+    //   this->box_y = 0;
+    //   this->box_y_trg = (gui->DISPLAY_HEIGHT - WIN_H) / 2;
+    //   this->box_w = gui->DISPLAY_WIDTH;
+    //   this->box_w_trg = WIN_W;
+    //   this->box_H = WIN_H;
+    //   this->box_h = 0;
+    //   this->bar_x = 0;
+    //   this->box_h_trg = this->box_H + CONFIG_UI[WIN_Y_OS];
 
-      u8g2->setFont(WIN_FONT);
-    }
+    //   u8g2->setFont(WIN_FONT);
+    // }
 
-    // 在离场时更新的参数
-    if (this->exit_flag)
-    {
-      this->box_H = 0;
-      this->box_y_trg = 0;
-      this->box_w_trg = gui->DISPLAY_WIDTH;
-      if (!this->box_y)
-      {
-        gui->pageSwitch(this->bg_page);
-        this->init_flag = false;
-        this->exit_flag = false;
-      }
-    }
+    // // 在离场时更新的参数
+    // if (this->exit_flag)
+    // {
+    //   this->box_H = 0;
+    //   this->box_y_trg = 0;
+    //   this->box_w_trg = gui->DISPLAY_WIDTH;
+    //   if (!this->box_y)
+    //   {
+    //     gui->pageSwitch(this->bg_page);
+    //     this->init_flag = false;
+    //     this->exit_flag = false;
+    //   }
+    // }
 
     // 在每次操作后都会更新的参数
     if (this->oper_flag)
@@ -116,6 +132,19 @@ public:
     }
   }
 
+  void leave()
+  {
+
+    this->box_H = 0;
+    this->box_y_trg = 0;
+    this->box_w_trg = gui->DISPLAY_WIDTH;
+    if (!this->box_y)
+    {
+      this->init_flag = false;
+      this->exit_flag = false;
+    }
+  };
+
   void onUserInput(int8_t btnID)
   {
     if (this->box_y != this->box_y_trg && this->box_y_trg == 0)
@@ -134,6 +163,9 @@ public:
       break;
     case BTN_ID_CANCEL:
     case BTN_ID_CONFIRM:
+      this->leave();
+      gui->pageSwitch(this->bg_page);
+
       this->exit_flag = true;
       break;
     }

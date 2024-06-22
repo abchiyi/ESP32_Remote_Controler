@@ -1,4 +1,4 @@
 
 #include "WouoUI.h"
 
-extern BasePage *P_DEVICES;
+BasePage *create_page_devices();

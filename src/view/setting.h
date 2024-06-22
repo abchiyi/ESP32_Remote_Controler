@@ -1,3 +1,3 @@
 #include <WouoUI.h>
 
-extern BasePage *P_SETTING;
+BasePage *create_page_setting();

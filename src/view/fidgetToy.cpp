@@ -86,7 +86,7 @@ public:
       break;
     case BTN_ID_CONFIRM:
     case BTN_ID_CANCEL:
-      this->gui->page_out_to(P_MENU);
+      this->gui->page_back();
       break;
     }
 
@@ -110,4 +110,7 @@ public:
   };
 };
 
-BasePage *F0TOY = new F0toy;
+BasePage *create_page_f0_toy()
+{
+  return new F0toy;
+}

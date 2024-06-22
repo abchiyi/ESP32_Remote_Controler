@@ -1,3 +1,3 @@
 #include <WouoUI.h>
 
-extern BasePage *P_MAIN;
+BasePage *create_page_main();

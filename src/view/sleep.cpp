@@ -25,7 +25,7 @@ public:
     case BTN_ID_CONFIRM:
       break;
     case BTN_ID_CANCEL:
-      gui->page_in_to(P_MENU);
+      gui->page_in_to(create_page_menu);
       // list.box_y = 0;
       // list.box_w = 0;
       // list.box_w_trg = 0;

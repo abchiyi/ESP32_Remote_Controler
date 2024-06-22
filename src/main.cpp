@@ -167,18 +167,8 @@ void setup()
   car_controll_start();
 
   /** GUI **/
-  std::vector<BasePage *> pages = {
-      F0TOY,
-      P_MAIN,
-      P_MENU,
-      P_ABOUT,
-      P_WINDOW,
-      P_DEVICES,
-      P_SETTING};
-  for (auto &page : pages)
-    WOUO_UI.addPage(page);
-
-  WOUO_UI.setDefaultPage(P_MAIN);
+  // WOUO_UI.setDefaultPage(P_MAIN);
+  WOUO_UI.setDefaultPage(create_page_setting);
   WOUO_UI.begin(&u8g2);
 
   /** 无线 **/

@@ -62,32 +62,41 @@ uint8_t CONFIG_UI[UI_PARAM] = {
     0    // COME_SCR
 };
 
-view_cb_t create_page_jump_fn(page_jump_mode_t mode, BasePage *&page)
+view_fn_t create_page_jump_fn(page_jump_mode_t mode, create_page_fn_t cb_fn)
 {
   return [&, mode](WouoUI *ui)
   {
-    mode == PAGE_IN ? ui->page_in_to(page) : ui->page_out_to(page);
+    mode == PAGE_IN
+        ? ui->page_in_to(cb_fn)
+        : ui->page_back();
   };
 };
 
-/* 以进入的形式前往指定页面 */
-void WouoUI::page_in_to(BasePage *page)
+void WouoUI::page_in_to(create_page_fn_t cb_fn)
 {
-  this->index_targe = page->index;
-  this->state = STATE_LAYER_IN;
-}
+  auto pt_page = cb_fn();
 
-/* 以退出的形式前往指定页面 */
-void WouoUI::page_out_to(BasePage *page)
+  addPage(pt_page);
+
+  ESP_LOGI(TAG, "page addr %d", pt_page);
+  this->history.push(pt_page);
+  this->state = STATE_LAYER_IN;
+};
+
+void WouoUI::page_back()
 {
-  this->index_targe = page->index;
-  this->state = STATE_LAYER_OUT;
+  if (history.size() > 1)
+  {
+    this->state = STATE_LAYER_OUT;
+    auto page = this->history.top();
+    page.page->leave();
+    this->history.pop();
+  }
 }
 
 /* 以切换形式前往页面 */
 void WouoUI::pageSwitch(BasePage *page)
 {
-  this->index = page->index;
   this->state = STATE_VIEW;
 }
 
@@ -97,8 +106,8 @@ void WouoUI::layer_in()
   this->state = STATE_FADE;
   this->init_flag = false;
 
-  auto page = this->getPage();                   // 当前页面
-  auto page_target = this->getPage(index_targe); // 目标页面
+  auto page = this->getPage();        // 当前页面
+  auto page_target = this->getPage(); // 目标页面
 
   page_target->select = 0;
   page_target->cursor_position_y = 0;
@@ -106,17 +115,17 @@ void WouoUI::layer_in()
   auto calc = [&](uint8_t v)
   { return v * (page->cursor_position_y / LIST_LINE_H); };
 
+  ESP_LOGI("get page", "page addr %d", page);
+
   page->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
                     calc(CONFIG_UI[BOX_Y_OS]));
-
-  this->index = this->index_targe;
 }
 
 // 进入更浅层级时的初始化
 void WouoUI::layer_out()
 {
-  auto page = this->getPage();                   // 当前页面
-  auto page_target = this->getPage(index_targe); // 目标页面
+  auto page = this->getPage();        // 当前页面
+  auto page_target = this->getPage(); // 目标页面
 
   this->state = STATE_FADE;
   this->init_flag = false;
@@ -129,7 +138,6 @@ void WouoUI::layer_out()
                            calc(CONFIG_UI[BOX_Y_OS]));
 
   page->leave();
-  this->index = this->index_targe;
 }
 
 /************************************* 动画函数 *************************************/
@@ -212,21 +220,19 @@ void WouoUI::oled_init()
  * @brief 添加对象式页面
  * @param page 页面指针
  */
-void WouoUI::addPage(BasePage *page)
+void WouoUI::addPage(BasePage *page) // TODO 重命名&简化函数
 {
-  static uint8_t pageIndex = 0;
-  page->u8g2 = this->u8g2;           // u8g2 指针
-  page->gui = this;                  // 设置gui引用
-  pageIndex++;                       // 页码+1
-  page->index = pageIndex;           // 设置页码
-  page->create();                    // 初始化页面
-  this->objPage[page->index] = page; // 储存页面
+  page->u8g2 = this->u8g2; // u8g2 指针
+  page->gui = this;        // 设置gui引用
+  page->create();          // 初始化页面
 };
 
 // 设置默认页面
-void WouoUI::setDefaultPage(BasePage *page)
+void WouoUI::setDefaultPage(create_page_fn_t cb_fn)
 {
-  this->index = page->index;
+  auto pt_page = cb_fn();
+  this->addPage(pt_page);
+  this->history.push(History(pt_page));
 }
 
 // 总进程
@@ -246,11 +252,12 @@ void WouoUI::uiUpdate()
     this->fade();
     break;
   case STATE_VIEW:
-    auto page = this->getPage();
     this->u8g2->clearBuffer();
+    auto page = this->getPage();
     if (!this->init_flag)
     {
       this->init_flag = true;
+      ESP_LOGI(TAG, "page addr %d", page);
       page->before();
     }
     page->render();

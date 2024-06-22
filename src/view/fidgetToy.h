@@ -1,3 +1,3 @@
 #include <WouoUI.h>
 
-extern BasePage *F0TOY;
+BasePage *create_page_f0_toy();extern BasePage *F0TOY;

@@ -18,7 +18,7 @@ public:
   void create()
   {
     this->name = "Main page";
-    ESP_LOGI(this->name, "page index is %d", this->index);
+    ESP_LOGI(this->name, "page create");
   };
 
   void before()
@@ -33,7 +33,7 @@ public:
     switch (btnID)
     {
     case BTN_ID_MENU:
-      gui->page_in_to(P_MENU);
+      gui->page_in_to(create_page_menu);
       break;
     }
   };
@@ -89,7 +89,10 @@ public:
     u8g2->print(RADIO.status == RADIO_CONNECTED
                     ? "< = >"
                     : "< x >");
-    };
+  };
 };
 
-BasePage *P_MAIN = new MainPage;
+BasePage *create_page_main()
+{
+  return new MainPage;
+}

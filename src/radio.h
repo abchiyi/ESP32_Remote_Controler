@@ -106,6 +106,18 @@ public:
     paired_devices[5] = mac;
   };
 
+  void remove(mac_t _mac)
+  {
+    auto array = get_copy();
+    paired_devices = {};
+    for (auto mac : array)
+    {
+      if (mac == _mac)
+        continue;
+      push_back(mac);
+    }
+  }
+
   void config_clear();
   void confgi_save();
 

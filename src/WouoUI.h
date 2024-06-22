@@ -1,8 +1,10 @@
 #include <U8g2lib.h>
 #include <EEPROM.h>
 #include <vector>
+#include "stack"
 #include <functional>
 #include "UI_element.h"
+#include <memory>
 
 #pragma once
 
@@ -20,10 +22,16 @@ typedef enum key_event
 #define UI_PARAM 11  // ui 变量总数
 
 // UI状态
-#define STATE_VIEW 0x00
-#define STATE_FADE 0x01
-#define STATE_LAYER_IN 0x02
-#define STATE_LAYER_OUT 0x03
+typedef enum
+{
+  STATE_VIEW,
+  STATE_FADE,
+  STATE_LAYER_IN,
+  STATE_LAYER_OUT,
+  STATE_SWITCH_IN,
+  STATE_SWITCH_OUT,
+  STATE_SWITCH_VIEW
+} ui_state_t;
 
 // 列表变量
 #define LIST_FONT u8g2_font_HelvetiPixel_tr
@@ -35,7 +43,7 @@ typedef enum key_event
 #define LIST_BOX_R 0.5f             // 光标圆角
 
 // 页面跳转模式
-typedef enum Page_Jump_Mode
+typedef enum
 {
   PAGE_IN,
   PAGE_OUT,
@@ -44,7 +52,7 @@ typedef enum Page_Jump_Mode
 class WouoUI;
 
 typedef const char *page_name_t;
-typedef std::function<void(WouoUI *)> view_cb_t;
+typedef std::function<void(WouoUI *)> view_fn_t;
 
 void animation(float *a, float *a_trg, uint8_t n);
 
@@ -52,8 +60,8 @@ void animation(float *a, float *a_trg, uint8_t n);
 struct LIST_VIEW_UNIT
 {
   std::string m_select; // 使用 std::string 替代 const char*
-  view_cb_t cb_fn = nullptr;
-  view_cb_t render_end = nullptr;
+  view_fn_t cb_fn = nullptr;
+  view_fn_t render_end = nullptr;
 };
 
 // list view 类型
@@ -63,7 +71,7 @@ typedef struct check_box_handle
 {
   uint8_t *target_val; // 目标变量值
   uint8_t value;       // checkbox 包含值
-  view_cb_t check()    // 选中复选框
+  view_fn_t check()    // 选中复选框
   {
     return [=](WouoUI *ui)
     {
@@ -71,7 +79,7 @@ typedef struct check_box_handle
     };
   };
 
-  view_cb_t chekc_radio()
+  view_fn_t chekc_radio()
   {
     return [=](WouoUI *ui)
     {
@@ -127,8 +135,8 @@ protected:
   }
 
 public:
-  U8G2 *u8g2;
-  WouoUI *gui; // wouoUI 指针
+  U8G2 *u8g2 = nullptr;
+  WouoUI *gui = nullptr; // wouoUI 指针
 
   /***** 光标 *****/
   uint8_t select = 0;            // 光标状态（选中第几行）
@@ -136,7 +144,6 @@ public:
   float cursor_position_x = 0.0; // 光标坐标 x
 
   page_name_t name = "Base page"; // 页面名称
-  uint8_t index;                  // 页码
 
   // 创建页面，在页面初始化时被调用
   virtual void create() {};
@@ -207,7 +214,7 @@ protected:
   void cursorMoveDOWN(uint step = 1);
 
   // private:
-  view_cb_t create_render_checxbox(check_box_handle &cbh)
+  view_fn_t create_render_checxbox(check_box_handle &cbh)
   {
     // 选择框变量
     static const uint8_t CB_U = 2;
@@ -237,7 +244,7 @@ protected:
 
   // 绘制行末尾数值
   template <typename T>
-  view_cb_t create_render_content(T *content)
+  view_fn_t create_render_content(T *content)
   {
     return [=](WouoUI *ui)
     {
@@ -248,7 +255,7 @@ protected:
 
 public:
   LIST_VIEW &view;          // 列表视图
-  void render();            // 渲染函数
+  void render() override;   // 渲染函数
   void onUserInput(int8_t); // ListPage 类特定的按键处理函数
 
   ListPage(LIST_VIEW &view) : view(view) {};
@@ -256,13 +263,30 @@ public:
   virtual void before();
 };
 
+typedef enum
+{
+  H_VIEW,
+  H_WINDOW,
+} history_mode_t;
+
+struct History
+{
+  BasePage *page;
+  history_mode_t mode;
+
+  History(BasePage *page) : page(page) {};
+};
+
+typedef std::function<BasePage *()> create_page_fn_t;
+
 class WouoUI
 {
 private:
   U8G2 *u8g2;
-
   uint16_t buf_len;
   uint8_t *buf_ptr;
+
+  std::stack<History> history; // 页面路由
 
   void layer_in();
   void oled_init();
@@ -280,11 +304,8 @@ public:
     this->DISPLAY_HEIGHT = u8g2->getHeight();
   };
 
-  uint16_t DISPLAY_HEIGHT;     // 屏幕高度 pix
-  uint16_t DISPLAY_WIDTH;      // 屏幕宽度 pix
-  BasePage *objPage[UI_DEPTH]; // 所有已注册的页面
-  uint8_t index;               // 当前页面的页码
-  uint8_t index_targe;         // 目标页面的页码
+  uint16_t DISPLAY_HEIGHT; // 屏幕高度 pix
+  uint16_t DISPLAY_WIDTH;  // 屏幕宽度 pix
 
   bool init_flag;
   bool oper_flag;
@@ -292,11 +313,11 @@ public:
   volatile bool btnPressed = false; // 按键事件处理标志
   volatile int8_t btnID;            // 按键事件触发时在这里读取按钮ID
 
-  void page_in_to(BasePage *);
-  void page_out_to(BasePage *);
+  void page_in_to(create_page_fn_t);
+  void page_back();
   void pageSwitch(BasePage *);
 
-  void setDefaultPage(BasePage *);
+  void setDefaultPage(create_page_fn_t);
 
   void addPage(BasePage *);
   void begin(U8G2 *u8g2);
@@ -309,15 +330,18 @@ public:
    */
   auto getPage(uint8_t index)
   {
-    return this->objPage[index];
-  }
+    // return this->objPage[index];
+    // XXX 无法访问目标元素
+    return this->history.top().page;
+  };
 
   /*
    * @brief 根据页码获取页面对象
    */
   auto getPage()
   {
-    return this->objPage[this->index];
+    // return this->objPage[this->index];
+    return this->history.top().page;
   }
 };
 
@@ -325,8 +349,8 @@ public:
  * @brief 简化跳转回调函数写法，
  * 对于只需要执行跳转动作的选项可以使用此函数生成跳转函数
  * @param mode 决定页码跳转模式
- * @param page 目标页面
+ * @param cb_fn 页面创建函数
  */
-view_cb_t create_page_jump_fn(page_jump_mode_t mode, BasePage *&page);
+view_fn_t create_page_jump_fn(page_jump_mode_t mode, create_page_fn_t cb_fn);
 
 extern uint8_t CONFIG_UI[UI_PARAM];
