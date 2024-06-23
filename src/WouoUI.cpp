@@ -79,7 +79,8 @@ void WouoUI::page_in_to(create_page_fn_t cb_fn)
   addPage(pt_page);
 
   ESP_LOGI(TAG, "page addr %d", pt_page);
-  this->history.push(pt_page);
+  // this->history.push(pt_page);
+  this->history.push_back(pt_page);
   this->state = STATE_LAYER_IN;
 };
 
@@ -88,11 +89,12 @@ void WouoUI::page_back()
   if (history.size() > 1)
   {
     this->state = STATE_LAYER_OUT;
-    auto history = this->history.top();
-    history.page->leave();
+    // auto history = this->history.top();
+    auto history = this->getPage();
+    history->leave();
 
-    delete history.page; // 销毁页面
-    this->history.pop(); // 销毁历史
+    this->history.pop_back(); // 销毁历史
+    delete history;           // 销毁页面
   }
 }
 
@@ -236,7 +238,7 @@ void WouoUI::setDefaultPage(create_page_fn_t cb_fn)
   {
     auto pt_page = cb_fn();
     this->addPage(pt_page);
-    this->history.push(History(pt_page));
+    this->history.push_back(History(pt_page));
   }
 }
 
@@ -451,29 +453,6 @@ void ListPage::render()
     animation(&text_x, 0.0f, list_ani);
     animation(&text_y, &text_y_trg, list_ani);
 
-    /**
-     * 绘制末尾元素
-     * 文本第一个字符作为绘制模式控制符号
-     * '~' 末尾绘制变量
-     * '+' 末尾绘多选框
-     * '-' 不绘制元素
-     * '=' 末尾绘制单选框
-     */
-    auto render_end_element = [&](uint index)
-    {
-      // XXX 移除
-      switch (view[index].m_select[0])
-      {
-      case '~':
-        // list_draw_val(index - 1);
-        break;
-      case '+':
-        break;
-      case '=':
-        break;
-      }
-    };
-
     // 绘制列表文字和行末尾元素
     for (int i = 0; i < length; ++i)
     {
@@ -487,7 +466,6 @@ void ListPage::render()
       u8g2->print(view[i].m_select.c_str());
       if (view[i].render_end)
         view[i].render_end(gui);
-      // render_end_element(i);
     }
   };
 

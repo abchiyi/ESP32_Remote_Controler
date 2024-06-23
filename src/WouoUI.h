@@ -1,7 +1,6 @@
 #include <U8g2lib.h>
 #include <EEPROM.h>
 #include <vector>
-#include "stack"
 #include <functional>
 #include "UI_element.h"
 #include <memory>
@@ -286,7 +285,7 @@ private:
   uint16_t buf_len;
   uint8_t *buf_ptr;
 
-  std::stack<History> history; // 页面路由
+  std::vector<History> history; // 页面路由
 
   void layer_in();
   void oled_init();
@@ -332,7 +331,7 @@ public:
   {
     // return this->objPage[index];
     // XXX 无法访问目标元素
-    return this->history.top().page;
+    return this->history[history.size() - 1].page;
   };
 
   /*
@@ -341,7 +340,7 @@ public:
   auto getPage()
   {
     // return this->objPage[this->index];
-    return this->history.top().page;
+    return this->history[history.size() - 1].page;
   }
 };
 
