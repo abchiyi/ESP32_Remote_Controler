@@ -3,7 +3,6 @@
 #include <vector>
 #include <functional>
 #include "UI_element.h"
-#include <memory>
 
 #pragma once
 
@@ -101,10 +100,67 @@ typedef enum
   COME_SCR,
 } ui_param_t;
 
+// 弹窗变量
+#define WIN_FONT u8g2_font_HelvetiPixel_tr
+#define WIN_H 27
+#define WIN_W 90
+#define WIN_TITLE_W 20
+#define WIN_TITLE_H 8
+#define WIN_TITLE_S 5
+#define WIN_VALUE_S 67
+#define WIN_BAR_H 3
+
+class BaseWindow
+{
+  friend class WouoUI;
+
+private:
+  uint8_t a = 100;
+
+  char title[WIN_TITLE_W];
+  uint8_t *value = &a;
+  uint8_t max = 100;
+  uint8_t min = 0;
+  uint8_t step = 1;
+
+  U8G2 *u8g2 = nullptr;
+  WouoUI *gui = nullptr;
+
+  bool exit_flag = false;
+  bool oper_flag = false;
+
+  float box_x;
+
+  float box_y;
+  float box_y_trg;
+
+  float box_w;
+  float box_w_trg;
+
+  float box_H;
+  float box_h;
+  float box_h_trg;
+
+  float bar_x;
+  float bar_x_trg;
+
+public:
+  bool init_flag = false;
+
+  page_name_t name = "pop window";
+  void create() {}; // 创建页面，在页面初始化时被调用
+  void before();
+  void leave();
+  void render();
+  void onUserInput(int8_t btnID);
+};
+
 class BasePage
 {
   friend class WouoUI; // 允许 WouoUI 访问受保护的变量
 private:
+  std::vector<BaseWindow *> windows; // 窗口
+
 protected:
   static BOX CURSOR;
 
@@ -152,6 +208,17 @@ public:
 
   // 页面绘制函数， 必须被子类覆盖
   virtual void render() = 0;
+
+  void __base_render()
+  {
+    render();
+    for (auto window : this->windows)
+    {
+      if (window->init_flag)
+        window->before();
+      window->render();
+    }
+  }
 
   /**
    * @brief 绘制一个轴向的进度条
@@ -253,6 +320,7 @@ typedef enum
 } history_mode_t;
 
 typedef std::function<BasePage *()> create_page_fn_t;
+typedef std::function<BaseWindow *()> create_window_fn_t;
 
 struct History
 {
@@ -296,6 +364,21 @@ public:
   volatile bool btnPressed = false; // 按键事件处理标志
   volatile int8_t btnID;            // 按键事件触发时在这里读取按钮ID
 
+  void page_pop_window(create_window_fn_t cb_fn)
+  {
+    auto page = getPage();
+    auto window = cb_fn();
+    window->gui = this;
+    window->u8g2 = u8g2;
+    page->windows.push_back(window);
+  }
+
+  BaseWindow *windows_top()
+  {
+    auto windows = this->getPage()->windows;
+    return windows[windows.size() - 1];
+  };
+
   void page_in_to(create_page_fn_t);
   void page_back();
   void pageSwitch(BasePage *);
@@ -312,7 +395,7 @@ public:
    * @brief 根据页码获取页面对象
    * @param index 页码
    */
-  auto getPage(uint8_t index)
+  BasePage *getPage(uint8_t index)
   {
     return this->history[index].page;
   };
@@ -320,7 +403,7 @@ public:
   /*
    * @brief 根据页码获取页面对象
    */
-  auto getPage()
+  BasePage *getPage()
   {
     return this->history[history.size() - 1].page;
   }

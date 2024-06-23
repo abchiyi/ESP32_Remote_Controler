@@ -21,14 +21,7 @@
 #include <U8g2lib.h>
 #include <WouoUI.h>
 // page
-#include "view/setting_devces.h"
-#include <view/fidgetToy.h>
-#include <view/mainPage.h>
-#include <view/setting.h>
-#include <view/window.h>
-#include <view/sleep.h>
-#include <view/about.h>
-#include <view/menu.h>
+#include "view/mainPage.h"
 
 #define TAG "Main ESP32 RC"
 

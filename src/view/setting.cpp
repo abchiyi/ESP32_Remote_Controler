@@ -1,5 +1,4 @@
 #include <view/setting.h>
-#include <view/window.h>
 #include <view/about.h>
 #include "tool.h"
 #include "radio.h"
@@ -27,8 +26,8 @@ private:
   {
     return [=](WouoUI *ui)
     {
-      // XXX
-      // popWindow(title, value, max, min, step, P_SETTING);
+      ui->page_pop_window([=]()
+                          { return new BaseWindow; });
     };
   };
 
