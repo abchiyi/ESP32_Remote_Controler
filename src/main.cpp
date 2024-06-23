@@ -167,8 +167,8 @@ void setup()
   car_controll_start();
 
   /** GUI **/
-  // WOUO_UI.setDefaultPage(P_MAIN);
-  WOUO_UI.setDefaultPage(create_page_setting);
+  WOUO_UI.setDefaultPage(create_page_main);
+  // WOUO_UI.setDefaultPage(create_page_setting);
   WOUO_UI.begin(&u8g2);
 
   /** 无线 **/

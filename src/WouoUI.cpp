@@ -64,7 +64,7 @@ uint8_t CONFIG_UI[UI_PARAM] = {
 
 view_fn_t create_page_jump_fn(page_jump_mode_t mode, create_page_fn_t cb_fn)
 {
-  return [&, mode](WouoUI *ui)
+  return [=](WouoUI *ui)
   {
     mode == PAGE_IN
         ? ui->page_in_to(cb_fn)
@@ -88,9 +88,11 @@ void WouoUI::page_back()
   if (history.size() > 1)
   {
     this->state = STATE_LAYER_OUT;
-    auto page = this->history.top();
-    page.page->leave();
-    this->history.pop();
+    auto history = this->history.top();
+    history.page->leave();
+
+    delete history.page; // 销毁页面
+    this->history.pop(); // 销毁历史
   }
 }
 
@@ -230,9 +232,12 @@ void WouoUI::addPage(BasePage *page) // TODO 重命名&简化函数
 // 设置默认页面
 void WouoUI::setDefaultPage(create_page_fn_t cb_fn)
 {
-  auto pt_page = cb_fn();
-  this->addPage(pt_page);
-  this->history.push(History(pt_page));
+  if (history.size() < 1) // index 0 为默认页面
+  {
+    auto pt_page = cb_fn();
+    this->addPage(pt_page);
+    this->history.push(History(pt_page));
+  }
 }
 
 // 总进程
