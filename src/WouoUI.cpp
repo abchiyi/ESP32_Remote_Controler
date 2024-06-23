@@ -85,15 +85,7 @@ void WouoUI::page_in_to(create_page_fn_t cb_fn)
 void WouoUI::page_back()
 {
   if (history.size() > 1)
-  {
     this->state = STATE_LAYER_OUT;
-    // auto history = this->history.top();
-    auto history = this->get_history();
-    history->leave();
-
-    this->history.pop_back(); // 销毁历史
-    delete history;           // 销毁页面
-  }
 }
 
 /* 以切换形式前往页面 */
@@ -137,7 +129,9 @@ void WouoUI::layer_out()
   page->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
                     calc(CONFIG_UI[BOX_Y_OS]));
 
-  page_before->leave();
+  page->leave();
+  this->history.pop_back(); // 销毁历史
+  delete page;              // 销毁页面
 }
 
 BasePage *WouoUI::get_history(int index)
