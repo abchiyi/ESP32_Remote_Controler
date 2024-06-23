@@ -16,6 +16,11 @@ LIST_VIEW Menu_view{
 class P_LMENU : public ListPage
 {
 public:
+  void before()
+  {
+    ListPage::name = "Menu";
+    ListPage::before();
+  };
   P_LMENU(LIST_VIEW &_view) : ListPage(_view) {};
 };
 

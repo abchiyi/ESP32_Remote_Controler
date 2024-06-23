@@ -72,14 +72,12 @@ view_fn_t create_page_jump_fn(create_page_fn_t cb_fn)
   };
 };
 
+/* ----------------- Wouo UI ----------------- */
+
 void WouoUI::page_in_to(create_page_fn_t cb_fn)
 {
   auto pt_page = cb_fn();
-
   addPage(pt_page);
-
-  ESP_LOGI(TAG, "page addr %d", pt_page);
-  // this->history.push(pt_page);
   this->history.push_back(pt_page);
   this->state = STATE_LAYER_IN;
 };
@@ -90,7 +88,7 @@ void WouoUI::page_back()
   {
     this->state = STATE_LAYER_OUT;
     // auto history = this->history.top();
-    auto history = this->getPage();
+    auto history = this->get_history();
     history->leave();
 
     this->history.pop_back(); // 销毁历史
@@ -110,41 +108,53 @@ void WouoUI::layer_in()
   this->state = STATE_FADE;
   this->init_flag = false;
 
-  auto page = this->getPage();        // 当前页面
-  auto page_target = this->getPage(); // 目标页面
+  auto page_before = this->get_history(-2); // 上一个页面
+  auto page = this->get_history();          // 当前页面
 
-  page_target->select = 0;
-  page_target->cursor_position_y = 0;
+  page->select = 0;
+  page->cursor_position_y = 0;
 
   auto calc = [&](uint8_t v)
-  { return v * (page->cursor_position_y / LIST_LINE_H); };
-
-  ESP_LOGI("get page", "page addr %d", page);
-
-  page->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
-                    calc(CONFIG_UI[BOX_Y_OS]));
+  { return v * (page_before->cursor_position_y / LIST_LINE_H); };
+  ESP_LOGI(TAG, "%d, page.select %d", calc(CONFIG_UI[BOX_Y_OS]), page_before->select);
+  page_before->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
+                           calc(CONFIG_UI[BOX_Y_OS]));
 }
 
 // 进入更浅层级时的初始化
 void WouoUI::layer_out()
 {
-  auto page = this->getPage();        // 当前页面
-  auto page_target = this->getPage(); // 目标页面
+  auto page_before = this->get_history(-2);
+  auto page = this->get_history();
 
   this->state = STATE_FADE;
   this->init_flag = false;
 
   auto calc = [&](uint8_t v)
   {
-    return v * abs((page_target->cursor_position_y - page->cursor_position_y) / LIST_LINE_H);
+    return v * abs((page->cursor_position_y - page_before->cursor_position_y) / LIST_LINE_H);
   };
-  page_target->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
-                           calc(CONFIG_UI[BOX_Y_OS]));
+  page->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
+                    calc(CONFIG_UI[BOX_Y_OS]));
 
-  page->leave();
+  page_before->leave();
 }
 
-/************************************* 动画函数 *************************************/
+BasePage *WouoUI::get_history(int index)
+{
+  auto size = history.size();
+
+  if (!size)
+    esp_system_abort("History is empty");
+
+  if (index == -1 || (size >= index && size < abs(index)))
+    return this->history.back().page;
+
+  if (index < 0)
+    return this->history[(size + index)].page;
+  else
+    return this->history[index].page;
+};
 
 // 消失动画
 void WouoUI::fade()
@@ -260,11 +270,10 @@ void WouoUI::uiUpdate()
     break;
   case STATE_VIEW:
     this->u8g2->clearBuffer();
-    auto page = this->getPage();
+    auto page = this->get_history();
     if (!this->init_flag)
     {
       this->init_flag = true;
-      ESP_LOGI(TAG, "page addr %d", page);
       page->before();
     }
     page->__base_render();
@@ -302,11 +311,18 @@ void WouoUI::begin(U8G2 *u8g2)
  */
 void WouoUI::btnUpdate(void (*func)(WouoUI *))
 {
+  // XXX 使用事件系统代替扫描
+  auto page = get_history();
   func(this);           // 按钮扫描函数
   if (this->btnPressed) // 当有按键按下时触发input函数
   {
     this->btnPressed = false;
-    this->getPage()->onUserInput(this->btnID);
+
+    // 顶部窗口接管按键
+    if (page->windows.size())
+      windows_top()->onUserInput(this->btnID);
+    else
+      page->onUserInput(this->btnID);
   }
 }
 
@@ -418,7 +434,7 @@ void ListPage::onUserInput(int8_t btnID)
 void ListPage::render()
 {
   auto length = this->view.size();
-  auto page = gui->getPage();
+  auto page = gui->get_history();
 
   static int16_t text_x_temp; // 文本横轴起始坐标
 
@@ -458,7 +474,7 @@ void ListPage::render()
     {
       // 绘制文本
       text_y_temp = text_y + LIST_LINE_H * i;
-      text_x_temp = text_x * (!com_scr ? (abs(gui->getPage()->select - i) + 1)
+      text_x_temp = text_x * (!com_scr ? (abs(gui->get_history()->select - i) + 1)
                                        : (i + 1));
       text_w_temp = text_x_temp + LIST_TEXT_W;
 
@@ -471,7 +487,7 @@ void ListPage::render()
 
   auto render_bar = [&]()
   {
-    this->bar_h_trg = ceil(gui->getPage()->select *
+    this->bar_h_trg = ceil(gui->get_history()->select *
                            ((float)gui->DISPLAY_HEIGHT / (length - 1)));
     animation(&this->bar_h, &this->bar_h_trg, list_ani);
     u8g2->drawBox(gui->DISPLAY_WIDTH - LIST_BAR_W, 0, LIST_BAR_W, this->bar_h);
@@ -505,7 +521,7 @@ void ListPage::cursorMoveDOWN(uint step)
 
   auto move = [&]()
   {
-    if (select != (((ListPage *)gui->getPage())->view.size() - 1))
+    if (select != (((ListPage *)gui->get_history())->view.size() - 1))
     {
       setCursorOS(box_x_os, CONFIG_UI[BOX_Y_OS]); // 光标轮廓扩大
       select += 1;                                // 选中行数下移一位
@@ -557,66 +573,42 @@ void ListPage::cursorMoveUP(uint step)
 };
 
 /* ----------------- Base Window ----------------- */
+void BaseWindow::close_window()
+{
+  this->leave();
+  this->gui->get_history()->windows.pop_back();
+  delete this;
+};
 
 void BaseWindow::before()
 {
-  // this->init_flag = true;
-  // this->oper_flag = true;
-  // this->box_y = 0;
-  // this->box_y_trg = (gui->DISPLAY_HEIGHT - WIN_H) / 2;
-  // this->box_w = gui->DISPLAY_WIDTH;
-  // this->box_w_trg = WIN_W;
-  // this->box_H = WIN_H;
-  // this->box_h = 0;
-  // this->bar_x = 0;
-  // this->box_h_trg = this->box_H + CONFIG_UI[WIN_Y_OS];
+  this->oper_flag = true;
+  this->box_y = 0;
+  this->box_y_trg = (gui->DISPLAY_HEIGHT - WIN_H) / 2;
+  this->box_w = gui->DISPLAY_WIDTH;
+  this->box_w_trg = WIN_W;
+  this->box_H = WIN_H;
+  this->box_h = 0;
+  this->bar_x = 0;
+  this->box_h_trg = this->box_H + CONFIG_UI[WIN_Y_OS];
 
-  // u8g2->setFont(WIN_FONT);
+  u8g2->setFont(WIN_FONT);
 }
 
 void BaseWindow::leave()
 {
-  this->box_H = 0;
-  this->box_y_trg = 0;
-  this->box_w_trg = gui->DISPLAY_WIDTH;
-  if (!this->box_y)
-  {
-    this->init_flag = false;
-    this->exit_flag = false;
-  }
 }
 
 void BaseWindow::render()
 {
-  // 在进场时更新的参数
-  if (!this->init_flag)
-  {
-    this->init_flag = true;
-    this->oper_flag = true;
-    this->box_y = 0;
-    this->box_y_trg = (gui->DISPLAY_HEIGHT - WIN_H) / 2;
-    this->box_w = gui->DISPLAY_WIDTH;
-    this->box_w_trg = WIN_W;
-    this->box_H = WIN_H;
-    this->box_h = 0;
-    this->bar_x = 0;
-    this->box_h_trg = this->box_H + CONFIG_UI[WIN_Y_OS];
-
-    u8g2->setFont(WIN_FONT);
-  }
-
   // 在离场时更新的参数
   if (this->exit_flag)
   {
-    this->box_H = 0;
-    this->box_y_trg = 0;
     this->box_w_trg = gui->DISPLAY_WIDTH;
+    this->box_y_trg = 0;
+    this->box_H = 0;
     if (!this->box_y)
-    {
-      // gui->pageSwitch(this->bg_page);
-      this->init_flag = false;
-      this->exit_flag = false;
-    }
+      close_window();
   }
 
   // 在每次操作后都会更新的参数

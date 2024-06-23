@@ -117,7 +117,7 @@ class BaseWindow
 private:
   uint8_t a = 100;
 
-  char title[WIN_TITLE_W];
+  char title[WIN_TITLE_W] = "Test window";
   uint8_t *value = &a;
   uint8_t max = 100;
   uint8_t min = 0;
@@ -145,8 +145,8 @@ private:
   float bar_x_trg;
 
 public:
-  bool init_flag = false;
-
+  // 销毁窗口
+  void close_window();
   page_name_t name = "pop window";
   void create() {}; // 创建页面，在页面初始化时被调用
   void before();
@@ -159,8 +159,6 @@ class BasePage
 {
   friend class WouoUI; // 允许 WouoUI 访问受保护的变量
 private:
-  std::vector<BaseWindow *> windows; // 窗口
-
 protected:
   static BOX CURSOR;
 
@@ -184,6 +182,8 @@ protected:
   }
 
 public:
+  std::vector<BaseWindow *> windows; // 窗口
+
   U8G2 *u8g2 = nullptr;
   WouoUI *gui = nullptr; // wouoUI 指针
 
@@ -213,11 +213,7 @@ public:
   {
     render();
     for (auto window : this->windows)
-    {
-      if (window->init_flag)
-        window->before();
       window->render();
-    }
   }
 
   /**
@@ -366,16 +362,17 @@ public:
 
   void page_pop_window(create_window_fn_t cb_fn)
   {
-    auto page = getPage();
+    auto page = get_history();
     auto window = cb_fn();
     window->gui = this;
     window->u8g2 = u8g2;
     page->windows.push_back(window);
+    window->before();
   }
 
   BaseWindow *windows_top()
   {
-    auto windows = this->getPage()->windows;
+    auto windows = this->get_history()->windows;
     return windows[windows.size() - 1];
   };
 
@@ -392,21 +389,10 @@ public:
   void begin(U8G2 *u8g2);
 
   /*
-   * @brief 根据页码获取页面对象
-   * @param index 页码
+   * @brief 获取历史路由
+   * @param index 路由序号
    */
-  BasePage *getPage(uint8_t index)
-  {
-    return this->history[index].page;
-  };
-
-  /*
-   * @brief 根据页码获取页面对象
-   */
-  BasePage *getPage()
-  {
-    return this->history[history.size() - 1].page;
-  }
+  BasePage *get_history(int index = -1);
 };
 
 /**
