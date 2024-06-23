@@ -44,6 +44,7 @@ typedef enum
 class WouoUI;
 
 typedef const char *page_name_t;
+
 typedef std::function<void(WouoUI *)> view_fn_t;
 
 void animation(float *a, float *a_trg, uint8_t n);
@@ -251,6 +252,8 @@ typedef enum
   H_WINDOW,
 } history_mode_t;
 
+typedef std::function<BasePage *()> create_page_fn_t;
+
 struct History
 {
   BasePage *page;
@@ -258,8 +261,6 @@ struct History
 
   History(BasePage *page) : page(page) {};
 };
-
-typedef std::function<BasePage *()> create_page_fn_t;
 
 class WouoUI
 {
