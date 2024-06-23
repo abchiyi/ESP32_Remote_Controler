@@ -1,8 +1,7 @@
 #include <view/about.h>
-#include <view/setting.h>
 
 LIST_VIEW about_menu{
-    {"[ WoW-UI ]", create_page_jump_fn(PAGE_OUT, create_page_setting)},
+    {"[ WoW-UI ]", create_page_jump_fn()},
     {"- Version: v1.0"},
     {"- Creator: RQNG"},
     {"- Bili UID: 9182439"},

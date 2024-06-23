@@ -1,8 +1,6 @@
 #include <view/setting.h>
 #include <view/window.h>
 #include <view/about.h>
-#include <view/menu.h>
-#include <view/setting_devces.h>
 #include "tool.h"
 #include "radio.h"
 
@@ -42,7 +40,7 @@ public:
     radio_2.init(&radio_v, 2);
 
     this->view = {
-        {"[ Setting ]", create_page_jump_fn(PAGE_OUT, create_page_menu)},
+        {"[ Setting ]", create_page_jump_fn()},
 
         {"~ Disp Bri",
          pop_fn("Disp Bri", get(DISP_BRI), 255, 0, 5),

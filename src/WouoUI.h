@@ -41,13 +41,6 @@ typedef enum
 #define LIST_BAR_W 3                // 滚动条宽度
 #define LIST_BOX_R 0.5f             // 光标圆角
 
-// 页面跳转模式
-typedef enum
-{
-  PAGE_IN,
-  PAGE_OUT,
-} page_jump_mode_t;
-
 class WouoUI;
 
 typedef const char *page_name_t;
@@ -221,23 +214,13 @@ protected:
     static const uint8_t CB_H = 12;
     static const uint8_t CB_D = 2;
 
-    // 外框
-    static auto list_draw_cbf = [&]()
-    {
-      u8g2->drawRFrame(text_w_temp, CB_U + text_y_temp, CB_W, CB_H, 0.5f);
-    };
-
-    // 点
-    static auto list_draw_cbd = [&]()
-    {
-      u8g2->drawBox(text_w_temp + CB_D + 1, CB_U + CB_D + 1 + text_y_temp, CB_W - (CB_D + 1) * 2, CB_H - (CB_D + 1) * 2);
-    };
-
     return [=](WouoUI *ui)
     {
-      list_draw_cbf();
+      // 外框
+      u8g2->drawRFrame(text_w_temp, CB_U + text_y_temp, CB_W, CB_H, 0.5f);
       if (*cbh.target_val == cbh.value)
-        list_draw_cbd();
+        // 点
+        u8g2->drawBox(text_w_temp + CB_D + 1, CB_U + CB_D + 1 + text_y_temp, CB_W - (CB_D + 1) * 2, CB_H - (CB_D + 1) * 2);
     };
   };
 
@@ -317,11 +300,12 @@ public:
   void pageSwitch(BasePage *);
 
   void setDefaultPage(create_page_fn_t);
-
   void addPage(BasePage *);
-  void begin(U8G2 *u8g2);
-  void uiUpdate();
+
   void btnUpdate(void (*func)(WouoUI *));
+
+  void uiUpdate();
+  void begin(U8G2 *u8g2);
 
   /*
    * @brief 根据页码获取页面对象
@@ -329,9 +313,7 @@ public:
    */
   auto getPage(uint8_t index)
   {
-    // return this->objPage[index];
-    // XXX 无法访问目标元素
-    return this->history[history.size() - 1].page;
+    return this->history[index].page;
   };
 
   /*
@@ -339,7 +321,6 @@ public:
    */
   auto getPage()
   {
-    // return this->objPage[this->index];
     return this->history[history.size() - 1].page;
   }
 };
@@ -350,6 +331,6 @@ public:
  * @param mode 决定页码跳转模式
  * @param cb_fn 页面创建函数
  */
-view_fn_t create_page_jump_fn(page_jump_mode_t mode, create_page_fn_t cb_fn);
+view_fn_t create_page_jump_fn(create_page_fn_t cb_fn = nullptr);
 
 extern uint8_t CONFIG_UI[UI_PARAM];

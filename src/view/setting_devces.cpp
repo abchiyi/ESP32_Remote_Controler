@@ -1,7 +1,5 @@
 #include "setting_devces.h"
 #include "WouoUI.h"
-#include "view/mainPage.h"
-#include "view/menu.h"
 #include "radio.h"
 
 #define TAG "Page devices"
@@ -27,7 +25,7 @@ public:
     {
 
         Setting_devces_view = {
-            {"[ Device ]", create_page_jump_fn(PAGE_OUT, create_page_menu)},
+            {"[ Device ]", create_page_jump_fn()},
             {"- Manage devices"},
         };
 

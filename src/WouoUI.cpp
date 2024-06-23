@@ -62,11 +62,11 @@ uint8_t CONFIG_UI[UI_PARAM] = {
     0    // COME_SCR
 };
 
-view_fn_t create_page_jump_fn(page_jump_mode_t mode, create_page_fn_t cb_fn)
+view_fn_t create_page_jump_fn(create_page_fn_t cb_fn)
 {
   return [=](WouoUI *ui)
   {
-    mode == PAGE_IN
+    cb_fn
         ? ui->page_in_to(cb_fn)
         : ui->page_back();
   };

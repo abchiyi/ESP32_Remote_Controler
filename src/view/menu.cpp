@@ -1,4 +1,3 @@
-#include <view/mainPage.h>
 #include <view/menu.h>
 #include "view/setting_devces.h"
 #include <view/setting.h>
@@ -7,11 +6,11 @@
 // #include <view/sleep.h>
 
 LIST_VIEW Menu_view{
-    {"[ Main ]", create_page_jump_fn(PAGE_OUT, create_page_main)},
-    {"- Set devices", create_page_jump_fn(PAGE_IN, create_page_devices)},
-    {"- F0toy", create_page_jump_fn(PAGE_IN, create_page_f0_toy)},
+    {"[ Main ]", create_page_jump_fn()},
+    {"- Set devices", create_page_jump_fn(create_page_devices)},
+    {"- F0toy", create_page_jump_fn(create_page_f0_toy)},
     {"- Editor"},
-    {"- Setting", create_page_jump_fn(PAGE_IN, create_page_setting)},
+    {"- Setting", create_page_jump_fn(create_page_setting)},
 };
 
 class P_LMENU : public ListPage
