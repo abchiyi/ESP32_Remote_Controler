@@ -8,12 +8,19 @@
 
 typedef enum key_event
 {
-  BTN_ID_UP,      // 上翻
+  BTN_ID_UP = 1,  // 上翻
   BTN_ID_DO,      // 下翻
   BTN_ID_CONFIRM, // 确认
   BTN_ID_CANCEL,  // 返回
   BTN_ID_MENU     // 菜单
-} key_event_t;
+} key_id_t;
+
+typedef struct Event
+{
+  key_id_t key_id;
+  Event(key_id_t __key_id) : key_id(__key_id) {};
+  Event() {};
+} event_t;
 
 // UI变量
 #define UI_DEPTH 256 // 页面栈深度
@@ -110,6 +117,9 @@ typedef enum
 #define WIN_VALUE_S 67
 #define WIN_BAR_H 3
 
+/**
+ * @brief 基础窗口类型，
+ */
 class BaseWindow
 {
   friend class WouoUI;
@@ -145,14 +155,24 @@ private:
   float bar_x_trg;
 
 public:
-  // 销毁窗口
+  // 此函数为内部调用准备，请勿直接调用
+  void __base_render()
+  {
+    // if (this->render())
+    // {
+    //   // ESP_LOGI("test", "run close_window");
+    // };
+    // this->close_window();
+  }
+  // 关闭窗口，并销毁窗口内存
   void close_window();
   page_name_t name = "pop window";
   void create() {}; // 创建页面，在页面初始化时被调用
   void before();
   void leave();
-  void render();
-  void onUserInput(int8_t btnID);
+  // 此函数为内部调用准备，请勿直接调用，返回 false将在合适的时机关闭窗口
+  bool render();
+  void onUserInput(event_t event);
 };
 
 class BasePage
@@ -204,7 +224,7 @@ public:
   virtual void leave() {};
 
   // 当有输入时被调用
-  virtual void onUserInput(int8_t) {}
+  virtual void onUserInput(event_t) {}
 
   // 页面绘制函数， 必须被子类覆盖
   virtual void render() = 0;
@@ -212,8 +232,6 @@ public:
   void __base_render()
   {
     render();
-    for (auto window : this->windows)
-      window->render();
   }
 
   /**
@@ -300,9 +318,9 @@ protected:
   };
 
 public:
-  LIST_VIEW &view;          // 列表视图
-  void render() override;   // 渲染函数
-  void onUserInput(int8_t); // ListPage 类特定的按键处理函数
+  LIST_VIEW &view;           // 列表视图
+  void render() override;    // 渲染函数
+  void onUserInput(event_t); // ListPage 类特定的按键处理函数
 
   ListPage(LIST_VIEW &view) : view(view) {};
 
@@ -342,7 +360,24 @@ private:
   void fade();
   void layer_out();
 
+  // 按键事件
+  QueueHandle_t Q_Event = xQueueCreate(10, sizeof(event_t));
+
 public:
+  // 发送event
+  void dispatchEvent(event_t event)
+  {
+    // TODO 配置事件发送等待时间
+    xQueueSend(Q_Event, &event, 10);
+  };
+
+  event_t getEvent()
+  {
+    event_t event;
+    xQueueReceive(Q_Event, &event, 1);
+    return event;
+  };
+
   uint8_t state = STATE_VIEW; // 页面绘制状态
   WouoUI(U8G2 *u8g2) : u8g2(u8g2)
   {
@@ -356,9 +391,6 @@ public:
 
   bool init_flag;
   bool oper_flag;
-
-  volatile bool btnPressed = false; // 按键事件处理标志
-  volatile int8_t btnID;            // 按键事件触发时在这里读取按钮ID
 
   void page_pop_window(create_window_fn_t cb_fn)
   {
@@ -382,8 +414,6 @@ public:
 
   void setDefaultPage(create_page_fn_t);
   void addPage(BasePage *);
-
-  void btnUpdate(void (*func)(WouoUI *));
 
   void uiUpdate();
   void begin(U8G2 *u8g2);

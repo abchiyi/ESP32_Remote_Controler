@@ -40,6 +40,8 @@
 #include <WouoUI.h>
 #include <cstdlib> // 或者 #include <stdlib.h>
 
+#include <esp_log.h>
+
 #define TAG "WouUI"
 
 BOX BasePage::CURSOR; // 声明静态 box 对象;
@@ -97,6 +99,7 @@ void WouoUI::pageSwitch(BasePage *page)
 // 进入更深层级时的初始化
 void WouoUI::layer_in()
 {
+  ESP_LOGD(TAG, "PAGE IN");
   this->state = STATE_FADE;
   this->init_flag = false;
 
@@ -108,7 +111,6 @@ void WouoUI::layer_in()
 
   auto calc = [&](uint8_t v)
   { return v * (page_before->cursor_position_y / LIST_LINE_H); };
-  ESP_LOGI(TAG, "%d, page.select %d", calc(CONFIG_UI[BOX_Y_OS]), page_before->select);
   page_before->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
                            calc(CONFIG_UI[BOX_Y_OS]));
 }
@@ -116,6 +118,7 @@ void WouoUI::layer_in()
 // 进入更浅层级时的初始化
 void WouoUI::layer_out()
 {
+  ESP_LOGD(TAG, "PAGE OUT");
   auto page_before = this->get_history(-2);
   auto page = this->get_history();
 
@@ -250,7 +253,6 @@ void WouoUI::setDefaultPage(create_page_fn_t cb_fn)
 void WouoUI::uiUpdate()
 {
   this->u8g2->sendBuffer();
-
   switch (this->state)
   {
   case STATE_LAYER_IN:
@@ -262,7 +264,7 @@ void WouoUI::uiUpdate()
   case STATE_FADE:
     this->fade();
     break;
-  case STATE_VIEW:
+  case STATE_VIEW: // 时刻刷新页面
     this->u8g2->clearBuffer();
     auto page = this->get_history();
     if (!this->init_flag)
@@ -270,7 +272,20 @@ void WouoUI::uiUpdate()
       this->init_flag = true;
       page->before();
     }
+    // 渲染页面&窗口
     page->__base_render();
+    for (auto window : page->windows)
+      window->render();
+
+    // 处理按键事件
+    event_t event;
+    if (xQueueReceive(Q_Event, &event, 2) == pdTRUE)
+    {
+      if (page->windows.size()) // 当有窗口显示时，顶部窗口接管按键
+        windows_top()->onUserInput(event);
+      else
+        page->onUserInput(event);
+    }
   }
 }
 
@@ -297,27 +312,6 @@ void WouoUI::begin(U8G2 *u8g2)
     }
   };
   xTaskCreatePinnedToCore(taskUpdate, "WouoUI gui update", 1024 * 10, (void *)this, 1, NULL, 1);
-}
-
-/*
- * @brief 按键事件更新，建议与渲染更新使用不同的任务执行以避免阻塞视图渲染
- * @param func 按钮扫描函数，在函数内自定义要执行的操作
- */
-void WouoUI::btnUpdate(void (*func)(WouoUI *))
-{
-  // XXX 使用事件系统代替扫描
-  auto page = get_history();
-  func(this);           // 按钮扫描函数
-  if (this->btnPressed) // 当有按键按下时触发input函数
-  {
-    this->btnPressed = false;
-
-    // 顶部窗口接管按键
-    if (page->windows.size())
-      windows_top()->onUserInput(this->btnID);
-    else
-      page->onUserInput(this->btnID);
-  }
 }
 
 /* ----------------- Base Page ----------------- */
@@ -396,10 +390,10 @@ void BasePage::draw_slider_x(float progress,
 
 /* ----------------- List Page ----------------- */
 // 处理按钮事件
-void ListPage::onUserInput(int8_t btnID)
+void ListPage::onUserInput(event_t event)
 {
   gui->oper_flag = true;
-  switch (btnID)
+  switch (event.key_id)
   {
   case BTN_ID_UP:
     ESP_LOGD(TAG, "MOVE_UP");
@@ -593,17 +587,8 @@ void BaseWindow::leave()
 {
 }
 
-void BaseWindow::render()
+bool BaseWindow::render()
 {
-  // 在离场时更新的参数
-  if (this->exit_flag)
-  {
-    this->box_w_trg = gui->DISPLAY_WIDTH;
-    this->box_y_trg = 0;
-    this->box_H = 0;
-    if (!this->box_y)
-      close_window();
-  }
 
   // 在每次操作后都会更新的参数
   if (this->oper_flag)
@@ -612,8 +597,7 @@ void BaseWindow::render()
     this->bar_x_trg = (float)(*this->value - this->min) / (float)(this->max - this->min) * (this->box_w_trg - 2 * WIN_TITLE_S);
   }
 
-  uint8_t winAni = 120; // XXX 固定的值
-  // uint8_t winAni = CONFIG_UI[WIN_ANI];
+  uint8_t winAni = CONFIG_UI[WIN_ANI];
   // 计算动画过渡值
   animation(&this->box_y, &this->box_y_trg, winAni);
   animation(&this->box_w, &this->box_w_trg, winAni);
@@ -645,15 +629,30 @@ void BaseWindow::render()
     // 绘制进度条
     u8g2->drawBox(this->box_x + WIN_TITLE_S, this->box_y + this->box_h - WIN_TITLE_S - WIN_BAR_H - 1, this->bar_x, WIN_BAR_H);
   }
+
+  // 在离场时更新的参数
+  if (this->exit_flag)
+  {
+    this->box_w_trg = gui->DISPLAY_WIDTH;
+    this->box_y_trg = 0;
+    this->box_H = 0;
+    if (!this->box_y)
+    {
+      ESP_LOGI("test", "run close_window");
+      close_window();
+      return true;
+    }
+  }
+  return false;
 };
 
-void BaseWindow::onUserInput(int8_t btnID)
+void BaseWindow::onUserInput(event_t event)
 {
   if (this->box_y != this->box_y_trg && this->box_y_trg == 0)
     return;
   this->oper_flag = true;
 
-  switch (btnID)
+  switch (event.key_id)
   {
   case BTN_ID_UP:
     if (*this->value < this->max)

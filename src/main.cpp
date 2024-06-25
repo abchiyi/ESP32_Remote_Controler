@@ -52,7 +52,10 @@ struct
   long count;
 } volatile btn;
 
-void singleBtnScan(WouoUI *gui, uint8_t *s_btn, uint8_t *LPT_flag, uint8_t active_value)
+void singleBtnScan(WouoUI *gui,
+                   uint8_t *s_btn,
+                   uint8_t *LPT_flag,
+                   key_event key)
 {
   uint8_t btn_LPT = 255;
   uint8_t btn_SPT = 50;
@@ -68,7 +71,6 @@ void singleBtnScan(WouoUI *gui, uint8_t *s_btn, uint8_t *LPT_flag, uint8_t activ
 
   if (*s_btn)
   {
-    gui->btnID = active_value;
     if (!*LPT_flag) // 长按激活时不再进入长按计算块
     {
       btn.count = 0;
@@ -80,11 +82,11 @@ void singleBtnScan(WouoUI *gui, uint8_t *s_btn, uint8_t *LPT_flag, uint8_t activ
         delay(1);
       }
       *LPT_flag = (btn.count < btn_LPT) ? 0 : 1;
-      gui->btnPressed = true;
+      gui->dispatchEvent(Event(key));
     }
     else
     {
-      gui->btnPressed = 1;
+      gui->dispatchEvent(Event(key));
       vTaskDelay(btn_SPT);
     }
   }
@@ -96,18 +98,10 @@ void btn_scan(WouoUI *gui)
   uint8_t *btnB = (uint8_t *)&Controller.btnB;
 
   if (Xbox.getButtonClick(A))
-  {
-    gui->btnID = BTN_ID_CONFIRM;
-    gui->btnPressed = true;
-    btn.count = 0;
-  }
+    gui->dispatchEvent(Event(BTN_ID_CONFIRM));
 
   if (Xbox.getButtonClick(B))
-  {
-    gui->btnID = BTN_ID_CANCEL;
-    gui->btnPressed = true;
-    btn.count = 0;
-  }
+    gui->dispatchEvent(Event(BTN_ID_CANCEL));
 
   static bool btnUpLPT = false;
   static bool btnDownLPT = false;
@@ -135,9 +129,8 @@ void TaskDataLayerUpdate(void *pt)
 {
   while (true)
   {
-    WOUO_UI.btnUpdate(btn_scan);
-    if (!WOUO_UI.btnPressed) // 没有按钮被触发时执行
-      vTaskDelay(1);
+    btn_scan(&WOUO_UI);
+    vTaskDelay(1); // XXX 使用固定频率执行
   }
 }
 
@@ -149,6 +142,7 @@ void ISR()
     RADIO.status = RADIO_PAIR_DEVICE;
 };
 
+#include "view/setting.h"
 void setup()
 {
   Serial.begin(115200);
@@ -160,8 +154,8 @@ void setup()
   car_controll_start();
 
   /** GUI **/
-  WOUO_UI.setDefaultPage(create_page_main);
-  // WOUO_UI.setDefaultPage(create_page_setting);
+  // WOUO_UI.setDefaultPage(create_page_main);
+  WOUO_UI.setDefaultPage(create_page_setting);
   WOUO_UI.begin(&u8g2);
 
   /** 无线 **/
