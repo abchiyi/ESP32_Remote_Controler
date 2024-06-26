@@ -329,14 +329,10 @@ protected:
   };
 
 public:
-  LIST_VIEW &view;           // 列表视图
-  void render() override;    // 渲染函数
-  void onUserInput(event_t); // ListPage 类特定的按键处理函数
-
+  LIST_VIEW &view;        // 列表视图
+  void render() override; // 渲染函数
   void create();
-
   ListPage(LIST_VIEW &view) : view(view) {};
-
   virtual void before();
 };
 

@@ -377,46 +377,21 @@ void BasePage::draw_slider_x(float progress,
 }
 
 /* ----------------- List Page ----------------- */
-// 处理按钮事件
-void ListPage::onUserInput(event_t event)
+void ListPage::create()
 {
-  switch (event.key_id)
-  {
-  case KEY_UP:
-    ESP_LOGD(TAG, "MOVE_UP");
-    cursorMoveUP(); // 光标向上移动一行
-    break;
-
-  case KEY_DOWN:
-    ESP_LOGD(TAG, "MOVE_DOWN");
-    cursorMoveDOWN(); // 光标向上移动一行
-    break;
-
-  case KEY_BACK: // 返回
-    ESP_LOGD(TAG, "CANCEL");
-    select = 0;
-  case KEY_CONFIRM: // 确认
-    ESP_LOGD(TAG, "CONFIRM");
-    // 执行与 view uint 绑定的回调函数，通常是页面跳转
-    if (this->view[select].cb_fn)
-      this->view[select].cb_fn(gui);
-    setCursorOS(CONFIG_UI[BOX_X_OS]);
-    break;
-  }
-}
-
-void ListPage::create() {
-  //   gui->on(KEY_UP, [&]()
-  //           { cursorMoveUP(); })
-  //       ->on(KEY_DOWN, [&]()
-  //            { cursorMoveDOWN(); })
-  //       ->on(KEY_BACK, [&]()
-  //            { select = 0; })
-  //       ->on(KEY_CONFIRM, [&]
-  //            {
-  //  if (this->view[select].cb_fn)
-  //           this->view[select].cb_fn(gui);
-  //         setCursorOS(CONFIG_UI[BOX_X_OS]); });
+  gui->on(KEY_UP, [&]()
+          { cursorMoveUP(); })
+      ->on(KEY_DOWN, [&]()
+           { cursorMoveDOWN(); })
+      ->on(KEY_BACK, [&]()
+           { 
+            auto fn = view[0].cb_fn; 
+           if(fn)fn(gui); })
+      ->on(KEY_CONFIRM, [&]
+           {
+   if (this->view[select].cb_fn)
+            this->view[select].cb_fn(gui);
+          setCursorOS(CONFIG_UI[BOX_X_OS]); });
 };
 
 // 列表页面渲染函数

@@ -34,6 +34,7 @@ private:
 public:
   void create()
   {
+    ListPage::create();
     com_scr_c.init(&CONFIG_UI[COME_SCR]);
     radio_1.init(&radio_v, 1);
     radio_2.init(&radio_v, 2);
