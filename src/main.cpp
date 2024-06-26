@@ -82,11 +82,11 @@ void singleBtnScan(WouoUI *gui,
         delay(1);
       }
       *LPT_flag = (btn.count < btn_LPT) ? 0 : 1;
-      gui->dispatchEvent(Event(key));
+      gui->dispatch_event(Event(key));
     }
     else
     {
-      gui->dispatchEvent(Event(key));
+      gui->dispatch_event(Event(key));
       vTaskDelay(btn_SPT);
     }
   }
@@ -98,10 +98,10 @@ void btn_scan(WouoUI *gui)
   uint8_t *btnB = (uint8_t *)&Controller.btnB;
 
   if (Xbox.getButtonClick(A))
-    gui->dispatchEvent(Event(KEY_CONFIRM));
+    gui->dispatch_event(Event(KEY_CONFIRM));
 
   if (Xbox.getButtonClick(B))
-    gui->dispatchEvent(Event(KEY_BACK));
+    gui->dispatch_event(Event(KEY_BACK));
 
   static bool btnUpLPT = false;
   static bool btnDownLPT = false;

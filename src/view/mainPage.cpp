@@ -19,8 +19,8 @@ public:
   {
     this->name = "Main page";
     ESP_LOGI(this->name, "page create");
-    gui->on(KEY_MENU, [&]()
-            { gui->page_in_to(create_page_menu); });
+    gui->add_event_listener(KEY_MENU, [&]()
+                            { gui->page_in_to(create_page_menu); });
   };
 
   void before()

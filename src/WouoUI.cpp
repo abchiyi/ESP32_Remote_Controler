@@ -46,11 +46,6 @@
 
 BOX BasePage::CURSOR; // 声明静态 box 对象;
 
-float ListPage::text_y;
-float ListPage::text_x;
-float ListPage::text_x_trg;
-float ListPage::text_y_trg;
-
 uint8_t CONFIG_UI[UI_PARAM] = {
     255, // DISP_BRI
     15,  // BOX_X_OS
@@ -270,7 +265,7 @@ void WouoUI::uiUpdate()
       if (page->windows.size()) // 当有窗口显示时，顶部窗口接管按键
         windows_top()->onUserInput(event);
       else
-        for (auto on : page->on_event)
+        for (auto on : page->eventListeners)
           if (event.key_id == on.key)
             on.cb_fn();
     }
@@ -376,165 +371,6 @@ void BasePage::draw_slider_x(float progress,
     u8g2->drawLine(line_pos_x, line_start, line_pos_x, line_end);
 }
 
-/* ----------------- List Page ----------------- */
-void ListPage::create()
-{
-  gui->on(KEY_UP, [&]()
-          { cursorMoveUP(); })
-      ->on(KEY_DOWN, [&]()
-           { cursorMoveDOWN(); })
-      ->on(KEY_BACK, [&]()
-           { 
-            auto fn = view[0].cb_fn; 
-           if(fn)fn(gui); })
-      ->on(KEY_CONFIRM, [&]
-           {
-   if (this->view[select].cb_fn)
-            this->view[select].cb_fn(gui);
-          setCursorOS(CONFIG_UI[BOX_X_OS]); });
-};
-
-// 列表页面渲染函数
-void ListPage::render()
-{
-  auto length = this->view.size();
-  auto page = gui->get_history();
-
-  static int16_t text_x_temp; // 文本横轴起始坐标
-
-  static uint8_t list_ani = CONFIG_UI[LIST_ANI];
-  static uint8_t com_scr = CONFIG_UI[COME_SCR];
-
-  // 在每次操作后都会更新的参数
-  // if (gui->oper_flag)
-  // {
-  //   gui->oper_flag = false;
-
-  // }
-
-  // 绘制光标
-  auto render_cursor = [&]()
-  {
-    /**
-     * 检查光标位置是否正确
-     * 当光标越界时，移动到列表的末尾
-     */
-    auto viewSize = view.size() - 1;
-    if (select > viewSize && viewSize != 0)
-      cursorMoveUP(select - viewSize);
-
-    CURSOR.min_width =
-        u8g2->getUTF8Width(view[select].m_select.c_str()) + LIST_TEXT_S * 2;
-    this->draw_cursor();
-  };
-
-  auto render_list = [&]()
-  {
-    animation(&text_x, 0.0f, list_ani);
-    animation(&text_y, &text_y_trg, list_ani);
-
-    // 绘制列表文字和行末尾元素
-    for (int i = 0; i < length; ++i)
-    {
-      // 绘制文本
-      text_y_temp = text_y + LIST_LINE_H * i;
-      text_x_temp = text_x * (!com_scr ? (abs(gui->get_history()->select - i) + 1)
-                                       : (i + 1));
-      text_w_temp = text_x_temp + LIST_TEXT_W;
-
-      u8g2->setCursor(text_x_temp + LIST_TEXT_S, LIST_TEXT_S + LIST_TEXT_H + text_y_temp);
-      u8g2->print(view[i].m_select.c_str());
-      if (view[i].render_end)
-        view[i].render_end(gui);
-    }
-  };
-
-  auto render_bar = [&]()
-  {
-    this->bar_h_trg = ceil(gui->get_history()->select *
-                           ((float)gui->DISPLAY_HEIGHT / (length - 1)));
-    animation(&this->bar_h, &this->bar_h_trg, list_ani);
-    u8g2->drawBox(gui->DISPLAY_WIDTH - LIST_BAR_W, 0, LIST_BAR_W, this->bar_h);
-  };
-
-  render_bar();
-  render_list();
-  render_cursor();
-};
-
-void ListPage::before()
-{
-  ESP_LOGI(TAG, "list page before");
-  text_x = -gui->DISPLAY_WIDTH;
-  text_y = cursor_position_y - LIST_LINE_H * select;
-  text_y_trg = text_y;
-
-  // CURSOR
-  CURSOR.x = 0;
-  CURSOR.round_corner = 0.5;
-  CURSOR.min_height = LIST_LINE_H;
-  CURSOR.transition = CONFIG_UI[LIST_ANI];
-
-  u8g2->setFont(LIST_FONT);
-  u8g2->setDrawColor(2);
-};
-
-void ListPage::cursorMoveDOWN(uint step)
-{
-  uint8_t box_x_os = CONFIG_UI[BOX_X_OS];
-
-  auto move = [&]()
-  {
-    if (select != (((ListPage *)gui->get_history())->view.size() - 1))
-    {
-      setCursorOS(box_x_os, CONFIG_UI[BOX_Y_OS]); // 光标轮廓扩大
-      select += 1;                                // 选中行数下移一位
-      // 光标到达屏幕底部
-      cursor_position_y < (gui->DISPLAY_HEIGHT - LIST_LINE_H)
-          ? cursor_position_y += LIST_LINE_H // 下移光标
-          : text_y_trg -= LIST_LINE_H;       // 上翻列表
-    }
-    else
-      setCursorOS(box_x_os); // 光标横向扩大
-
-    ESP_LOGD("TAG", "step %d, select %d, pos_Y %.2f text_y %.2f",
-             step, select, cursor_position_y, text_y_trg);
-  };
-
-  if (step < 2)
-    move();
-  else
-    for (size_t i = 0; i < step; i++)
-      move();
-};
-
-void ListPage::cursorMoveUP(uint step)
-{
-  uint8_t box_x_os = CONFIG_UI[BOX_X_OS];
-
-  auto move = [&]()
-  {
-    if (select != 0)
-    {
-      setCursorOS(box_x_os, CONFIG_UI[BOX_Y_OS]); // 光标轮廓扩大
-      select -= 1;                                // 选中行数上移一位
-      cursor_position_y                           // 当光标未到达屏幕顶部时
-          ? cursor_position_y -= LIST_LINE_H      // 上移光标
-          : text_y_trg += LIST_LINE_H;            // 下翻列表
-    }
-    else
-      setCursorOS(box_x_os); // 光标横向扩大
-
-    ESP_LOGD("TAG", "step %d, select %d, pos_Y %.2f text_y %.2f",
-             step, select, cursor_position_y, text_y_trg);
-  };
-
-  if (step < 2)
-    move();
-  else
-    for (size_t i = 0; i < step; i++)
-      move();
-};
 
 /* ----------------- Base Window ----------------- */
 void BaseWindow::close_window()

@@ -29,14 +29,13 @@ typedef const char *page_name_t;
 typedef std::function<void(WouoUI *)> gui_cb_fn_t; // WouoUI * 指针参数回调
 typedef std::function<void()> void_cb_fn_t;        // 无参回调函数类型
 
-typedef struct event_handel
+typedef struct event_listener
 {
   void_cb_fn_t cb_fn;
   key_id_t key;
-  event_handel(key_id_t _key_id, void_cb_fn_t _cb_fn)
+  event_listener(key_id_t _key_id, void_cb_fn_t _cb_fn)
       : key(_key_id), cb_fn(_cb_fn) {};
-
-} event_handel_t;
+} event_listener_t;
 
 #define UI_PARAM 11 // ui 变量总数
 
@@ -63,6 +62,7 @@ typedef enum
 #define LIST_BOX_R 0.5f             // 光标圆角
 
 void animation(float *a, float *a_trg, uint8_t n);
+void animation(float *a, float a_trg, uint8_t n);
 
 // list view unit
 struct LIST_VIEW_UNIT
@@ -164,15 +164,6 @@ private:
   float bar_x_trg;
 
 public:
-  // 此函数为内部调用准备，请勿直接调用
-  void __base_render()
-  {
-    // if (this->render())
-    // {
-    //   // ESP_LOGI("test", "run close_window");
-    // };
-    // this->close_window();
-  }
   // 关闭窗口，并销毁窗口内存
   void close_window();
   page_name_t name = "pop window";
@@ -191,7 +182,7 @@ private:
 protected:
   static BOX CURSOR;
 
-  std::vector<event_handel_t> on_event;
+  std::vector<event_listener_t> eventListeners;
 
   // 绘制 CURSOR 并计算动画过渡参数
   void draw_cursor()
@@ -272,70 +263,6 @@ public:
                      uint8_t length = 60, bool biaxial = false);
 };
 
-class ListPage : public BasePage
-{
-protected:
-  float bar_h = 0.0;     // 滚动条目实际长度
-  float bar_h_trg = 0.0; // 滚动条目标长度
-
-  static float text_x;
-  static float text_x_trg;
-  static float text_y;
-  static float text_y_trg;
-
-  int16_t text_y_temp; // 文本纵轴起始坐标
-  int16_t text_w_temp; // 文本起始起始坐标
-
-  /**
-   * @brief 向上移动光标，当光标移动到屏幕顶部，且列表未到达顶部则向下卷动列表
-   * @param step 执行一次移动光标多少行
-   */
-  void cursorMoveUP(uint step = 1);
-
-  /**
-   * @brief 向下移动光标，当光标移动到屏幕底部，且列表未到达顶底则向上卷动列表
-   * @param step 执行一次移动光标多少行
-   */
-  void cursorMoveDOWN(uint step = 1);
-
-  // private:
-  gui_cb_fn_t create_render_checxbox(check_box_handle &cbh)
-  {
-    // 选择框变量
-    static const uint8_t CB_U = 2;
-    static const uint8_t CB_W = 12;
-    static const uint8_t CB_H = 12;
-    static const uint8_t CB_D = 2;
-
-    return [=](WouoUI *ui)
-    {
-      // 外框
-      u8g2->drawRFrame(text_w_temp, CB_U + text_y_temp, CB_W, CB_H, 0.5f);
-      if (*cbh.target_val == cbh.value)
-        // 点
-        u8g2->drawBox(text_w_temp + CB_D + 1, CB_U + CB_D + 1 + text_y_temp, CB_W - (CB_D + 1) * 2, CB_H - (CB_D + 1) * 2);
-    };
-  };
-
-  // 绘制行末尾数值
-  template <typename T>
-  gui_cb_fn_t create_render_content(T *content)
-  {
-    return [=](WouoUI *ui)
-    {
-      u8g2->setCursor(text_w_temp, LIST_TEXT_H + LIST_TEXT_S + text_y_temp);
-      u8g2->print(*content);
-    };
-  };
-
-public:
-  LIST_VIEW &view;        // 列表视图
-  void render() override; // 渲染函数
-  void create();
-  ListPage(LIST_VIEW &view) : view(view) {};
-  virtual void before();
-};
-
 typedef enum
 {
   H_VIEW,
@@ -374,23 +301,16 @@ private:
 
 public:
   // 发送event
-  void dispatchEvent(event_t event)
+  void dispatch_event(event_t event)
   {
     // TODO 配置事件发送等待时间
     xQueueSend(Q_Event, &event, 10);
   };
 
-  //
-  event_t getEvent()
+  // 注册事件监听
+  WouoUI *add_event_listener(key_id_t key_id, void_cb_fn_t cb_fn)
   {
-    event_t event;
-    xQueueReceive(Q_Event, &event, 1);
-    return event;
-  };
-
-  WouoUI *on(key_id_t key_id, void_cb_fn_t cb_fn)
-  {
-    this->get_history()->on_event.push_back(event_handel(key_id, cb_fn));
+    this->get_history()->eventListeners.push_back(event_listener(key_id, cb_fn));
     return this;
   };
 
