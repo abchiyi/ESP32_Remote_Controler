@@ -18,13 +18,13 @@ public:
   {
     switch (btnID)
     {
-    case BTN_ID_DO:
+    case KEY_DOWN:
       break; // 顺时针旋转执行的函数
-    case BTN_ID_UP:
+    case KEY_UP:
       break; // 逆时针旋转执行的函数
-    case BTN_ID_CONFIRM:
+    case KEY_CONFIRM:
       break;
-    case BTN_ID_CANCEL:
+    case KEY_BACK:
       gui->page_in_to(create_page_menu);
       // list.box_y = 0;
       // list.box_w = 0;

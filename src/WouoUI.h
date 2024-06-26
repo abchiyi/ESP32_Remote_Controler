@@ -6,13 +6,13 @@
 
 #pragma once
 
-typedef enum key_event
+typedef enum key_id
 {
-  BTN_ID_UP = 1,  // 上翻
-  BTN_ID_DO,      // 下翻
-  BTN_ID_CONFIRM, // 确认
-  BTN_ID_CANCEL,  // 返回
-  BTN_ID_MENU     // 菜单
+  KEY_UP = 1,  // 上翻
+  KEY_DOWN,    // 下翻
+  KEY_CONFIRM, // 确认
+  KEY_BACK,    // 返回
+  KEY_MENU     // 菜单
 } key_id_t;
 
 typedef struct Event
@@ -22,14 +22,29 @@ typedef struct Event
   Event() {};
 } event_t;
 
-// UI变量
-#define UI_DEPTH 256 // 页面栈深度
-#define UI_PARAM 11  // ui 变量总数
+class WouoUI;
+
+typedef const char *page_name_t;
+
+typedef std::function<void(WouoUI *)> gui_cb_fn_t; // WouoUI * 指针参数回调
+typedef std::function<void()> void_cb_fn_t;        // 无参回调函数类型
+
+typedef struct event_handel
+{
+  void_cb_fn_t cb_fn;
+  key_id_t key;
+  event_handel(key_id_t _key_id, void_cb_fn_t _cb_fn)
+      : key(_key_id), cb_fn(_cb_fn) {};
+
+} event_handel_t;
+
+#define UI_PARAM 11 // ui 变量总数
 
 // UI状态
 typedef enum
 {
   STATE_VIEW,
+  STATE_BEFORE_VIEW,
   STATE_FADE,
   STATE_LAYER_IN,
   STATE_LAYER_OUT,
@@ -47,20 +62,14 @@ typedef enum
 #define LIST_BAR_W 3                // 滚动条宽度
 #define LIST_BOX_R 0.5f             // 光标圆角
 
-class WouoUI;
-
-typedef const char *page_name_t;
-
-typedef std::function<void(WouoUI *)> view_fn_t;
-
 void animation(float *a, float *a_trg, uint8_t n);
 
 // list view unit
 struct LIST_VIEW_UNIT
 {
   std::string m_select; // 使用 std::string 替代 const char*
-  view_fn_t cb_fn = nullptr;
-  view_fn_t render_end = nullptr;
+  gui_cb_fn_t cb_fn = nullptr;
+  gui_cb_fn_t render_end = nullptr;
 };
 
 // list view 类型
@@ -70,7 +79,7 @@ typedef struct check_box_handle
 {
   uint8_t *target_val; // 目标变量值
   uint8_t value;       // checkbox 包含值
-  view_fn_t check()    // 选中复选框
+  gui_cb_fn_t check()  // 选中复选框
   {
     return [=](WouoUI *ui)
     {
@@ -78,7 +87,7 @@ typedef struct check_box_handle
     };
   };
 
-  view_fn_t chekc_radio()
+  gui_cb_fn_t chekc_radio()
   {
     return [=](WouoUI *ui)
     {
@@ -181,6 +190,8 @@ class BasePage
 private:
 protected:
   static BOX CURSOR;
+
+  std::vector<event_handel_t> on_event;
 
   // 绘制 CURSOR 并计算动画过渡参数
   void draw_cursor()
@@ -288,7 +299,7 @@ protected:
   void cursorMoveDOWN(uint step = 1);
 
   // private:
-  view_fn_t create_render_checxbox(check_box_handle &cbh)
+  gui_cb_fn_t create_render_checxbox(check_box_handle &cbh)
   {
     // 选择框变量
     static const uint8_t CB_U = 2;
@@ -308,7 +319,7 @@ protected:
 
   // 绘制行末尾数值
   template <typename T>
-  view_fn_t create_render_content(T *content)
+  gui_cb_fn_t create_render_content(T *content)
   {
     return [=](WouoUI *ui)
     {
@@ -321,6 +332,8 @@ public:
   LIST_VIEW &view;           // 列表视图
   void render() override;    // 渲染函数
   void onUserInput(event_t); // ListPage 类特定的按键处理函数
+
+  void create();
 
   ListPage(LIST_VIEW &view) : view(view) {};
 
@@ -371,6 +384,7 @@ public:
     xQueueSend(Q_Event, &event, 10);
   };
 
+  //
   event_t getEvent()
   {
     event_t event;
@@ -378,7 +392,13 @@ public:
     return event;
   };
 
-  uint8_t state = STATE_VIEW; // 页面绘制状态
+  WouoUI *on(key_id_t key_id, void_cb_fn_t cb_fn)
+  {
+    this->get_history()->on_event.push_back(event_handel(key_id, cb_fn));
+    return this;
+  };
+
+  uint8_t state = STATE_LAYER_IN; // 页面绘制状态
   WouoUI(U8G2 *u8g2) : u8g2(u8g2)
   {
     // 获取屏幕宽高
@@ -388,9 +408,6 @@ public:
 
   uint16_t DISPLAY_HEIGHT; // 屏幕高度 pix
   uint16_t DISPLAY_WIDTH;  // 屏幕宽度 pix
-
-  bool init_flag;
-  bool oper_flag;
 
   void page_pop_window(create_window_fn_t cb_fn)
   {
@@ -413,8 +430,6 @@ public:
   void pageSwitch(BasePage *);
 
   void setDefaultPage(create_page_fn_t);
-  void addPage(BasePage *);
-
   void uiUpdate();
   void begin(U8G2 *u8g2);
 
@@ -431,6 +446,6 @@ public:
  * @param mode 决定页码跳转模式
  * @param cb_fn 页面创建函数
  */
-view_fn_t create_page_jump_fn(create_page_fn_t cb_fn = nullptr);
+gui_cb_fn_t create_page_jump_fn(create_page_fn_t cb_fn = nullptr);
 
 extern uint8_t CONFIG_UI[UI_PARAM];

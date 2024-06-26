@@ -62,8 +62,6 @@ public:
     cursor_position_x = 0;
     cursor_position_y = 0;
 
-    gui->oper_flag = true;
-
     // 其它初始化
     u8g2->setDrawColor(1);
   }
@@ -71,21 +69,20 @@ public:
   void onUserInput(int8_t btnID)
   {
     ESP_LOGI(this->name, "F0toy");
-    gui->oper_flag = true;
     switch (btnID)
     {
-    case BTN_ID_UP:
+    case KEY_UP:
       f0.select++;
       if (f0.select > F0_POS_N - 1)
         f0.select = 0;
       break;
-    case BTN_ID_DO:
+    case KEY_DOWN:
       f0.select--;
       if (f0.select < 0)
         f0.select = F0_POS_N - 1;
       break;
-    case BTN_ID_CONFIRM:
-    case BTN_ID_CANCEL:
+    case KEY_CONFIRM:
+    case KEY_BACK:
       this->gui->page_back();
       break;
     }
@@ -97,14 +94,11 @@ public:
   void render()
   {
     // 在每次操作后都会更新的参数
-    if (gui->oper_flag)
-    {
-      gui->oper_flag = false;
-      // if (CURSOR.x != box_x_trg)
-      //   box_w_trg += f0.param[F0_X_OS];
-      // if (CURSOR.y != box_y_trg)
-      //   box_h_trg += f0.param[F0_Y_OS];
-    }
+
+    // if (CURSOR.x != box_x_trg)
+    //   box_w_trg += f0.param[F0_X_OS];
+    // if (CURSOR.y != box_y_trg)
+    //   box_h_trg += f0.param[F0_Y_OS];
 
     draw_cursor();
   };

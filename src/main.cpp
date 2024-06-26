@@ -2,7 +2,7 @@
 #include <variant>
 #include <esp_log.h>
 #include "EEPROM.h"
-
+#include "pins_arduino.h"
 // 无线依赖
 #include <esp_now.h>
 #include <esp_wifi.h>
@@ -55,7 +55,7 @@ struct
 void singleBtnScan(WouoUI *gui,
                    uint8_t *s_btn,
                    uint8_t *LPT_flag,
-                   key_event key)
+                   key_id_t key)
 {
   uint8_t btn_LPT = 255;
   uint8_t btn_SPT = 50;
@@ -98,10 +98,10 @@ void btn_scan(WouoUI *gui)
   uint8_t *btnB = (uint8_t *)&Controller.btnB;
 
   if (Xbox.getButtonClick(A))
-    gui->dispatchEvent(Event(BTN_ID_CONFIRM));
+    gui->dispatchEvent(Event(KEY_CONFIRM));
 
   if (Xbox.getButtonClick(B))
-    gui->dispatchEvent(Event(BTN_ID_CANCEL));
+    gui->dispatchEvent(Event(KEY_BACK));
 
   static bool btnUpLPT = false;
   static bool btnDownLPT = false;
@@ -115,13 +115,13 @@ void btn_scan(WouoUI *gui)
   uint8_t joyLDown = Controller.joyLVert < -300 ? 1 : 0;
   uint8_t btnMenu = Controller.btnStart;
 
-  singleBtnScan(&WOUO_UI, btnUp, (uint8_t *)&btnUpLPT, BTN_ID_UP);
-  singleBtnScan(&WOUO_UI, btnDown, (uint8_t *)&btnDownLPT, BTN_ID_DO);
+  singleBtnScan(&WOUO_UI, btnUp, (uint8_t *)&btnUpLPT, KEY_UP);
+  singleBtnScan(&WOUO_UI, btnDown, (uint8_t *)&btnDownLPT, KEY_DOWN);
 
-  singleBtnScan(&WOUO_UI, &joyLUp, (uint8_t *)&joyUPLPT, BTN_ID_UP);
-  singleBtnScan(&WOUO_UI, &joyLDown, (uint8_t *)&joyDOWNLPT, BTN_ID_DO);
+  singleBtnScan(&WOUO_UI, &joyLUp, (uint8_t *)&joyUPLPT, KEY_UP);
+  singleBtnScan(&WOUO_UI, &joyLDown, (uint8_t *)&joyDOWNLPT, KEY_DOWN);
 
-  singleBtnScan(&WOUO_UI, &btnMenu, (uint8_t *)&btnMenuLPT, BTN_ID_MENU);
+  singleBtnScan(&WOUO_UI, &btnMenu, (uint8_t *)&btnMenuLPT, KEY_MENU);
 }
 
 // 数据层处理任务
@@ -130,7 +130,7 @@ void TaskDataLayerUpdate(void *pt)
   while (true)
   {
     btn_scan(&WOUO_UI);
-    vTaskDelay(1); // XXX 使用固定频率执行
+    vTaskDelay(5); // XXX 使用固定频率执行
   }
 }
 
@@ -142,7 +142,6 @@ void ISR()
     RADIO.status = RADIO_PAIR_DEVICE;
 };
 
-#include "view/setting.h"
 void setup()
 {
   Serial.begin(115200);
@@ -154,8 +153,7 @@ void setup()
   car_controll_start();
 
   /** GUI **/
-  // WOUO_UI.setDefaultPage(create_page_main);
-  WOUO_UI.setDefaultPage(create_page_setting);
+  WOUO_UI.setDefaultPage(create_page_main);
   WOUO_UI.begin(&u8g2);
 
   /** 无线 **/

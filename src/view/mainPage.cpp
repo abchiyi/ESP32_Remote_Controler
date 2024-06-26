@@ -19,6 +19,8 @@ public:
   {
     this->name = "Main page";
     ESP_LOGI(this->name, "page create");
+    gui->on(KEY_MENU, [&]()
+            { gui->page_in_to(create_page_menu); });
   };
 
   void before()
@@ -27,16 +29,6 @@ public:
     u8g2->setFont(LIST_FONT);
     u8g2->setDrawColor(2);
   }
-
-  void onUserInput(int8_t btnID)
-  {
-    switch (btnID)
-    {
-    case BTN_ID_MENU:
-      gui->page_in_to(create_page_menu);
-      break;
-    }
-  };
 
   void render_channel_view()
   {
@@ -82,8 +74,14 @@ public:
 
   void render()
   {
-    this->render_channel_view();
+    static TickType_t last_run;
 
+    auto tick = xTaskGetTickCount();
+    u8g2->setCursor(10, 10);
+    u8g2->printf("%d FPS", 1000 / (tick - last_run));
+    last_run = tick;
+
+    this->render_channel_view();
     // 连接状态
     u8g2->setCursor((gui->DISPLAY_WIDTH - 6 * 5) / 2, gui->DISPLAY_HEIGHT);
     u8g2->print(RADIO.status == RADIO_CONNECTED

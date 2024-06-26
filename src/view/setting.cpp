@@ -22,7 +22,7 @@ private:
   }
 
   // 创建弹窗回调
-  view_fn_t pop_fn(const char title[], uint8_t *value, uint8_t max, uint8_t min, uint8_t step)
+  gui_cb_fn_t pop_fn(const char title[], uint8_t *value, uint8_t max, uint8_t min, uint8_t step)
   {
     return [=](WouoUI *ui)
     {

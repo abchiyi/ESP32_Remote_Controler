@@ -56,15 +56,15 @@ uint8_t CONFIG_UI[UI_PARAM] = {
     15,  // BOX_X_OS
     10,  // BOX_Y_OS
     30,  // WIN_Y_OS
-    120, // LIST_ANI
-    60,  // WIN_ANI
-    30,  // FADE_ANI
+    80,  // LIST_ANI
+    40,  // WIN_ANI
+    20,  // FADE_ANI
     20,  // BTN_SPT
     200, // BTN_LPT
     0    // COME_SCR
 };
 
-view_fn_t create_page_jump_fn(create_page_fn_t cb_fn)
+gui_cb_fn_t create_page_jump_fn(create_page_fn_t cb_fn)
 {
   return [=](WouoUI *ui)
   {
@@ -79,9 +79,11 @@ view_fn_t create_page_jump_fn(create_page_fn_t cb_fn)
 void WouoUI::page_in_to(create_page_fn_t cb_fn)
 {
   auto pt_page = cb_fn();
-  addPage(pt_page);
+  pt_page->u8g2 = this->u8g2; // u8g2 指针
+  pt_page->gui = this;        // 设置gui引用
   this->history.push_back(pt_page);
   this->state = STATE_LAYER_IN;
+  pt_page->create(); // 初始化页面
 };
 
 void WouoUI::page_back()
@@ -101,16 +103,18 @@ void WouoUI::layer_in()
 {
   ESP_LOGD(TAG, "PAGE IN");
   this->state = STATE_FADE;
-  this->init_flag = false;
 
   auto page_before = this->get_history(-2); // 上一个页面
   auto page = this->get_history();          // 当前页面
-
   page->select = 0;
   page->cursor_position_y = 0;
+  auto calc = [&](uint8_t v) -> float
+  {
+    if (!page_before->cursor_position_y)
+      return 0.0;
+    return v * (page_before->cursor_position_y / LIST_LINE_H);
+  };
 
-  auto calc = [&](uint8_t v)
-  { return v * (page_before->cursor_position_y / LIST_LINE_H); };
   page_before->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
                            calc(CONFIG_UI[BOX_Y_OS]));
 }
@@ -123,7 +127,6 @@ void WouoUI::layer_out()
   auto page = this->get_history();
 
   this->state = STATE_FADE;
-  this->init_flag = false;
 
   auto calc = [&](uint8_t v)
   {
@@ -131,7 +134,6 @@ void WouoUI::layer_out()
   };
   page->setCursorOS(calc(CONFIG_UI[BOX_X_OS]),
                     calc(CONFIG_UI[BOX_Y_OS]));
-
   page->leave();
   this->history.pop_back(); // 销毁历史
   delete page;              // 销毁页面
@@ -140,11 +142,10 @@ void WouoUI::layer_out()
 BasePage *WouoUI::get_history(int index)
 {
   auto size = history.size();
-
   if (!size)
     esp_system_abort("History is empty");
 
-  if (index == -1 || (size >= index && size < abs(index)))
+  if (index == -1 || size >= index || size < abs(index))
     return this->history.back().page;
 
   if (index < 0)
@@ -187,7 +188,7 @@ void WouoUI::fade()
         this->buf_ptr[i] = this->buf_ptr[i] & 0x00;
     break;
   default:
-    this->state = STATE_VIEW;
+    this->state = STATE_BEFORE_VIEW;
     fade = 0;
     break;
   }
@@ -227,26 +228,11 @@ void WouoUI::oled_init()
   this->u8g2->setContrast(CONFIG_UI[DISP_BRI]);
 }
 
-/*
- * @brief 添加对象式页面
- * @param page 页面指针
- */
-void WouoUI::addPage(BasePage *page) // TODO 重命名&简化函数
-{
-  page->u8g2 = this->u8g2; // u8g2 指针
-  page->gui = this;        // 设置gui引用
-  page->create();          // 初始化页面
-};
-
 // 设置默认页面
 void WouoUI::setDefaultPage(create_page_fn_t cb_fn)
 {
   if (history.size() < 1) // index 0 为默认页面
-  {
-    auto pt_page = cb_fn();
-    this->addPage(pt_page);
-    this->history.push_back(History(pt_page));
-  }
+    page_in_to(cb_fn);
 }
 
 // 总进程
@@ -264,14 +250,14 @@ void WouoUI::uiUpdate()
   case STATE_FADE:
     this->fade();
     break;
+  case STATE_BEFORE_VIEW:
+    ESP_LOGI(TAG, "before view");
+    this->get_history()->before();
+    this->state = STATE_VIEW;
+    break;
   case STATE_VIEW: // 时刻刷新页面
     this->u8g2->clearBuffer();
     auto page = this->get_history();
-    if (!this->init_flag)
-    {
-      this->init_flag = true;
-      page->before();
-    }
     // 渲染页面&窗口
     page->__base_render();
     for (auto window : page->windows)
@@ -284,7 +270,9 @@ void WouoUI::uiUpdate()
       if (page->windows.size()) // 当有窗口显示时，顶部窗口接管按键
         windows_top()->onUserInput(event);
       else
-        page->onUserInput(event);
+        for (auto on : page->on_event)
+          if (event.key_id == on.key)
+            on.cb_fn();
     }
   }
 }
@@ -302,7 +290,7 @@ void WouoUI::begin(U8G2 *u8g2)
   // 设置屏幕刷新任务
   auto taskUpdate = [](void *pt)
   {
-    const TickType_t xFreequency = 10; // 渲染一帧间隔 /ms
+    const TickType_t xFreequency = 13; // 渲染一帧间隔 /ms
     TickType_t xLastWakeTime = xTaskGetTickCount();
     WouoUI *gui = (WouoUI *)pt;
     while (true)
@@ -392,23 +380,22 @@ void BasePage::draw_slider_x(float progress,
 // 处理按钮事件
 void ListPage::onUserInput(event_t event)
 {
-  gui->oper_flag = true;
   switch (event.key_id)
   {
-  case BTN_ID_UP:
+  case KEY_UP:
     ESP_LOGD(TAG, "MOVE_UP");
     cursorMoveUP(); // 光标向上移动一行
     break;
 
-  case BTN_ID_DO:
+  case KEY_DOWN:
     ESP_LOGD(TAG, "MOVE_DOWN");
     cursorMoveDOWN(); // 光标向上移动一行
     break;
 
-  case BTN_ID_CANCEL: // 返回
+  case KEY_BACK: // 返回
     ESP_LOGD(TAG, "CANCEL");
     select = 0;
-  case BTN_ID_CONFIRM: // 确认
+  case KEY_CONFIRM: // 确认
     ESP_LOGD(TAG, "CONFIRM");
     // 执行与 view uint 绑定的回调函数，通常是页面跳转
     if (this->view[select].cb_fn)
@@ -417,6 +404,20 @@ void ListPage::onUserInput(event_t event)
     break;
   }
 }
+
+void ListPage::create() {
+  //   gui->on(KEY_UP, [&]()
+  //           { cursorMoveUP(); })
+  //       ->on(KEY_DOWN, [&]()
+  //            { cursorMoveDOWN(); })
+  //       ->on(KEY_BACK, [&]()
+  //            { select = 0; })
+  //       ->on(KEY_CONFIRM, [&]
+  //            {
+  //  if (this->view[select].cb_fn)
+  //           this->view[select].cb_fn(gui);
+  //         setCursorOS(CONFIG_UI[BOX_X_OS]); });
+};
 
 // 列表页面渲染函数
 void ListPage::render()
@@ -488,7 +489,7 @@ void ListPage::render()
 
 void ListPage::before()
 {
-  gui->oper_flag = true;
+  ESP_LOGI(TAG, "list page before");
   text_x = -gui->DISPLAY_WIDTH;
   text_y = cursor_position_y - LIST_LINE_H * select;
   text_y_trg = text_y;
@@ -654,16 +655,16 @@ void BaseWindow::onUserInput(event_t event)
 
   switch (event.key_id)
   {
-  case BTN_ID_UP:
+  case KEY_UP:
     if (*this->value < this->max)
       *this->value += this->step;
     break;
-  case BTN_ID_DO:
+  case KEY_DOWN:
     if (*this->value > this->min)
       *this->value -= this->step;
     break;
-  case BTN_ID_CANCEL:
-  case BTN_ID_CONFIRM:
+  case KEY_BACK:
+  case KEY_CONFIRM:
     this->leave();
     // gui->pageSwitch(this->bg_page);
 
