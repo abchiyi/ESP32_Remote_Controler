@@ -26,8 +26,14 @@ private:
   {
     return [=](WouoUI *ui)
     {
+      auto window_pt = new BaseWindow;
+      strcpy(window_pt->title, title);
+      window_pt->value = value;
+      window_pt->max = max;
+      window_pt->min = min;
+      window_pt->step = step;
       ui->page_pop_window([=]()
-                          { return new BaseWindow; });
+                          { return window_pt; });
     };
   };
 

@@ -12,15 +12,6 @@ LIST_VIEW Setting_devces_view;
 class L_DEVICES : public ListPage
 {
 public:
-    void create()
-    {
-    }
-
-    void before()
-    {
-        ListPage::before();
-    };
-
     void render()
     {
 

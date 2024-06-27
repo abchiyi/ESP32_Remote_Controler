@@ -33,13 +33,6 @@ void ListPage::render()
   static uint8_t list_ani = CONFIG_UI[LIST_ANI];
   static uint8_t com_scr = CONFIG_UI[COME_SCR];
 
-  // 在每次操作后都会更新的参数
-  // if (gui->oper_flag)
-  // {
-  //   gui->oper_flag = false;
-
-  // }
-
   // 绘制光标
   auto render_cursor = [&]()
   {
@@ -181,4 +174,3 @@ gui_cb_fn_t ListPage::create_render_checxbox(check_box_handle_t &cbh)
       u8g2->drawBox(text_w_temp + CB_D + 1, CB_U + CB_D + 1 + text_y_temp, CB_W - (CB_D + 1) * 2, CB_H - (CB_D + 1) * 2);
   };
 }
-

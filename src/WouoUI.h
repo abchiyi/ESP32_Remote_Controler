@@ -135,13 +135,6 @@ class BaseWindow
 
 private:
   uint8_t a = 100;
-
-  char title[WIN_TITLE_W] = "Test window";
-  uint8_t *value = &a;
-  uint8_t max = 100;
-  uint8_t min = 0;
-  uint8_t step = 1;
-
   U8G2 *u8g2 = nullptr;
   WouoUI *gui = nullptr;
 
@@ -164,6 +157,13 @@ private:
   float bar_x_trg;
 
 public:
+
+  char title[WIN_TITLE_W] = "Test window";
+  uint8_t *value = &a;
+  uint8_t max = 100;
+  uint8_t min = 0;
+  uint8_t step = 1;
+
   // 关闭窗口，并销毁窗口内存
   void close_window();
   page_name_t name = "pop window";
