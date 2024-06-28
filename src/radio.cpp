@@ -200,6 +200,7 @@ void onSend(const uint8_t *mac_addr, esp_now_send_status_t status)
   {
     ESP_LOGI(TAG, "DISCONNECT with timeout");
     RADIO.status = RADIO_BEFORE_DISCONNECT;
+    counter_resend = 0;
   }
   // else
   //   ESP_LOGI(TAG, "Send to " MACSTR " SUCCESS", MAC2STR(mac_addr));
@@ -208,15 +209,20 @@ void onSend(const uint8_t *mac_addr, esp_now_send_status_t status)
 // 主任务
 void TaskRadioMainLoop(void *pt)
 {
-  const static TickType_t xFrequency = pdMS_TO_TICKS(6);
-  static TickType_t xLastWakeTime;
-  static TickType_t end;
+  const static TickType_t xFrequency = pdMS_TO_TICKS(8);
+  static TickType_t xLastWakeTime = xTaskGetTickCount();
   static TickType_t start;
+  static TickType_t end;
 
   uint8_t counter_pair_new_fail = 0;
 
+  auto counter_max = 20;
+  auto counter = 0;
+  auto buffer = 0;
   while (true)
   {
+    RADIO.update_loop_metrics();
+
     switch (RADIO.status)
     {
     case RADIO_PAIR_DEVICE:
@@ -243,6 +249,9 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_CONNECTED:
+      counter++;
+      start = xTaskGetTickCount();
+
       if (RADIO.status != RADIO_CONNECTED)
         break;
 
@@ -261,6 +270,16 @@ void TaskRadioMainLoop(void *pt)
             xQueueReset(Q_DATA_RECV); // 2 Tick 后队列依然满->清空队列
       }();
 
+      end = xTaskGetTickCount();
+
+      buffer += (end - start);
+      if (counter >= counter_max)
+      {
+        RADIO.run_time = buffer / 20;
+        end = xTaskGetTickCount();
+        counter = 0;
+        buffer = 0;
+      }
       xTaskDelayUntil(&xLastWakeTime, xFrequency);
       break;
 
@@ -289,29 +308,38 @@ bool Radio::send(const T &data)
   // ESP_LOGI(TAG, "Send to " MACSTR " - pd of : %d",
   //          MAC2STR(this->peer_info.peer_addr), &data);
 
-  auto status = esp_now_send(this->peer_info.peer_addr,
-                             (uint8_t *)&data, sizeof(data));
   String error_message;
-
-  if (status == ESP_OK)
-    return true;
-
-  switch (status)
+  switch (esp_now_send(this->peer_info.peer_addr,
+                       (uint8_t *)&data, sizeof(data)))
   {
+  case ESP_OK:
+    return true;
   case ESP_ERR_ESPNOW_NO_MEM:
     error_message = String("out of memory");
+    break;
   case ESP_ERR_ESPNOW_NOT_FOUND:
     error_message = String("peer is not found");
+    break;
+
   case ESP_ERR_ESPNOW_IF:
     error_message = String("current WiFi interface doesn't match that of peer");
+    break;
+
   case ESP_ERR_ESPNOW_NOT_INIT:
     error_message = String("ESPNOW is not initialized");
+    break;
+
   case ESP_ERR_ESPNOW_ARG:
     error_message = String("invalid argument");
+    break;
+
   case ESP_ERR_ESPNOW_INTERNAL:
     error_message = String("internal error");
+    break;
+
   default:
     error_message = String("Send fail");
+    break;
   }
 
   ESP_LOGE(TAG, "Send to " MACSTR " - %s",

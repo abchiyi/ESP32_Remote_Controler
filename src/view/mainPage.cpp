@@ -79,6 +79,10 @@ public:
     auto tick = xTaskGetTickCount();
     u8g2->setCursor(10, 10);
     u8g2->printf("%d FPS", 1000 / (tick - last_run));
+    u8g2->setCursor(10, 20);
+    u8g2->printf("FQ %d ", RADIO.Frequency);
+    u8g2->setCursor(10, 30);
+    u8g2->printf("Run time %d ", RADIO.run_time);
     last_run = tick;
 
     this->render_channel_view();

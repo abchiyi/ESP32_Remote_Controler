@@ -142,6 +142,26 @@ public:
   uint8_t timeout_resend = 50;      // 超时重发
   uint8_t resend_count = 5;         // 超时重发次数
   uint8_t timeout_disconnect = 250; // 超时断开连接
+
+  int Frequency = 10; // 主循环运行频率
+  int run_time = 10;  // 主循环单次执行时间
+
+  void update_loop_metrics()
+  {
+    static auto counter = 0;
+    static TickType_t last_run;
+    static auto buffer = 0;
+    auto now = xTaskGetTickCount();
+    buffer += (now - last_run);
+    counter++;
+    if (counter >= 100)
+    {
+      Frequency = 1000 / (buffer / 100);
+      counter = 0;
+      buffer = 0;
+    }
+    last_run = now;
+  };
 };
 
 extern Radio RADIO;
