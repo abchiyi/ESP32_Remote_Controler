@@ -25,10 +25,10 @@ uint16_t set_combined_int(uint16_t value1, uint16_t value2)
 // 挡位状态
 typedef enum gear
 {
-  REVERSE,
-  FORWARD,
   SLIDE,
-  BRAKE
+  BRAKE,
+  REVERSE,
+  FORWARD
 } gear_t;
 
 /* 前照灯 */
