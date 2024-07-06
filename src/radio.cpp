@@ -81,14 +81,11 @@ bool pairTo(
 
   switch (esp_now_add_peer(&peer_info))
   {
+  case ESP_ERR_ESPNOW_EXIST:
+    ESP_LOGE(TAG, "Peer Exists");
   case ESP_OK:
     RADIO.peer_info = peer_info;
     ESP_LOGI(TAG, "Pair success");
-    return true;
-
-  case ESP_ERR_ESPNOW_EXIST:
-    RADIO.peer_info = peer_info;
-    ESP_LOGE(TAG, "Peer Exists");
     return true;
 
   case ESP_ERR_ESPNOW_NOT_INIT:
@@ -126,13 +123,21 @@ bool handshake(mac_t mac_addr)
 
   if (!RADIO.send(data)) // 发送失败退出握手
     return false;
-  // todo 验证响应地址
 
   if (!wait_response(RADIO.timeout_resend, &data))
     return false;
 
+  if (data.mac_addr != mac_addr)
+  {
+    ESP_LOGI(TAG,
+             "地址不一致\nTarget : " MACSTR "\nAddr   : " MACSTR "",
+             MAC2STR(mac_addr),
+             MAC2STR(data.mac_addr));
+    return false;
+  }
+
   // 当通道 0 有数据时表示响应设备将使用另一地址与主机通讯
-  if (data.channel[0])
+  if (data.new_addr)
   {
     ESP_LOGI(TAG, "add new mac");
     if (esp_now_del_peer(RADIO.peer_info.peer_addr) != ESP_OK)
@@ -152,15 +157,8 @@ bool handshake(mac_t mac_addr)
     return handshake(newAddr); // 与新地址握手
   }
 
-  // 对比收到的数据的发送地址与目标配对地址是否一致
-  if (areMacsEqual(mac_addr, data.mac_addr))
-    return true;
-  else
-  {
-    ESP_LOGI(TAG, "handshake fail, T:" MACSTR ", R:" MACSTR "",
-             MAC2STR(mac_addr), MAC2STR(data.mac_addr));
-    return false;
-  }
+  ESP_LOGI(TAG, "handshake success");
+  return true;
 };
 
 // 接收回调
