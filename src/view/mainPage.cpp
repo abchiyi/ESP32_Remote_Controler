@@ -88,9 +88,9 @@ public:
     this->render_channel_view();
     // 连接状态
     u8g2->setCursor((gui->DISPLAY_WIDTH - 6 * 5) / 2, gui->DISPLAY_HEIGHT);
-    u8g2->print(RADIO.status == RADIO_CONNECTED
-                    ? "< = >"
-                    : "< x >");
+    u8g2->printf("< %s >", RADIO.status == RADIO_CONNECTED
+                               ? "="
+                               : "x");
   };
 };
 

@@ -32,7 +32,7 @@ typedef enum gear
 } gear_t;
 
 /* 前照灯 */
-int HeadLight = 0;          // 进/远光/示宽/前雾灯复用灯
+int HeadLight = 0;          // 近/远光/示宽/前雾灯复用灯
 bool DISTANT_LIGHT = false; // 远光
 bool LOW_BEAM = false;      // 近光
 
@@ -80,8 +80,6 @@ void set_channel(radio_data_t *data)
   brake = BRAKE_KEY == BRAKE_RT ? RT : LT;
 
   REVERSING_LIGHT = HOLD_LT ? 150 : 0; // 倒车灯
-
-  // ESP_LOGI(TAG, "Hold LT :%d, Hold RT :%d, Brake :%d", HOLD_LT, HOLD_RT, brake);
 
   auto gear = HOLD_RT   ? FORWARD
               : HOLD_LT ? REVERSE

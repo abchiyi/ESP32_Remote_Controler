@@ -133,7 +133,7 @@ bool handshake(mac_t mac_addr)
              "地址不一致\nTarget : " MACSTR "\nAddr   : " MACSTR "",
              MAC2STR(mac_addr),
              MAC2STR(data.mac_addr));
-    return false;
+    // return false; // XXX 修正
   }
 
   // 当通道 0 有数据时表示响应设备将使用另一地址与主机通讯
