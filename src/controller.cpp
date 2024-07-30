@@ -67,7 +67,7 @@ void syncAnalogHat(int16_t _from, int16_t *_to)
 // 启动xbox控制器
 void CONTROLLER::begin()
 {
-  xTaskCreate(task_update, "taskUSB", 4096, NULL, 1, NULL);
+  xTaskCreatePinnedToCore(task_update, "taskUSB", 4096, NULL, configMAX_PRIORITIES - 1, NULL, 0);
 }
 
 void CONTROLLER::update()
@@ -138,6 +138,5 @@ String CONTROLLER::toString()
     "joyRVert: " + String(joyRVert) + "\n" +
     "trigLT: " + String(trigLT) + "\n" +
     "trigRT: " + String(trigRT) + "\n";
-  // clang-format on
   return str;
 }

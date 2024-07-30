@@ -207,10 +207,10 @@ void onSend(const uint8_t *mac_addr, esp_now_send_status_t status)
 // 主任务
 void TaskRadioMainLoop(void *pt)
 {
-  const static TickType_t xFrequency = pdMS_TO_TICKS(8);
+  const static TickType_t xFrequency = pdMS_TO_TICKS(16);
   static TickType_t xLastWakeTime = xTaskGetTickCount();
-  static TickType_t start;
-  static TickType_t end;
+  static TickType_t last_run;
+  static TickType_t temp;
 
   uint8_t counter_pair_new_fail = 0;
 
@@ -245,16 +245,13 @@ void TaskRadioMainLoop(void *pt)
       RADIO.status = RADIO_CONNECTED;
       xLastWakeTime = xTaskGetTickCount();
       break;
-
     case RADIO_CONNECTED:
       counter++;
-      start = xTaskGetTickCount();
-
       if (RADIO.status != RADIO_CONNECTED)
         break;
-
       [&]() // 向接收机发送数据
       {
+        RADIO.conected_before_send();
         radio_data_t data;
         xQueueReceive(Q_DATA_SEND, &data, 1);
         RADIO.send(data); // 回传数据
@@ -264,21 +261,22 @@ void TaskRadioMainLoop(void *pt)
       {
         radio_data_t data;
         if (wait_response(RADIO.timeout_resend, &data))
-          if (xQueueSend(Q_DATA_RECV, &data, 2) == pdTRUE)
-            xQueueReset(Q_DATA_RECV); // 2 Tick 后队列依然满->清空队列
+          ;
+        // if (xQueueSend(Q_DATA_RECV, &data, 2) == pdTRUE)
+        // xQueueReset(Q_DATA_RECV); // 2 Tick 后队列依然满->清空队列
       }();
 
-      end = xTaskGetTickCount();
-
-      buffer += (end - start);
+      temp = xTaskGetTickCount();
+      buffer += (temp - last_run);
+      last_run = temp;
       if (counter >= counter_max)
       {
         RADIO.run_time = buffer / 20;
-        end = xTaskGetTickCount();
+        last_run = xTaskGetTickCount();
         counter = 0;
         buffer = 0;
       }
-      xTaskDelayUntil(&xLastWakeTime, xFrequency);
+      // xTaskDelayUntil(&xLastWakeTime, xFrequency);
       break;
 
     case RADIO_BEFORE_DISCONNECT:

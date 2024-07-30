@@ -112,11 +112,8 @@ public:
     auto array = get_copy();
     paired_devices = {};
     for (auto mac : array)
-    {
-      if (mac == _mac)
-        continue;
-      push_back(mac);
-    }
+      if (mac != _mac)
+        push_back(mac);
   }
 
   void config_clear();
@@ -163,6 +160,8 @@ public:
     }
     last_run = now;
   };
+
+  std::function<void()> conected_before_send;
 };
 
 extern Radio RADIO;

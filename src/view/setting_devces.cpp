@@ -26,7 +26,7 @@ public:
             snprintf(macStr, sizeof(macStr), MACSTR, MAC2STR(mac_array));
             std::string macString = std::string("- ") + macStr;
             Setting_devces_view.push_back({macString,
-                                           [&](WouoUI *ui)
+                                           [=](WouoUI *ui)
                                            {
                                                RADIO.remove(mac_array);
                                                ESP_LOGI(TAG, "Remove");

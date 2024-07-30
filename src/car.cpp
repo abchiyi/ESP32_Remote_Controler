@@ -8,8 +8,6 @@ enum break_key
   BRAKE_RT
 };
 
-SemaphoreHandle_t xMutex;
-
 radio_data_t data_to_send;
 
 /**
@@ -87,44 +85,17 @@ void set_channel(radio_data_t *data)
 
   auto value = gear == FORWARD ? RT : LT;
 
-  if (xSemaphoreTake(xMutex, 4) == pdTRUE)
-  {
-    data->channel[0] = (value << 4) | (gear << 2) | brake;
-    data->channel[1] = set_combined_int(Controller.joyLHori, gear);
-    xSemaphoreGive(xMutex);
-  }
+  data->channel[0] = (value << 4) | (gear << 2) | brake;
+  data->channel[1] = set_combined_int(Controller.joyLHori, gear);
 }
 
-void task_controll_main(void *pt)
+void task_controll_main()
 {
-  TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
-  const TickType_t xFrequency = pdMS_TO_TICKS(8); // 设置采样率 250hz
-
-  while (true)
-  {
-    if (RADIO.status == RADIO_CONNECTED && Xbox.XboxOneConnected)
-    {
-      // TODO 判断接收机的工作模式以对应的模式发送控制数据
-      set_channel(&data_to_send);
-      RADIO.set_data(&data_to_send);
-    }
-    xTaskDelayUntil(&xLastWakeTime, xFrequency);
-  }
+  set_channel(&data_to_send);
+  RADIO.set_data(&data_to_send);
 }
 
 void car_controll_start()
 {
-  xMutex = xSemaphoreCreateMutex();
-
-  xTaskCreate(task_controll_main, "main_controller", 4096, NULL, 1, NULL);
-}
-
-radio_data_t get_channel_status()
-{
-  if (xSemaphoreTake(xMutex, 4) == pdTRUE)
-  {
-    radio_data_t data = data_to_send;
-    xSemaphoreGive(xMutex);
-    return data;
-  }
+  RADIO.conected_before_send = task_controll_main;
 }
