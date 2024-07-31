@@ -5,6 +5,7 @@
 #include <car.h>
 #include <view/setting_devces.h>
 #include "view/about.h"
+#include "WiFi.h"
 
 #define slider_width 6
 #define slider_length 45
@@ -83,6 +84,8 @@ public:
     u8g2->printf("FQ %d ", RADIO.Frequency);
     u8g2->setCursor(10, 30);
     u8g2->printf("Run time %d ", RADIO.run_time);
+    u8g2->setCursor(10, 40);
+    u8g2->printf("RSSI %d ", WiFi.RSSI());
     last_run = tick;
 
     this->render_channel_view();
