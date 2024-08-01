@@ -163,28 +163,19 @@ esp_err_t handshake(mac_t mac_addr)
   if (!macOK(mac_addr))
     return false;
 
-  ESP_LOGI(TAG, "step 1");
   // 2次握手请求，每次重试3次，均无响应握手失败
   for (size_t i = 1; i <= 3; i++) // M -> S
   {
     RADIO.send(data); // 不关心是否发送成功，当发送重试次数耗尽，判断握手失败
     if (wait_ACK(timeOut, mac_addr))
-      break;
+      for (size_t i = 1; i <= 3; i++) // S <- M
+        if (wait_response(timeOut, &data))
+          return ESP_OK;
     if (i >= 3)
       return ESP_FAIL;
   }
 
-  ESP_LOGI(TAG, "step 2");
-  for (size_t i = 1; i <= 3; i++) // M <- S
-  {
-    if (wait_response(timeOut, &data))
-      break;
-    if (i >= 3)
-      return ESP_FAIL;
-  }
-
-  ESP_LOGI(TAG, "OK");
-  return ESP_OK;
+  return ESP_FAIL;
 };
 
 // 接收回调
@@ -304,6 +295,12 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_DISCONNECT:
+      if (!macOK(RADIO.last_connected_device))
+      {
+        vTaskDelay(RADIO.timeout_resend);
+        continue;
+      }
+
       if (handshake(RADIO.last_connected_device) == ESP_OK)
         RADIO.status = RADIO_BEFORE_CONNECTED;
       vTaskDelay(RADIO.timeout_resend);
