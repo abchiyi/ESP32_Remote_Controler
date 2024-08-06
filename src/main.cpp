@@ -136,10 +136,8 @@ void TaskDataLayerUpdate(void *pt)
 
 void ISR()
 {
-  if (RADIO.status == RADIO_CONNECTED)
-    RADIO.status = RADIO_BEFORE_DISCONNECT;
-  else
-    RADIO.status = RADIO_PAIR_DEVICE;
+  // RADIO.status = RADIO_PAIR_DEVICE;
+  RADIO.status = RADIO_IN_SCAN_BEFORE;
 };
 
 void setup()

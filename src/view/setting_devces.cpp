@@ -12,6 +12,15 @@ LIST_VIEW Setting_devces_view;
 class L_DEVICES : public ListPage
 {
 public:
+    void before()
+    {
+        if (RADIO.status != RADIO_CONNECTED)
+        {
+            ESP_LOGI(TAG, "before&scan AP");
+            RADIO.status = RADIO_IN_SCAN_BEFORE;
+        }
+    };
+
     void render()
     {
 
@@ -20,20 +29,28 @@ public:
             {"- Manage devices"},
         };
 
-        for (const auto &mac_array : RADIO.get_copy())
-        {
-            char macStr[18]; // 用于存储 MAC 地址字符串的数组
-            snprintf(macStr, sizeof(macStr), MACSTR, MAC2STR(mac_array));
-            std::string macString = std::string("- ") + macStr;
-            Setting_devces_view.push_back({macString,
-                                           [=](WouoUI *ui)
-                                           {
-                                               RADIO.remove(mac_array);
-                                               ESP_LOGI(TAG, "Remove");
-                                           }});
-        }
+        if (RADIO.status != RADIO_IN_SCAN)
+            for (const auto &ap : RADIO.AP)
+            {
+                char macStr[18]; // 用于存储 MAC 地址字符串的数组
+                snprintf(macStr, sizeof(macStr), MACSTR, MAC2STR(ap.MAC));
+                std::string macString = std::string("- ") + macStr;
+                Setting_devces_view.push_back(
+                    {String("- " + ap.SSID).c_str(),
+                     [=](WouoUI *ui)
+                     {
+                         ESP_LOGI(TAG, "connect to %s", ap.SSID.c_str());
+                         RADIO.connect_to(&ap);
+                     },
+                     create_render_content(&ap.RSSI)});
+            }
 
         ListPage::render();
+    }
+
+    void leave()
+    {
+        RADIO.AP.clear();  
     }
 
     L_DEVICES(LIST_VIEW &_view) : ListPage(_view) {};

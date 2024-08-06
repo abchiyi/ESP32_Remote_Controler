@@ -241,6 +241,27 @@ void TaskRadioMainLoop(void *pt)
     RADIO.update_loop_metrics();
     switch (RADIO.status)
     {
+      /** 无连接状态，等待，什么都不做 */
+    case RADIO_NO_CONNECTION_BEFORE:
+      ESP_LOGI(TAG, "RADIO_NO_CONNECTION");
+      RADIO.status = RADIO_NO_CONNECTION;
+      break;
+
+    case RADIO_NO_CONNECTION:
+      vTaskDelay(RADIO.timeout_resend);
+      break;
+
+      /** 扫描AP */
+    case RADIO_IN_SCAN_BEFORE:
+      ESP_LOGI(TAG, "RADIO_IN_SCAN");
+      RADIO.status = RADIO_IN_SCAN;
+      break;
+    case RADIO_IN_SCAN:
+      RADIO.scan_ap();
+      if (RADIO.status == RADIO_IN_SCAN)
+        RADIO.status = RADIO_NO_CONNECTION_BEFORE;
+      break;
+
     case RADIO_PAIR_DEVICE:
       if (RADIO.pairNewDevice() == ESP_OK)
         RADIO.status = RADIO_BEFORE_CONNECTED;
@@ -295,14 +316,9 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_DISCONNECT:
-      if (!macOK(RADIO.last_connected_device))
-      {
-        vTaskDelay(RADIO.timeout_resend);
-        continue;
-      }
-
-      if (handshake(RADIO.last_connected_device) == ESP_OK)
-        RADIO.status = RADIO_BEFORE_CONNECTED;
+      if (macOK(RADIO.last_connected_device))
+        if (handshake(RADIO.last_connected_device) == ESP_OK)
+          RADIO.status = RADIO_BEFORE_CONNECTED;
       vTaskDelay(RADIO.timeout_resend);
       break;
 
@@ -364,50 +380,7 @@ bool Radio::send(const T &data)
  */
 esp_err_t Radio::pairNewDevice()
 {
-  static std::vector<ap_info> ap_infos(0);
-  auto scanWiFi = [&]()
-  {
-    ESP_LOGI(TAG, "Start scan");
-    // 扫描1~13信道，过滤并储存所有查找到的AP信息
-    for (size_t channel_i = 1; channel_i < 14; channel_i++)
-    {
-      auto scanResults = WiFi.scanNetworks(0, 0, 0, 100, channel_i);
-      if (scanResults == 0) // 当前信道没有扫描到AP跳转到下一信道扫描
-        continue;
-      for (int i = 0; i < scanResults; i++)
-        // 过滤 AP,由特定字符起始则被视为一个可以配对的设备
-        if (WiFi.SSID(i).indexOf(SLAVE_KE_NAME) == 0)
-          ap_infos.emplace_back(ap_info(
-              WiFi.SSID(i),
-              WiFi.RSSI(i),
-              WiFi.channel(i),
-              WiFi.BSSID(i)));
-      WiFi.scanDelete(); // 清除扫描信息
-    }
-    ESP_LOGI(TAG, "AP scan comp");
-    if (!ap_infos.size())
-    {
-      ESP_LOGI(TAG, "NO AP find");
-      return ESP_FAIL; // 没有找到AP
-    }
-    // 打印所有扫描到的 AP
-    for (size_t i = 0; i < ap_infos.size(); i++)
-      ESP_LOGI(TAG, "%s", ap_infos[i].toStr().c_str());
-    return ESP_OK;
-  };
-
-  for (size_t i = 1; i <= 30; i++) // 扫描30次
-  {
-    ap_infos.clear();
-    if (scanWiFi() == ESP_OK)
-      break;
-    if (i >= 30) // 规定时间内没有找到匹配的AP，配对失败
-      return ESP_FAIL;
-  }
-
-  // 信号最强的AP
-  auto tragetAP = &ap_infos[std::max_element(ap_infos.begin(), ap_infos.end()) -
-                            ap_infos.begin()];
+  auto tragetAP = &this->target_ap;
 
   WiFi.begin(tragetAP->SSID);
   while (WiFi.status() != WL_CONNECTED)
@@ -503,7 +476,7 @@ void Radio::begin()
   WiFi.macAddress(this->__mac_addr.data());
 
   initRadio();
-  this->status = RADIO_DISCONNECT;
+  this->status = RADIO_NO_CONNECTION_BEFORE;
 
   ESP_LOGI(TAG, "mac " MACSTR "", MAC2STR(last_connected_device));
   addPeer(last_connected_device, 1);
@@ -542,6 +515,38 @@ esp_err_t Radio::set_data(radio_data_t *data)
              : ESP_OK;
 }
 
+/**
+ * @brief 扫描AP
+ * @param v_array 扫描到的AP地址,扫描前会被清空
+ * @return
+ *  - ESP_OK 扫描完成并找到AP
+ *  - ESP_FAIL 扫描完成没有找到符合条件的AP
+ */
+esp_err_t Radio::scan_ap()
+{
+  this->AP.clear();
+  // 扫描1~13信道，过滤并储存所有查找到的AP信息
+  for (size_t channel_i = 1; channel_i < 14; channel_i++)
+  {
+    auto scanResults = WiFi.scanNetworks(0, 0, 0, 10, channel_i);
+    if (scanResults == 0) // 当前信道没有扫描到AP跳转到下一信道扫描
+      continue;
+    for (int i = 0; i < scanResults; i++)
+      // 过滤 AP,由特定字符起始则被视为一个可以配对的设备
+      if (WiFi.SSID(i).indexOf(SLAVE_KE_NAME) == 0)
+        this->AP.emplace_back(ap_info(
+            WiFi.SSID(i),
+            WiFi.RSSI(i),
+            WiFi.channel(i),
+            WiFi.BSSID(i)));
+    WiFi.scanDelete(); // 清除扫描信息
+  }
+
+  if (this->AP.size())
+    return ESP_FAIL; // 没有找到AP
+  return ESP_OK;
+};
+
 void Radio::confgi_save()
 {
   ESP_LOGI(TAG, "Save confgi");
@@ -563,3 +568,11 @@ void Radio::config_clear()
   nvs_call(STORGE_NAME_SPACE, [](Preferences &prefs)
            { prefs.clear(); });
 }
+
+esp_err_t Radio::connect_to(const ap_info_t *apInfo)
+{
+  ESP_LOGI(TAG, "aa");
+  RADIO.target_ap = *apInfo;
+  this->status = RADIO_PAIR_DEVICE;
+  return ESP_OK;
+};

@@ -11,7 +11,6 @@ typedef std::array<unsigned char, ESP_NOW_ETH_ALEN> mac_t; // MAC 地址
 
 typedef enum radio_status
 {
-
   RADIO_BEFORE_PAIR_DEVICE,
   RADIO_PAIR_DEVICE,
 
@@ -23,6 +22,13 @@ typedef enum radio_status
 
   RADIO_BEFORE_DISCONNECT,
   RADIO_DISCONNECT,
+
+  RADIO_NO_CONNECTION_BEFORE,
+  RADIO_NO_CONNECTION,
+
+  RADIO_IN_SCAN_BEFORE,
+  RADIO_IN_SCAN,
+
 } radio_status_t;
 
 // AP 扫描信息
@@ -117,11 +123,13 @@ public:
 
   void config_clear();
   void confgi_save();
+  esp_err_t scan_ap();                     // 扫描AP
+  esp_err_t pairNewDevice();               // 配对新设备
+  esp_err_t connect_to(const ap_info_t *); // 连接到设备
 
+  ap_info_t target_ap;         // 目标AP
   esp_now_peer_info peer_info; // 配对信息
   radio_status_t status;       // 无线状态
-
-  esp_err_t pairNewDevice(); // 配对新设备
 
   template <typename T>
   bool send(const T &data);
@@ -129,6 +137,7 @@ public:
   void begin();
   void begin(uint8_t send_timeout);
 
+  // TODO 移除get & set 使用回调处理
   esp_err_t get_data(radio_data_t *data); // 读取收到的数据
   esp_err_t set_data(radio_data_t *data); // 设置要发送的数据
 
@@ -139,6 +148,8 @@ public:
   uint8_t timeout_resend = 50;      // 超时重发
   uint8_t resend_count = 5;         // 超时重发次数
   uint8_t timeout_disconnect = 250; // 超时断开连接
+
+  std::vector<ap_info_t> AP; // 发现的AP，scan_ap执行完毕或不处于扫描状态时读取
 
   int Frequency = 10; // 主循环运行频率
   int run_time = 10;  // 主循环单次执行时间

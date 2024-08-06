@@ -294,7 +294,7 @@ void WouoUI::begin(U8G2 *u8g2)
       vTaskDelayUntil(&xLastWakeTime, xFreequency);
     }
   };
-  xTaskCreatePinnedToCore(taskUpdate, "WouoUI gui update", 1024 * 10, (void *)this, 1, NULL, 1);
+  xTaskCreatePinnedToCore(taskUpdate, "WouoUI gui update", 1024 * 20, (void *)this, 1, NULL, 1);
 }
 
 /* ----------------- Base Page ----------------- */
@@ -370,7 +370,6 @@ void BasePage::draw_slider_x(float progress,
   if (biaxial)                          // 绘制中位线
     u8g2->drawLine(line_pos_x, line_start, line_pos_x, line_end);
 }
-
 
 /* ----------------- Base Window ----------------- */
 void BaseWindow::close_window()
