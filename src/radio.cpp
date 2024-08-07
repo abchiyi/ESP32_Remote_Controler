@@ -1,5 +1,7 @@
 #include <radio.h>
 #include <WiFi.h>
+#include "esp_wifi.h"
+#include "esp_wifi_types.h"
 #include <vector>
 #include <esp_wifi.h>
 #include <algorithm>
@@ -171,8 +173,6 @@ esp_err_t handshake(mac_t mac_addr)
       for (size_t i = 1; i <= 3; i++) // S <- M
         if (wait_response(timeOut, &data))
           return ESP_OK;
-    if (i >= 3)
-      return ESP_FAIL;
   }
 
   return ESP_FAIL;
@@ -260,6 +260,9 @@ void TaskRadioMainLoop(void *pt)
       RADIO.scan_ap();
       if (RADIO.status == RADIO_IN_SCAN)
         RADIO.status = RADIO_NO_CONNECTION_BEFORE;
+
+      if (RADIO.adter_scan_ap_comp)
+        RADIO.adter_scan_ap_comp(); // AP 扫描完成回调
       break;
 
     case RADIO_PAIR_DEVICE:
@@ -316,6 +319,9 @@ void TaskRadioMainLoop(void *pt)
       break;
 
     case RADIO_DISCONNECT:
+      if (RADIO.status != RADIO_DISCONNECT)
+        break;
+
       if (macOK(RADIO.last_connected_device))
         if (handshake(RADIO.last_connected_device) == ESP_OK)
           RADIO.status = RADIO_BEFORE_CONNECTED;
@@ -382,12 +388,12 @@ esp_err_t Radio::pairNewDevice()
 {
   auto tragetAP = &this->target_ap;
 
-  WiFi.begin(tragetAP->SSID);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    ESP_LOGI(TAG, ".");
-    delay(100);
-  }
+  // WiFi.begin(tragetAP->SSID);
+  // while (WiFi.status() != WL_CONNECTED)
+  // {
+  //   ESP_LOGI(TAG, ".");
+  //   delay(100);
+  // }
 
   ESP_LOGI(TAG, "Connected to %s", tragetAP->SSID.c_str());
   //---------------- 握手 -----------------
@@ -410,6 +416,51 @@ esp_err_t Radio::pairNewDevice()
   }
 }
 
+typedef struct
+{
+  uint8_t frame_ctrl[2];
+  uint8_t duration_id[2];
+  uint8_t addr1[6];
+  uint8_t addr2[6];
+  uint8_t addr3[6];
+  uint8_t seq_ctrl[2];
+  uint8_t addr4[6];
+} wifi_ieee80211_mac_hdr_t;
+
+typedef struct
+{
+  wifi_ieee80211_mac_hdr_t hdr;
+  uint8_t payload[];
+} wifi_ieee80211_packet_t;
+
+/**
+ * @brief  混杂模式监听回调,在这里读取来自从机的RSSI信号
+ */
+void promiscuous_rx_cb(void *buff, wifi_promiscuous_pkt_type_t type)
+{
+  if (type != WIFI_PKT_MGMT)
+    return;
+
+  const wifi_promiscuous_pkt_t *ppkt = (wifi_promiscuous_pkt_t *)buff;
+  const wifi_ieee80211_packet_t *ipkt =
+      (wifi_ieee80211_packet_t *)ppkt->payload;
+
+  const wifi_ieee80211_mac_hdr_t *hdr = &ipkt->hdr;
+
+  mac_t source_mac = {
+      hdr->addr2[0],
+      hdr->addr2[1],
+      hdr->addr2[2],
+      hdr->addr2[3],
+      hdr->addr2[4],
+      hdr->addr2[5],
+  };
+
+  if (source_mac == RADIO.last_connected_device)
+    RADIO.RSSI = ppkt->rx_ctrl.rssi;
+  // ESP_LOGI(TAG, "Source MAC: " MACSTR "", MAC2STR(source_mac));
+}
+
 // 初始化无线
 void initRadio()
 {
@@ -425,6 +476,10 @@ void initRadio()
              WiFi.macAddress().c_str(), WiFi.channel());
   else
     esp_system_abort("WIFI Start FAIL");
+
+  // 开启混杂模式
+  ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
+  ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(&promiscuous_rx_cb));
 
   // 设置 ESPNOW 通讯速率
   esp_wifi_config_espnow_rate(WIFI_IF_STA, WIFI_PHY_RATE_LORA_500K) == ESP_OK
@@ -458,6 +513,7 @@ void initRadio()
  */
 void Radio::begin()
 {
+  initRadio();
   // 读取配置
   nvs_call(STORGE_NAME_SPACE, [&](Preferences &prefs)
            {
@@ -475,13 +531,12 @@ void Radio::begin()
   // 写入本机的 MAC 地址
   WiFi.macAddress(this->__mac_addr.data());
 
-  initRadio();
   this->status = RADIO_NO_CONNECTION_BEFORE;
 
   ESP_LOGI(TAG, "mac " MACSTR "", MAC2STR(last_connected_device));
   addPeer(last_connected_device, 1);
 
-  xTaskCreate(TaskRadioMainLoop, "TaskRadioMainLoop", 1024 * 10, NULL, 24, NULL);
+  xTaskCreatePinnedToCore(TaskRadioMainLoop, "TaskRadioMainLoop", 1024 * 10, NULL, 24, NULL, 0);
 
   ESP_LOGI(TAG, "Radio started :)");
 }
@@ -528,7 +583,7 @@ esp_err_t Radio::scan_ap()
   // 扫描1~13信道，过滤并储存所有查找到的AP信息
   for (size_t channel_i = 1; channel_i < 14; channel_i++)
   {
-    auto scanResults = WiFi.scanNetworks(0, 0, 0, 10, channel_i);
+    auto scanResults = WiFi.scanNetworks(0, 0, 0, 100, channel_i);
     if (scanResults == 0) // 当前信道没有扫描到AP跳转到下一信道扫描
       continue;
     for (int i = 0; i < scanResults; i++)

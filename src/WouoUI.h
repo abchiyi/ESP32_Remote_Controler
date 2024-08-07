@@ -157,7 +157,6 @@ private:
   float bar_x_trg;
 
 public:
-
   char title[WIN_TITLE_W] = "Test window";
   uint8_t *value = &a;
   uint8_t max = 100;

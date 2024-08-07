@@ -9,6 +9,8 @@
 
 typedef std::array<unsigned char, ESP_NOW_ETH_ALEN> mac_t; // MAC 地址
 
+typedef std::function<void()> radio_cb_fn_t;
+
 typedef enum radio_status
 {
   RADIO_BEFORE_PAIR_DEVICE,
@@ -74,6 +76,8 @@ bool macOK(const mac_t &arr);
  */
 class Radio
 {
+  friend void TaskRadioMainLoop(void *pt);
+
 private:
   mac_t __mac_addr; // 此设备mac 地址
 
@@ -127,6 +131,7 @@ public:
   esp_err_t pairNewDevice();               // 配对新设备
   esp_err_t connect_to(const ap_info_t *); // 连接到设备
 
+  int8_t RSSI = 0;
   ap_info_t target_ap;         // 目标AP
   esp_now_peer_info peer_info; // 配对信息
   radio_status_t status;       // 无线状态
@@ -145,7 +150,7 @@ public:
    * freeRTOS 在esp32 一个 tick 为 1ms
    * 以下定义的超时值单位为 1ms
    */
-  uint8_t timeout_resend = 50;      // 超时重发
+  uint8_t timeout_resend = 70;      // 超时重发
   uint8_t resend_count = 5;         // 超时重发次数
   uint8_t timeout_disconnect = 250; // 超时断开连接
 
@@ -171,7 +176,10 @@ public:
     last_run = now;
   };
 
-  std::function<void()> conected_before_send;
+  radio_cb_fn_t conected_before_send; // 数据发送前回调
+
+  // 回调数据 当 AP 扫描完成后
+  radio_cb_fn_t adter_scan_ap_comp;
 };
 
 extern Radio RADIO;

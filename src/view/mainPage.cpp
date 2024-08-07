@@ -85,7 +85,7 @@ public:
     u8g2->setCursor(10, 30);
     u8g2->printf("Run time %d ", RADIO.run_time);
     u8g2->setCursor(10, 40);
-    u8g2->printf("RSSI %d ", WiFi.RSSI());
+    u8g2->printf("RSSI %d ", RADIO.RSSI);
     last_run = tick;
 
     this->render_channel_view();
