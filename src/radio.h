@@ -176,7 +176,10 @@ public:
     last_run = now;
   };
 
-  radio_cb_fn_t conected_before_send; // 数据发送前回调
+  /** 回调函数 */
+  radio_cb_fn_t cb_fn_on_disconnect = NULL;                      // 断开连接时
+  std::function<void(radio_data_t &)> cb_fn_arfter_recve = NULL; // 收到数据后
+  std::function<void(radio_data_t &)> cb_fn_before_send = NULL;  // 发送数据前
 
   // 回调数据 当 AP 扫描完成后
   radio_cb_fn_t adter_scan_ap_comp;

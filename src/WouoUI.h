@@ -6,6 +6,8 @@
 
 #pragma once
 
+class WouoUI;
+
 typedef enum key_id
 {
   KEY_UP = 1,  // 上翻
@@ -53,11 +55,12 @@ typedef enum
 } ui_state_t;
 
 // 列表变量
+// #define LIST_FONT u8g2_font_profont12_mf
 #define LIST_FONT u8g2_font_HelvetiPixel_tr
 #define LIST_LINE_H 16              // 行高
-#define LIST_TEXT_W 100             // 末尾元素起始位
+#define LIST_TEXT_W 95              // 末尾元素起始位
 #define LIST_TEXT_H LIST_LINE_H / 2 // 文本中轴线对齐高度
-#define LIST_TEXT_S 4               // 边距
+#define LIST_TEXT_GAP 4             // 边距
 #define LIST_BAR_W 3                // 滚动条宽度
 #define LIST_BOX_R 0.5f             // 光标圆角
 
@@ -87,7 +90,7 @@ typedef struct check_box_handle
     };
   };
 
-  gui_cb_fn_t chekc_radio()
+  gui_cb_fn_t check_radio()
   {
     return [=](WouoUI *ui)
     {
@@ -134,7 +137,6 @@ class BaseWindow
   friend class WouoUI;
 
 private:
-  uint8_t a = 100;
   U8G2 *u8g2 = nullptr;
   WouoUI *gui = nullptr;
 
@@ -158,10 +160,6 @@ private:
 
 public:
   char title[WIN_TITLE_W] = "Test window";
-  uint8_t *value = &a;
-  uint8_t max = 100;
-  uint8_t min = 0;
-  uint8_t step = 1;
 
   // 关闭窗口，并销毁窗口内存
   void close_window();
@@ -173,6 +171,54 @@ public:
   bool render();
   void onUserInput(event_t event);
 };
+
+template <typename T>
+class WindowValueSet : public BaseWindow
+{
+private:
+public:
+  T *value;
+  T max;
+  T min;
+  T step;
+
+  bool render()
+  {
+
+    if (this->box_h > (WIN_TITLE_H + 2 * WIN_TITLE_S))
+    {
+      u8g2->setCursor(this->box_x + WIN_VALUE_S, this->box_y + WIN_TITLE_S + WIN_TITLE_H);
+      u8g2->print(*this->value); // 绘制数值
+
+      u8g2->setCursor(this->box_x + WIN_TITLE_S, this->box_y + WIN_TITLE_S + WIN_TITLE_H);
+
+      // 绘制标题
+      u8g2->print(this->title);
+
+      // 绘制进度条
+      u8g2->drawBox(this->box_x + WIN_TITLE_S, this->box_y + this->box_h - WIN_TITLE_S - WIN_BAR_H - 1, this->bar_x, WIN_BAR_H);
+    }
+
+    return BaseWindow::render();
+  }
+
+  WindowValueSet(T *value, T max, T min, T step)
+      : value(value), max(max), min(min), step(step)
+  {
+  }
+};
+
+// // 创建弹窗回调
+// gui_cb_fn_t pop_window_set_value(const char title[], uint8_t *value, uint8_t max, uint8_t min, uint8_t step)
+// {
+//   return [=](WouoUI *ui)
+//   {
+//     BaseWindow *window_pt = new WindowValueSet(value, max, min, step);
+//     strcpy(window_pt->title, title);
+//     ui->page_pop_window([=]()
+//                         { return window_pt; });
+//   };
+// };
 
 class BasePage
 {
@@ -364,3 +410,16 @@ public:
 gui_cb_fn_t create_page_jump_fn(create_page_fn_t cb_fn = nullptr);
 
 extern uint8_t CONFIG_UI[UI_PARAM];
+
+// 创建弹窗回调
+template <typename T>
+gui_cb_fn_t pop_fn(const char title[], T *value, T max, T min, T step)
+{
+  return [=](WouoUI *ui)
+  {
+    BaseWindow *window_pt = new WindowValueSet<T>(value, max, min, step);
+    strcpy(window_pt->title, title);
+    ui->page_pop_window([=]()
+                        { return window_pt; });
+  };
+}

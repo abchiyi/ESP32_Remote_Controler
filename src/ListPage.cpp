@@ -28,8 +28,6 @@ void ListPage::render()
   auto length = this->view.size();
   auto page = gui->get_history();
 
-  static int16_t text_x_temp; // 文本横轴起始坐标
-
   static uint8_t list_ani = CONFIG_UI[LIST_ANI];
   static uint8_t com_scr = CONFIG_UI[COME_SCR];
 
@@ -45,7 +43,7 @@ void ListPage::render()
       cursorMoveUP(select - viewSize);
 
     CURSOR.min_width =
-        u8g2->getUTF8Width(view[select].m_select.c_str()) + LIST_TEXT_S * 2;
+        u8g2->getUTF8Width(view[select].m_select.c_str()) + LIST_TEXT_GAP * 2;
     this->draw_cursor();
   };
 
@@ -59,12 +57,14 @@ void ListPage::render()
     {
       // 绘制文本
       text_y_temp = text_y + LIST_LINE_H * i;
-      text_x_temp = text_x * (!com_scr ? (abs(gui->get_history()->select - i) + 1)
-                                       : (i + 1));
-      text_w_temp = text_x_temp + LIST_TEXT_W;
-
-      u8g2->setCursor(text_x_temp + LIST_TEXT_S, LIST_TEXT_S + LIST_TEXT_H + text_y_temp);
+      text_x_temp = text_x * (!com_scr
+                                  ? (abs(gui->get_history()->select - i) + 1)
+                                  : (i + 1));
+      // text_w_temp = text_x_temp + LIST_TEXT_W;
+      u8g2->setCursor(text_x_temp + LIST_TEXT_GAP,
+                      LIST_TEXT_GAP + LIST_TEXT_H + text_y_temp);
       u8g2->print(view[i].m_select.c_str());
+
       if (view[i].render_end)
         view[i].render_end(gui);
     }
@@ -157,7 +157,7 @@ void ListPage::cursorMoveUP(uint step)
       move();
 };
 
-gui_cb_fn_t ListPage::create_render_checxbox(check_box_handle_t &cbh)
+gui_cb_fn_t ListPage::create_render_checkbox(check_box_handle_t &cbh)
 {
   // 选择框变量
   static const uint8_t CB_U = 2;
@@ -167,6 +167,12 @@ gui_cb_fn_t ListPage::create_render_checxbox(check_box_handle_t &cbh)
 
   return [=](WouoUI *ui)
   {
+    auto text_w_temp =       // 元素起始点
+        gui->DISPLAY_WIDTH   // 屏幕宽度
+        + text_x_temp        // 文本横轴起始点，负数~0的值
+        - CB_W               // 内容宽度
+        - LIST_TEXT_GAP * 2; // 末尾留白
+
     // 外框
     u8g2->drawRFrame(text_w_temp, CB_U + text_y_temp, CB_W, CB_H, 0.5f);
     if (*cbh.target_val == cbh.value)

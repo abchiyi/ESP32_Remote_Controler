@@ -2,6 +2,7 @@
 #include <view/about.h>
 #include "tool.h"
 #include "radio.h"
+#include "setting_power.h"
 
 #define TAG "page setting"
 
@@ -21,22 +22,6 @@ private:
     return &CONFIG_UI[index];
   }
 
-  // 创建弹窗回调
-  gui_cb_fn_t pop_fn(const char title[], uint8_t *value, uint8_t max, uint8_t min, uint8_t step)
-  {
-    return [=](WouoUI *ui)
-    {
-      auto window_pt = new BaseWindow;
-      strcpy(window_pt->title, title);
-      window_pt->value = value;
-      window_pt->max = max;
-      window_pt->min = min;
-      window_pt->step = step;
-      ui->page_pop_window([=]()
-                          { return window_pt; });
-    };
-  };
-
 public:
   void create()
   {
@@ -45,56 +30,59 @@ public:
     radio_1.init(&radio_v, 1);
     radio_2.init(&radio_v, 2);
 
+    uint8_t aa = 100;
+
     this->view = {
         {"[ Setting ]", create_page_jump_fn()},
+        {"- [Power]", create_page_jump_fn(create_page_setting_power)},
 
         {"~ Disp Bri",
-         pop_fn("Disp Bri", get(DISP_BRI), 255, 0, 5),
-         create_render_content(get(DISP_BRI))},
+         pop_fn<uint8_t>("Disp Bri", get(DISP_BRI), 255, 0, 5),
+         create_render_content(*get(DISP_BRI))},
 
         {"~ Box X OS",
-         pop_fn("Box X OS", get(BOX_X_OS), 50, 0, 1),
-         create_render_content(get(BOX_X_OS))},
+         pop_fn<uint8_t>("Box X OS", get(BOX_X_OS), 50, 0, 1),
+         create_render_content(*get(BOX_X_OS))},
 
         {"~ Box Y OS",
-         pop_fn("Box Y OS", get(BOX_Y_OS), 50, 0, 1),
-         create_render_content(get(BOX_Y_OS))},
+         pop_fn<uint8_t>("Box Y OS", get(BOX_Y_OS), 50, 0, 1),
+         create_render_content(*get(BOX_Y_OS))},
 
         {"~ Win Y OS",
-         pop_fn("Win Y OS", get(WIN_Y_OS), 40, 0, 1),
-         create_render_content(get(WIN_Y_OS))},
+         pop_fn<uint8_t>("Win Y OS", get(WIN_Y_OS), 40, 0, 1),
+         create_render_content(*get(WIN_Y_OS))},
 
         {"~ List Ani",
-         pop_fn("List Ani", get(LIST_ANI), 255, 20, 1),
-         create_render_content(get(LIST_ANI))},
+         pop_fn<uint8_t>("List Ani", get(LIST_ANI), 255, 20, 1),
+         create_render_content(*get(LIST_ANI))},
 
         {"~ Win Ani",
-         pop_fn("Win Ani", get(WIN_ANI), 255, 20, 1),
-         create_render_content(get(WIN_ANI))},
+         pop_fn<uint8_t>("Win Ani", get(WIN_ANI), 255, 20, 1),
+         create_render_content(*get(WIN_ANI))},
 
         {"~ Fade Ani",
-         pop_fn("Fade Ani", get(FADE_ANI), 255, 0, 1),
-         create_render_content(get(FADE_ANI))},
+         pop_fn<uint8_t>("Fade Ani", get(FADE_ANI), 255, 0, 1),
+         create_render_content(*get(FADE_ANI))},
 
         {"~ Btn SPT",
-         pop_fn("Btn SPT", get(BTN_SPT), 255, 0, 1),
-         create_render_content(get(BTN_SPT))},
+         pop_fn<uint8_t>("Btn SPT", get(BTN_SPT), 255, 0, 1),
+         create_render_content(*get(BTN_SPT))},
 
         {"~ Btn LPT",
-         pop_fn("Btn LPT", get(BTN_LPT), 255, 0, 1),
-         create_render_content(get(BTN_LPT))},
+         pop_fn<uint8_t>("Btn LPT", get(BTN_LPT), 255, 0, 1),
+         create_render_content(*get(BTN_LPT))},
 
         {"+ Come Fm Scr",
          com_scr_c.check(),
-         create_render_checxbox(com_scr_c)},
+         create_render_checkbox(com_scr_c)},
 
-        {"= Raidio 1",
-         radio_1.chekc_radio(),
-         create_render_checxbox(radio_1)},
+        {"= Radio 1",
+         radio_1.check_radio(),
+         create_render_checkbox(radio_1)},
 
-        {"= Raidio 2",
-         radio_2.chekc_radio(),
-         create_render_checxbox(radio_2)},
+        {"= Radio 2",
+         radio_2.check_radio(),
+         create_render_checkbox(radio_2)},
 
         {"- Rest", [&](WouoUI *ui)
          {

@@ -276,6 +276,7 @@ void WouoUI::begin(U8G2 *u8g2)
 {
   // 设置屏幕指针
   this->u8g2 = u8g2;
+  this->u8g2->setBusClock(2000000);
   // 获取屏幕宽高
   this->DISPLAY_WIDTH = u8g2->getWidth();
   this->DISPLAY_HEIGHT = u8g2->getHeight();
@@ -405,7 +406,7 @@ bool BaseWindow::render()
   if (this->oper_flag)
   {
     this->oper_flag = false;
-    this->bar_x_trg = (float)(*this->value - this->min) / (float)(this->max - this->min) * (this->box_w_trg - 2 * WIN_TITLE_S);
+    // this->bar_x_trg = (float)(*this->value - this->min) / (float)(this->max - this->min) * (this->box_w_trg - 2 * WIN_TITLE_S);
   }
 
   uint8_t winAni = CONFIG_UI[WIN_ANI];
@@ -426,20 +427,6 @@ bool BaseWindow::render()
   // 绘制外框描边
   u8g2->setDrawColor(2);
   u8g2->drawFrame(this->box_x, this->box_y, this->box_w, this->box_h);
-
-  if (this->box_h > (WIN_TITLE_H + 2 * WIN_TITLE_S))
-  {
-    u8g2->setCursor(this->box_x + WIN_VALUE_S, this->box_y + WIN_TITLE_S + WIN_TITLE_H);
-    u8g2->print(*this->value); // 绘制数值
-
-    u8g2->setCursor(this->box_x + WIN_TITLE_S, this->box_y + WIN_TITLE_S + WIN_TITLE_H);
-
-    // 绘制标题
-    u8g2->print(this->title);
-
-    // 绘制进度条
-    u8g2->drawBox(this->box_x + WIN_TITLE_S, this->box_y + this->box_h - WIN_TITLE_S - WIN_BAR_H - 1, this->bar_x, WIN_BAR_H);
-  }
 
   // 在离场时更新的参数
   if (this->exit_flag)
@@ -465,14 +452,14 @@ void BaseWindow::onUserInput(event_t event)
 
   switch (event.key_id)
   {
-  case KEY_UP:
-    if (*this->value < this->max)
-      *this->value += this->step;
-    break;
-  case KEY_DOWN:
-    if (*this->value > this->min)
-      *this->value -= this->step;
-    break;
+  // case KEY_UP:
+  //   if (*this->value < this->max)
+  //     *this->value += this->step;
+  //   break;
+  // case KEY_DOWN:
+  //   if (*this->value > this->min)
+  //     *this->value -= this->step;
+  //   break;
   case KEY_BACK:
   case KEY_CONFIRM:
     this->leave();

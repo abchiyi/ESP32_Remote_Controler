@@ -1,0 +1,1 @@
+#define PIN_PMU_IRQ 17

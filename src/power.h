@@ -1,19 +1,13 @@
 
+#define XPOWERS_CHIP_AXP202
+#include "XPowersLib.h"
 class power
 {
 private:
   /* data */
 public:
-  power(/* args */);
-  ~power();
+  void begin();
 };
 
-power::power(/* args */)
-{
-}
-
-power::~power()
-{
-}
-
 extern power Power;
+extern XPowersPMU PMU;

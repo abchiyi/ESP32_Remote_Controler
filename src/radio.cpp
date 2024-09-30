@@ -284,9 +284,9 @@ void TaskRadioMainLoop(void *pt)
         break;
       [&]() // 向接收机发送数据
       {
-        RADIO.conected_before_send();
         radio_data_t data;
-        xQueueReceive(Q_DATA_SEND, &data, 1);
+        if (RADIO.cb_fn_before_send)
+          RADIO.cb_fn_before_send(data);
         RADIO.send(data); // 回传数据
       }();
 
@@ -294,9 +294,8 @@ void TaskRadioMainLoop(void *pt)
       {
         radio_data_t data;
         if (wait_response(RADIO.timeout_resend, &data))
-          ;
-        // if (xQueueSend(Q_DATA_RECV, &data, 2) == pdTRUE)
-        // xQueueReset(Q_DATA_RECV); // 2 Tick 后队列依然满->清空队列
+          if (RADIO.cb_fn_arfter_recve)
+            RADIO.cb_fn_arfter_recve(data);
       }();
 
       temp = xTaskGetTickCount();

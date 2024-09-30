@@ -6,11 +6,25 @@
 #include <view/setting_devces.h>
 #include "view/about.h"
 #include "WiFi.h"
+#include "tool.h"
 
 #define slider_width 6
 #define slider_length 45
 
 #define TAG "Main page"
+
+float VBUS_V;
+float CURREN_A;
+float POWER_W;
+
+void read_power_info(void *radio_data)
+{
+  auto data = *(radio_data_t *)radio_data;
+
+  VBUS_V = combineFloat(data.channel[0], data.channel[1]);
+  CURREN_A = combineFloat(data.channel[2], data.channel[3]);
+  POWER_W = combineFloat(data.channel[4], data.channel[5]);
+};
 
 class MainPage : public BasePage
 {
@@ -79,12 +93,14 @@ public:
 
     auto tick = xTaskGetTickCount();
     u8g2->setCursor(10, 10);
-    u8g2->printf("%d FPS", 1000 / (tick - last_run));
+    u8g2->printf("BAT %.2fV", VBUS_V);
     u8g2->setCursor(10, 20);
-    u8g2->printf("FQ %d ", RADIO.Frequency);
+    u8g2->printf("CUR %.2fA ", CURREN_A);
     u8g2->setCursor(10, 30);
-    u8g2->printf("Run time %d ", RADIO.run_time);
+    u8g2->printf("POWER %.2fW ", POWER_W);
     u8g2->setCursor(10, 40);
+    u8g2->printf("FQ %d ", RADIO.Frequency);
+    u8g2->setCursor(10, 50);
     u8g2->printf("RSSI %d ", RADIO.RSSI);
     last_run = tick;
 

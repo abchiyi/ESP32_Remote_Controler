@@ -55,7 +55,7 @@ public:
                      xTimerStop(xTimer, 5);
                      RADIO.connect_to(&ap);
                  },
-                 create_render_content(&ap.RSSI)});
+                 create_render_content(ap.RSSI)});
         }
 
         ListPage::render();

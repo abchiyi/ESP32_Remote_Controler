@@ -8,8 +8,6 @@ enum break_key
   BRAKE_RT
 };
 
-radio_data_t data_to_send;
-
 /**
  * @brief 输出一个高低位合并的数值
  * @param value1 12bit特数值
@@ -87,15 +85,13 @@ void set_channel(radio_data_t *data)
 
   data->channel[0] = (value << 4) | (gear << 2) | brake;
   data->channel[1] = set_combined_int(Controller.joyLHori, gear);
-}
-
-void task_controll_main()
-{
-  set_channel(&data_to_send);
-  RADIO.set_data(&data_to_send);
+  data->channel[2] = set_combined_int(Controller.joyLVert, gear);
 }
 
 void car_controll_start()
 {
-  RADIO.conected_before_send = task_controll_main;
+  RADIO.cb_fn_before_send = [&](radio_data_t &data)
+  {
+    set_channel(&data);
+  };
 }
