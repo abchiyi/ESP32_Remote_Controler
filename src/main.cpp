@@ -45,8 +45,6 @@
 // U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, CS, DC, RES);
 U8G2_SH1107_PIMORONI_128X128_F_4W_HW_SPI u8g2(U8G2_R2, CS, DC, RES);
 
-WouoUI WOUO_UI(&u8g2); // 定义gui对象
-
 // 按键变量
 struct
 {
@@ -163,8 +161,9 @@ void setup()
   car_controll_start();
 
   /** GUI **/
-  WOUO_UI.setDefaultPage(create_page_main);
   WOUO_UI.begin(&u8g2);
+
+  WOUO_UI.setDefaultPage(create_page_main);
   u8g2.setContrast(255);
 
   /** 无线 **/

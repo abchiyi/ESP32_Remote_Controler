@@ -7,14 +7,19 @@
 #pragma once
 
 class WouoUI;
+extern WouoUI WOUO_UI;
 
+// TODO 重新设计交互触发事件标志
 typedef enum key_id
 {
   KEY_UP = 1,  // 上翻
   KEY_DOWN,    // 下翻
   KEY_CONFIRM, // 确认
   KEY_BACK,    // 返回
-  KEY_MENU     // 菜单
+  KEY_MENU,    // 菜单
+
+  KEY_DOWN, // 有按钮按下
+  KEY_UP,   // 有按钮释放
 } key_id_t;
 
 typedef struct Event
@@ -360,12 +365,6 @@ public:
   };
 
   uint8_t state = STATE_LAYER_IN; // 页面绘制状态
-  WouoUI(U8G2 *u8g2) : u8g2(u8g2)
-  {
-    // 获取屏幕宽高
-    this->DISPLAY_WIDTH = u8g2->getWidth();
-    this->DISPLAY_HEIGHT = u8g2->getHeight();
-  };
 
   uint16_t DISPLAY_HEIGHT; // 屏幕高度 pix
   uint16_t DISPLAY_WIDTH;  // 屏幕宽度 pix

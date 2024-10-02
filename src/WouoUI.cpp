@@ -44,6 +44,8 @@
 
 #define TAG "WouUI"
 
+WouoUI WOUO_UI; // 定义gui对象
+
 BOX BasePage::CURSOR; // 声明静态 box 对象;
 
 uint8_t CONFIG_UI[UI_PARAM] = {
@@ -272,8 +274,46 @@ void WouoUI::uiUpdate()
   }
 }
 
+TimerHandle_t xTimer_GUI_SLEEP;
+
+#include "view/sleep.h"
+
+// 睡眠定时器回调
+void sleep_cb(TimerHandle_t timer)
+{
+  ESP_LOGI(TAG, "Sleep");
+  WOUO_UI.page_in_to(page_sleep);
+};
+
 void WouoUI::begin(U8G2 *u8g2)
 {
+
+  // 设置屏幕休眠
+  xTimer_GUI_SLEEP = xTimerCreate(
+      "timer screen sleep", // 定时器名称
+      pdMS_TO_TICKS(30000), // 定时器周期（以系统节拍为单位）
+      pdFALSE,              // pdTrue自动重载（周期性定时器）
+      (void *)0,            // 定时器ID
+      sleep_cb              // 回调函数
+  );
+
+  if (xTimer_GUI_SLEEP == NULL)
+  {
+    // 定时器创建失败
+    printf("Timer creation failed!\n");
+  }
+  else
+  {
+    // 定时器创建成功
+    if (xTimerStart(xTimer_GUI_SLEEP, 0) != pdPASS)
+    {
+      // 定时器启动失败
+      printf("Timer start failed!\n");
+    }
+  }
+
+  xTimerStart(xTimer_GUI_SLEEP, 10);
+
   // 设置屏幕指针
   this->u8g2 = u8g2;
   this->u8g2->setBusClock(2000000);

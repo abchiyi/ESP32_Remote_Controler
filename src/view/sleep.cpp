@@ -6,12 +6,7 @@ class Sleep : public BasePage
 public:
   void before()
   {
-
     this->u8g2->setPowerSave(1); // 关闭屏幕
-    // if (eeprom.change)
-    // {
-    //   eeprom.change = false;
-    // }
   }
 
   void onUserInput(int8_t btnID)
@@ -43,3 +38,8 @@ public:
 };
 
 BasePage *P_SLEEP = new Sleep;
+
+BasePage *page_sleep()
+{
+  return new Sleep;
+}
