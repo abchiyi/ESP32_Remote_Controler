@@ -5,8 +5,9 @@
 #include <radio.h>
 #include "FreeRTOS.h"
 
+#include "pins.h"
+
 #define TAG "Controller"
-#define UsbHostShellRestPin 16
 USB Usb;
 XBOXONE Xbox(&Usb);
 CONTROLLER Controller;
@@ -15,8 +16,9 @@ CONTROLLER Controller;
 void usbInit()
 {
   ESP_LOGI(TAG, "Usb init");
-  pinMode(UsbHostShellRestPin, OUTPUT);
-  digitalWrite(UsbHostShellRestPin, HIGH);
+  pinMode(PIN_USB_HOST_SHELL_REST, OUTPUT);
+  digitalWrite(PIN_USB_HOST_SHELL_REST, HIGH);
+
   static int counter = 0;
   if (Usb.Init() == -1)
   {

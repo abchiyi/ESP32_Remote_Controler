@@ -1,0 +1,1 @@
+void hid_begin();

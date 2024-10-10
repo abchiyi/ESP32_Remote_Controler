@@ -28,3 +28,6 @@ void splitFloat(float a, uint16_t *pa1, uint16_t *pa2);
 
 // 将两个16位的无符号整数组合成原始的32位浮点数
 float combineFloat(uint16_t pa1, uint16_t pa2);
+
+// 过滤摇杆输出到-2048~2047;
+int16_t analogHatFilter(int16_t value);

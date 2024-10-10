@@ -28,3 +28,25 @@ float combineFloat(uint16_t pa1, uint16_t pa2)
   uint32_t p = ((uint32_t)pa1 << 16) | (uint32_t)pa2;
   return *((float *)(&p));
 }
+
+#include "XBOXONE.h"
+// 0 ~ 2047
+#define DEAD_ZONE 8000.0F
+const int maxLength = 32768;
+const int resolution = 2048;
+
+const float_t step = (float_t)(maxLength - DEAD_ZONE) / (float_t)resolution;
+
+int16_t analogHatFilter(int16_t value)
+{
+  // 计算除去死区后摇杆的值
+  const int16_t t_from = value < 0
+                             ? value - -DEAD_ZONE
+                             : value - DEAD_ZONE;
+
+  int16_t toValue = value < (DEAD_ZONE * -1) || value > DEAD_ZONE
+                        ? (float_t)t_from / step
+                        : 0;
+
+  return toValue < -2048 ? -2048 : toValue;
+}

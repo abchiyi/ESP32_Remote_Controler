@@ -305,14 +305,7 @@ void WouoUI::begin(U8G2 *u8g2)
   else
   {
     // 定时器创建成功
-    if (xTimerStart(xTimer_GUI_SLEEP, 0) != pdPASS)
-    {
-      // 定时器启动失败
-      printf("Timer start failed!\n");
-    }
   }
-
-  xTimerStart(xTimer_GUI_SLEEP, 10);
 
   // 设置屏幕指针
   this->u8g2 = u8g2;

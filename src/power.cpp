@@ -56,6 +56,7 @@ void power::begin()
   PMU.enableExternalPin();
 
   ESP_LOGI(TAG, "EXTERN ON %d", PMU.isEnableExternalPin());
+  ESP_LOGI(TAG, "BTE V  %d", PMU.getBattVoltage());
 
   ESP_LOGI(TAG,
            "DCDC=======================================================================");

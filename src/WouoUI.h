@@ -17,9 +17,6 @@ typedef enum key_id
   KEY_CONFIRM, // 确认
   KEY_BACK,    // 返回
   KEY_MENU,    // 菜单
-
-  KEY_DOWN, // 有按钮按下
-  KEY_UP,   // 有按钮释放
 } key_id_t;
 
 typedef struct Event
