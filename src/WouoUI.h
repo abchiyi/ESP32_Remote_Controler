@@ -17,6 +17,7 @@ typedef enum key_id
   KEY_CONFIRM, // 确认
   KEY_BACK,    // 返回
   KEY_MENU,    // 菜单
+  KEY_WAKE     // 唤醒
 } key_id_t;
 
 typedef struct Event
@@ -334,7 +335,10 @@ private:
   uint16_t buf_len;
   uint8_t *buf_ptr;
 
-  std::vector<History> history; // 页面路由
+  TimerHandle_t xTimer_GUI_SLEEP; // GUI休眠定时器
+  std::vector<History> history;   // 页面路由
+
+  //
 
   void layer_in();
   void oled_init();
@@ -347,10 +351,13 @@ private:
   QueueHandle_t Q_Event = xQueueCreate(10, sizeof(event_t));
 
 public:
+  uint8_t state = STATE_LAYER_IN; // 页面绘制状态
+  uint16_t DISPLAY_HEIGHT;        // 屏幕高度 pix
+  uint16_t DISPLAY_WIDTH;         // 屏幕宽度 pix
+
   // 发送event
   void dispatch_event(event_t event)
   {
-    // TODO 配置事件发送等待时间
     xQueueSend(Q_Event, &event, 10);
   };
 
@@ -361,12 +368,14 @@ public:
     return this;
   };
 
-  uint8_t state = STATE_LAYER_IN; // 页面绘制状态
+  // 获取顶部窗口
+  BaseWindow *get_top_window()
+  {
+    auto windows = this->get_history()->windows;
+    return windows[windows.size() - 1];
+  };
 
-  uint16_t DISPLAY_HEIGHT; // 屏幕高度 pix
-  uint16_t DISPLAY_WIDTH;  // 屏幕宽度 pix
-
-  void page_pop_window(create_window_fn_t cb_fn)
+  void page_pop_window(create_window_fn_t cb_fn) // 弹出窗口
   {
     auto page = get_history();
     auto window = cb_fn();
@@ -374,21 +383,15 @@ public:
     window->u8g2 = u8g2;
     page->windows.push_back(window);
     window->before();
-  }
-
-  BaseWindow *windows_top()
-  {
-    auto windows = this->get_history()->windows;
-    return windows[windows.size() - 1];
   };
-
-  void page_in_to(create_page_fn_t);
-  void page_back();
-  void pageSwitch(BasePage *);
-
-  void setDefaultPage(create_page_fn_t);
-  void uiUpdate();
-  void begin(U8G2 *u8g2);
+  void gui_sleep();                      // GUI进入睡眠
+  void gui_awake();                      // 唤醒GUI
+  void page_in_to(create_page_fn_t);     // 进入页面
+  void page_back();                      // 退出页面，返回到上一页
+  void pageSwitch(BasePage *);           // 切换页面
+  void setDefaultPage(create_page_fn_t); // 设置主页面
+  void uiUpdate();                       // 归刷
+  void begin(U8G2 *u8g2);                // 启动GUI
 
   /*
    * @brief 获取历史路由

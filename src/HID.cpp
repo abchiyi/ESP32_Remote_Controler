@@ -15,7 +15,13 @@ struct listener
   key_id event_id_sub;    // 触发事件标识
 
   virtual void update() = 0;
-  virtual void sendEvent() = 0;
+
+  virtual void sendEvent()
+  {
+    WOUO_UI.dispatch_event(Event(event_id));
+    WOUO_UI.dispatch_event(Event(KEY_WAKE));
+    send_count++;
+  };
 };
 
 struct listenerButton : public listener
@@ -26,12 +32,6 @@ struct listenerButton : public listener
   {
     this->event_id = event_id;
     this->key = key;
-  };
-
-  void sendEvent() override
-  {
-    WOUO_UI.dispatch_event(Event(event_id));
-    send_count++;
   };
 
   void update() override
@@ -81,15 +81,9 @@ struct listenerJoystick : public listener
   void sendEvent() override
   {
     if (joy_is_up)
-    {
-      ESP_LOGI(TAG, "send1");
       WOUO_UI.dispatch_event(Event(event_id));
-    }
     else
-    {
-      ESP_LOGI(TAG, "send2");
       WOUO_UI.dispatch_event(Event(event_id_sub));
-    }
   };
 
   void update() override
@@ -97,8 +91,8 @@ struct listenerJoystick : public listener
     // XXX 该实现需要修正
     int btn_LPT = 100;
     int btn_SPT = 15;
-    // btn_LPT = CONFIG_UI[BTN_LPT];
-    // btn_SPT = CONFIG_UI[BTN_SPT];
+    btn_LPT = CONFIG_UI[BTN_LPT];
+    btn_SPT = CONFIG_UI[BTN_SPT];
     auto analogHatStatus = analogHatFilter(Xbox.getAnalogHat(key));
     int hold_time = btn_LPT;
     hold_time = btn_LPT * (1.0f - (abs((float)analogHatStatus) / 2048.0f));
@@ -114,34 +108,44 @@ struct listenerJoystick : public listener
     }
     // 根据按压时间决定发出事件
     if (press_count >= btn_SPT)
-    {
-      ESP_LOGI(TAG, "AnalogHat %d, hold time %d", analogHatStatus, hold_time);
-
       this->sendEvent();
-    }
   }
 };
+
+// 绑定按键到GUI事件
+std::vector<std::tuple<ButtonEnum, key_id>> button = {
+    {START, KEY_MENU},
+    {DOWN, KEY_DOWN},
+    {A, KEY_CONFIRM},
+    {B, KEY_BACK},
+    {UP, KEY_UP},
+};
+
+std::vector<std::tuple<AnalogHatEnum, key_id, key_id>> joystick = {
+    {LeftHatY, KEY_UP, KEY_DOWN}};
 
 std::vector<listener *> listeners;
-
-void task_hid(void *pt)
-{
-  TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
-  const TickType_t xFrequency = pdMS_TO_TICKS(8); // 设置采样率 250hz
-  while (true)
-  {
-    for (auto &listener : listeners)
-      listener->update();
-    // xTaskDelayUntil(&xLastWakeTime, xFrequency);
-    vTaskDelay(8);
-  }
-};
-
 void hid_begin()
 {
-  listeners.push_back(new listenerButton(UP, KEY_UP));
-  listeners.push_back(new listenerButton(DOWN, KEY_DOWN));
-  listeners.push_back(new listenerButton(START, KEY_MENU));
-  listeners.push_back(new listenerJoystick(LeftHatY, KEY_UP, KEY_DOWN));
+
+  // 注册监听器
+  for (const auto &[button, event_id] : button)
+    listeners.push_back(new listenerButton(button, event_id));
+
+  for (const auto &[joystick, event_id, event_id_sub] : joystick)
+    listeners.push_back(new listenerJoystick(joystick, event_id, event_id_sub));
+
+  auto task_hid = [](void *pt)
+  {
+    TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
+    const TickType_t xFrequency = pdMS_TO_TICKS(8); // 设置采样率 250hz
+    while (true)
+    {
+      for (auto &listener : listeners)
+        listener->update();
+      xTaskDelayUntil(&xLastWakeTime, xFrequency);
+    }
+  };
+
   xTaskCreate(task_hid, "task_hid", 1024 * 3, NULL, 1, NULL);
 }

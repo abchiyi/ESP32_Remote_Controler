@@ -13,9 +13,10 @@ void ListPage::create()
       ->add_event_listener(KEY_DOWN, [&]()
                            { cursorMoveDOWN(); })
       ->add_event_listener(KEY_BACK, [&]()
-                           { 
-            auto fn = view[0].cb_fn; 
-           if(fn)fn(gui); })
+                           {
+                             auto fn = view[0].cb_fn;
+                             if (fn)
+                               fn(gui); })
       ->add_event_listener(KEY_CONFIRM, [&]
                            {
    if (this->view[select].cb_fn)

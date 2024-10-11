@@ -43,6 +43,7 @@
 #include <esp_log.h>
 
 #define TAG "WouUI"
+constexpr TickType_t FRAME_SPACING = 13; // ms,每刷新一帧的间隔
 
 WouoUI WOUO_UI; // 定义gui对象
 
@@ -70,6 +71,26 @@ gui_cb_fn_t create_page_jump_fn(create_page_fn_t cb_fn)
         : ui->page_back();
   };
 };
+
+// 渐近动画
+void animation(float *a, float *a_trg, uint8_t n)
+{
+  if (!n)
+    *a = *a_trg;
+
+  if (*a != *a_trg)
+  {
+    if (fabs(*a - *a_trg) < 0.15f)
+      *a = *a_trg;
+    else
+      *a += (*a_trg - *a) / (n / 10.0f);
+  }
+}
+
+void animation(float *a, float a_trg, uint8_t n)
+{
+  animation(a, &a_trg, n);
+}
 
 /* ----------------- Wouo UI ----------------- */
 
@@ -192,25 +213,18 @@ void WouoUI::fade()
   fade++;
 }
 
-// 渐近动画
-void animation(float *a, float *a_trg, uint8_t n)
+void WouoUI::gui_sleep()
 {
-  if (!n)
-    *a = *a_trg;
+  this->u8g2->setPowerSave(1);            // 关闭屏幕
+  xTimerStop(this->xTimer_GUI_SLEEP, 10); // 停止定时器
+};
 
-  if (*a != *a_trg)
-  {
-    if (fabs(*a - *a_trg) < 0.15f)
-      *a = *a_trg;
-    else
-      *a += (*a_trg - *a) / (n / 10.0f);
-  }
-}
-
-void animation(float *a, float a_trg, uint8_t n)
+void WouoUI::gui_awake()
 {
-  animation(a, &a_trg, n);
-}
+  u8g2->setPowerSave(0);                   // 开启屏幕
+  this->page_back();                       // 退出睡眠页
+  xTimerStart(this->xTimer_GUI_SLEEP, 10); // 重置定时器
+};
 
 // OLED初始化函数
 void WouoUI::oled_init()
@@ -223,6 +237,9 @@ void WouoUI::oled_init()
   this->buf_len =
       8 * this->u8g2->getBufferTileHeight() * this->u8g2->getBufferTileWidth();
   this->u8g2->setContrast(CONFIG_UI[DISP_BRI]);
+
+  this->DISPLAY_WIDTH = u8g2->getWidth();
+  this->DISPLAY_HEIGHT = u8g2->getHeight();
 }
 
 // 设置默认页面
@@ -265,7 +282,7 @@ void WouoUI::uiUpdate()
     if (xQueueReceive(Q_Event, &event, 2) == pdTRUE)
     {
       if (page->windows.size()) // 当有窗口显示时，顶部窗口接管按键
-        windows_top()->onUserInput(event);
+        get_top_window()->onUserInput(event);
       else
         for (auto on : page->eventListeners)
           if (event.key_id == on.key)
@@ -274,11 +291,8 @@ void WouoUI::uiUpdate()
   }
 }
 
-TimerHandle_t xTimer_GUI_SLEEP;
-
-#include "view/sleep.h"
-
 // 睡眠定时器回调
+#include "view/sleep.h"
 void sleep_cb(TimerHandle_t timer)
 {
   ESP_LOGI(TAG, "Sleep");
@@ -287,45 +301,38 @@ void sleep_cb(TimerHandle_t timer)
 
 void WouoUI::begin(U8G2 *u8g2)
 {
+  // 初始化显示屏
+  this->u8g2 = u8g2;
+  this->oled_init();
 
-  // 设置屏幕休眠
+  // 配置休眠定时器
   xTimer_GUI_SLEEP = xTimerCreate(
       "timer screen sleep", // 定时器名称
-      pdMS_TO_TICKS(30000), // 定时器周期（以系统节拍为单位）
-      pdFALSE,              // pdTrue自动重载（周期性定时器）
+      // TODO 再GUI变量中定义休眠延迟时间
+      pdMS_TO_TICKS(60000), // 定时器周期（以系统节拍为单位）
+      pdTRUE,               // pdTrue自动重载（周期性定时器）
       (void *)0,            // 定时器ID
       sleep_cb              // 回调函数
   );
 
   if (xTimer_GUI_SLEEP == NULL)
   {
-    // 定时器创建失败
-    printf("Timer creation failed!\n");
+    ESP_LOGE(TAG, "xTimer_GUI_SLEEP creation failed!");
+    for (;;) //  报告错误并停止程序
+      ;
   }
   else
-  {
-    // 定时器创建成功
-  }
-
-  // 设置屏幕指针
-  this->u8g2 = u8g2;
-  this->u8g2->setBusClock(2000000);
-  // 获取屏幕宽高
-  this->DISPLAY_WIDTH = u8g2->getWidth();
-  this->DISPLAY_HEIGHT = u8g2->getHeight();
-
-  this->oled_init();
+    xTimerStart(xTimer_GUI_SLEEP, 10);
 
   // 设置屏幕刷新任务
   auto taskUpdate = [](void *pt)
   {
-    const TickType_t xFreequency = 13; // 渲染一帧间隔 /ms
     TickType_t xLastWakeTime = xTaskGetTickCount();
     WouoUI *gui = (WouoUI *)pt;
     while (true)
     {
       gui->uiUpdate();
-      vTaskDelayUntil(&xLastWakeTime, xFreequency);
+      vTaskDelayUntil(&xLastWakeTime, FRAME_SPACING);
     }
   };
   xTaskCreatePinnedToCore(taskUpdate, "WouoUI gui update", 1024 * 20, (void *)this, 1, NULL, 1);
