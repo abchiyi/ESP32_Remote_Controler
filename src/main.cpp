@@ -4,10 +4,7 @@
 #include "EEPROM.h"
 #include "pins_arduino.h"
 // 无线依赖
-#include <esp_now.h>
-#include <esp_wifi.h>
 #include <radio.h>
-#include <WiFi.h>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -44,7 +41,7 @@
 
 // Screen
 // U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, CS, DC, RES);
-U8G2_SH1107_PIMORONI_128X128_F_4W_HW_SPI u8g2(U8G2_R0, CS, DC, RES);
+U8G2_SH1107_PIMORONI_128X128_F_4W_HW_SPI u8g2(U8G2_R3, CS, DC, RES);
 
 // 按键变量
 struct
@@ -77,7 +74,7 @@ void setup()
   Controller.begin();
 
   /** 控制输出 **/
-  car_controll_start();
+  // car_control_start();
 
   hid_begin();
 
@@ -99,7 +96,7 @@ void setup()
   // pinMode(0, INPUT_PULLUP);
   // attachInterrupt(digitalPinToInterrupt(0), ISR, RISING);
 
-  vTaskDelete(NULL); // 干掉 loopTask
+  // vTaskDelete(NULL); // 干掉 loopTask
 }
 
 void loop()

@@ -1,4 +1,6 @@
-#include <radio.h>
+
+#include "./radio.h"
+
 #include <WiFi.h>
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
@@ -8,20 +10,20 @@
 #include <esp_err.h>
 #include <cstring>
 #include <esp_mac.h>
-#include "tool.h"
+#include <tool.h>
 
 #define TAG "Radio"
 
 /******** 储存配置命名 ********/
-#define STORGE_NAME_SPACE "RADIO_CONFIG" // 储存命名空间
-#define STORGE_LAST_DEVICE "SLD"         // 最后连接的设备
-#define STORGE_ALL_DEVICES "SAD"         // 配对过的设备
+#define STORAGE_NAME_SPACE "RADIO_CONFIG" // 储存命名空间
+#define STORAGE_LAST_DEVICE "SLD"         // 最后连接的设备
+#define STORAGE_ALL_DEVICES "SAD"         // 配对过的设备
 
 /**
  * AP扫描关键字
  *使用该字作为SSID起始将被视为一个可配对的设备
  * */
-#define SLAVE_KE_NAME "Slave"
+#define SLAVE_KE_NAME "ESP"
 
 Radio RADIO;
 
@@ -183,8 +185,8 @@ void onRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
 {
   if (incomingData == nullptr)
     return;
-  radio_data_t data;
-  memcpy(&data, incomingData, sizeof(data));
+  radio_data_t data;                         // 定义数据结构体
+  memcpy(&data, incomingData, sizeof(data)); // 复制内存到结构体
   memcpy(&data.mac_addr, mac, sizeof(data.mac_addr));
 
   if (xQueueSend(Q_RECV_DATA, &data, 1) != pdPASS)
@@ -465,7 +467,7 @@ void initRadio()
 {
   // set wifi
   ESP_LOGI(TAG, "Init wifi");
-  WiFi.enableLongRange(true);
+  // WiFi.enableLongRange(true);
   // esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_LR);
   // esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_LR);
 
@@ -514,16 +516,16 @@ void Radio::begin()
 {
   initRadio();
   // 读取配置
-  nvs_call(STORGE_NAME_SPACE, [&](Preferences &prefs)
+  nvs_call(STORAGE_NAME_SPACE, [&](Preferences &prefs)
            {
              prefs
              .getBytes(
-              STORGE_ALL_DEVICES,
+              STORAGE_ALL_DEVICES,
                &paired_devices,
                 sizeof(paired_devices));
              prefs
              .getBytes(
-              STORGE_LAST_DEVICE,
+              STORAGE_LAST_DEVICE,
                &last_connected_device,
                 sizeof(mac_t)); });
 
@@ -604,14 +606,14 @@ esp_err_t Radio::scan_ap()
 void Radio::confgi_save()
 {
   ESP_LOGI(TAG, "Save confgi");
-  nvs_call(STORGE_NAME_SPACE, [&](Preferences &prefs)
+  nvs_call(STORAGE_NAME_SPACE, [&](Preferences &prefs)
            {
              prefs.putBytes(
-              STORGE_LAST_DEVICE, 
+              STORAGE_LAST_DEVICE, 
               &last_connected_device,
                sizeof(mac_t));
              prefs.putBytes(
-              STORGE_ALL_DEVICES,
+              STORAGE_ALL_DEVICES,
                &paired_devices, 
                sizeof(paired_devices)); });
 };
@@ -619,7 +621,7 @@ void Radio::confgi_save()
 void Radio::config_clear()
 {
   ESP_LOGI(TAG, "Clear confgi");
-  nvs_call(STORGE_NAME_SPACE, [](Preferences &prefs)
+  nvs_call(STORAGE_NAME_SPACE, [](Preferences &prefs)
            { prefs.clear(); });
 }
 

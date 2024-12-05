@@ -5,7 +5,6 @@
 #include <car.h>
 #include <view/setting_devces.h>
 #include "view/about.h"
-#include "WiFi.h"
 #include "tool.h"
 
 #define slider_width 6

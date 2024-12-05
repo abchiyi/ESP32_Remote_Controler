@@ -236,7 +236,7 @@ protected:
   void draw_cursor()
   {
     CURSOR.x = cursor_position_x;
-    CURSOR.y = cursor_position_y;
+    CURSOR.y = cursor_position_y + LIST_LINE_H;
 
     animation(&CURSOR.width, &CURSOR.min_width, CURSOR.transition);
     animation(&CURSOR.height, &CURSOR.min_height, CURSOR.transition);
@@ -278,11 +278,7 @@ public:
 
   // 页面绘制函数， 必须被子类覆盖
   virtual void render() = 0;
-
-  void __base_render()
-  {
-    render();
-  }
+  void __base_render();
 
   /**
    * @brief 绘制一个轴向的进度条

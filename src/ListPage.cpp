@@ -13,15 +13,12 @@ void ListPage::create()
       ->add_event_listener(KEY_DOWN, [&]()
                            { cursorMoveDOWN(); })
       ->add_event_listener(KEY_BACK, [&]()
-                           {
-                             auto fn = view[0].cb_fn;
+                           {  auto fn = view[0].cb_fn;
                              if (fn)
                                fn(gui); })
       ->add_event_listener(KEY_CONFIRM, [&]
-                           {
-   if (this->view[select].cb_fn)
-            this->view[select].cb_fn(gui);
-          setCursorOS(CONFIG_UI[BOX_X_OS]); });
+                           {  if (this->view[select].cb_fn)
+            this->view[select].cb_fn(gui);     setCursorOS(CONFIG_UI[BOX_X_OS]); });
 };
 
 void ListPage::render()
@@ -57,7 +54,7 @@ void ListPage::render()
     for (int i = 0; i < length; ++i)
     {
       // 绘制文本
-      text_y_temp = text_y + LIST_LINE_H * i;
+      text_y_temp = text_y + LIST_LINE_H * i + LIST_LINE_H;
       text_x_temp = text_x * (!com_scr
                                   ? (abs(gui->get_history()->select - i) + 1)
                                   : (i + 1));
@@ -112,7 +109,7 @@ void ListPage::cursorMoveDOWN(uint step)
       setCursorOS(box_x_os, CONFIG_UI[BOX_Y_OS]); // 光标轮廓扩大
       select += 1;                                // 选中行数下移一位
       // 光标到达屏幕底部
-      cursor_position_y < (gui->DISPLAY_HEIGHT - LIST_LINE_H)
+      cursor_position_y < (gui->DISPLAY_HEIGHT - LIST_LINE_H - LIST_LINE_H)
           ? cursor_position_y += LIST_LINE_H // 下移光标
           : text_y_trg -= LIST_LINE_H;       // 上翻列表
     }

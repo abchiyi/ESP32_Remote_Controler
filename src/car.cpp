@@ -88,7 +88,7 @@ void set_channel(radio_data_t *data)
   data->channel[2] = set_combined_int(Controller.joyLVert, gear);
 }
 
-void car_controll_start()
+void car_control_start()
 {
   RADIO.cb_fn_before_send = [&](radio_data_t &data)
   {

@@ -38,16 +38,13 @@
 */
 #include <SPI.h>
 #include <WouoUI.h>
-#include <cstdlib> // 或者 #include <stdlib.h>
-
+#include <cstdlib>
 #include <esp_log.h>
 
 #define TAG "WouUI"
 constexpr TickType_t FRAME_SPACING = 13; // ms,每刷新一帧的间隔
-
-WouoUI WOUO_UI; // 定义gui对象
-
-BOX BasePage::CURSOR; // 声明静态 box 对象;
+WouoUI WOUO_UI;                          // 定义gui对象
+BOX BasePage::CURSOR;                    // 声明静态 box 对象;
 
 uint8_t CONFIG_UI[UI_PARAM] = {
     255, // DISP_BRI
@@ -309,10 +306,10 @@ void WouoUI::begin(U8G2 *u8g2)
   xTimer_GUI_SLEEP = xTimerCreate(
       "timer screen sleep", // 定时器名称
       // TODO 再GUI变量中定义休眠延迟时间
-      pdMS_TO_TICKS(60000), // 定时器周期（以系统节拍为单位）
-      pdTRUE,               // pdTrue自动重载（周期性定时器）
-      (void *)0,            // 定时器ID
-      sleep_cb              // 回调函数
+      pdMS_TO_TICKS(60000 * 10), // 定时器周期（以系统节拍为单位）
+      pdTRUE,                    // pdTrue自动重载（周期性定时器）
+      (void *)0,                 // 定时器ID
+      sleep_cb                   // 回调函数
   );
 
   if (xTimer_GUI_SLEEP == NULL)
@@ -338,7 +335,13 @@ void WouoUI::begin(U8G2 *u8g2)
   xTaskCreatePinnedToCore(taskUpdate, "WouoUI gui update", 1024 * 20, (void *)this, 1, NULL, 1);
 }
 
+#include "view/herder.h"
 /* ----------------- Base Page ----------------- */
+void BasePage::__base_render()
+{
+  this->render();
+  render_header(this);
+};
 
 void BasePage::draw_slider_y(float progress,
                              uint8_t x, uint8_t y, uint8_t width,

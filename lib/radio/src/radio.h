@@ -4,6 +4,16 @@
 #include <vector>
 #include <array>
 
+// 32 bytes is enough for CRTP packets (30+1) + checksum 1
+#define WIFI_RX_TX_PACKET_SIZE (32)
+
+/* Structure used for in/out data via USB */
+typedef struct
+{
+  uint8_t size;
+  uint8_t data[WIFI_RX_TX_PACKET_SIZE];
+} UDPPacket;
+
 #define MAX_CHANNEL 8         // 最大控制通道数量
 #define MAX_DEVICES_NUMBER 10 // 最大储存已配对设备
 

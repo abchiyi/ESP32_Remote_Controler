@@ -28,17 +28,37 @@ public:
     // com_scr_c.init(&CONFIG_UI[COME_SCR]);
     // radio_1.init(&radio_v, 1);
     // radio_2.init(&radio_v, 2);
+    std::string rendered_content = std::to_string(
+        static_cast<int>(PMU.getBattVoltage() / 10) / 100.0);
 
     this->view = {
         {"[ Power ]", create_page_jump_fn()},
-
-        {"~ Disp Bri",
-         pop_fn<uint8_t>("Disp Bri", &aa, 255, 0, 5),
-         create_render_content(aa)},
-
-        {"~ Dc3 sysV",
-         pop_fn<float>("DC3 V", &DC3, 255, 0, 5),
-         create_render_content(result)}};
+        {
+            "~ Dc3 sysV",
+            pop_fn<float>("DC3 V", &DC3, 255, 0, 5),
+            create_render_content(result),
+        },
+        {
+            "~ battery %",
+            NULL,
+            create_render_content(String(PMU.getBatteryPercent()) + "%"),
+        },
+        {
+            "~ bat vot",
+            NULL,
+            create_render_content(String(PMU.getBattVoltage() / 1000.0f) + "v"),
+        },
+        {
+            "~ bat is charging",
+            NULL,
+            create_render_content(PMU.isCharging() ? "yes" : "no"),
+        },
+        {
+            "~ bat c cur",
+            NULL,
+            create_render_content(String(PMU.getBatteryChargeCurrent() / 1000) + "a"),
+        },
+    };
   };
 
   void leave()

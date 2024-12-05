@@ -1,1 +1,1 @@
-void car_controll_start();
+void car_control_start();
