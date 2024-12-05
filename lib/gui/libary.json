@@ -1,0 +1,5 @@
+{
+  "name": "Gui",
+  "expo": ["src/*"],
+  "headers": ["gui.h"]
+}

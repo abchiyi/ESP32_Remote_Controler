@@ -6,6 +6,7 @@
 #include <view/setting_devces.h>
 #include "view/about.h"
 #include "tool.h"
+#include "WiFi.h"
 
 #define slider_width 6
 #define slider_length 45
@@ -106,7 +107,10 @@ public:
     this->render_channel_view();
     // 连接状态
     u8g2->setCursor((gui->DISPLAY_WIDTH - 6 * 5) / 2, gui->DISPLAY_HEIGHT);
-    u8g2->printf("< %s >", RADIO.status == RADIO_CONNECTED
+    // u8g2->printf("< %s >", RADIO.status == RADIO_CONNECTED
+    //                            ? "="
+    //                            : "x");
+    u8g2->printf("< %s >", WiFi.isConnected()
                                ? "="
                                : "x");
   };
