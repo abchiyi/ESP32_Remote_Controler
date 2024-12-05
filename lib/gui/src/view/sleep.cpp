@@ -1,5 +1,4 @@
 #include <view/sleep.h>
-#include <view/menu.h>
 
 class Sleep : public BasePage
 {
