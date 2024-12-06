@@ -1,5 +1,8 @@
 {
   "name": "Gui",
   "expo": ["src/*"],
-  "headers": ["gui.h"]
+  "headers": ["gui.h"],
+  "dependencies": {
+    "olikraus/U8g2": "^2.35.19"
+  }
 }

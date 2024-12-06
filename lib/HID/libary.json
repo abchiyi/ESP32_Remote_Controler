@@ -1,0 +1,6 @@
+{
+  "name": "HID",
+  "expo": ["src/*"],
+  "headers": ["hud.h"],
+  "dependencies": {}
+}
