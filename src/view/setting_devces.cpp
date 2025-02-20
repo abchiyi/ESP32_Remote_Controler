@@ -136,7 +136,7 @@ void task_udp(void *)
     }
 };
 
-LIST_VIEW Setting_devces_view;
+LIST_VIEW Setting_devices_view;
 class L_DEVICES : public ListPage
 {
 public:
@@ -153,7 +153,7 @@ public:
     void render()
     {
 
-        Setting_devces_view = {
+        Setting_devices_view = {
             {"[ Device ]", create_page_jump_fn()},
             {"- Manage devices"},
         };
@@ -163,7 +163,7 @@ public:
             char macStr[18]; // 用于存储 MAC 地址字符串的数组
             snprintf(macStr, sizeof(macStr), MACSTR, MAC2STR(ap.MAC));
             std::string macString = std::string("- ") + macStr;
-            Setting_devces_view.push_back(
+            Setting_devices_view.push_back(
                 {String("- " + ap.SSID).c_str(),
                  [=](WouoUI *ui)
                  {
@@ -183,7 +183,7 @@ public:
     void leave()
     {
         xTimerStop(xTimer, 5);
-        RADIO.adter_scan_ap_comp = nullptr;
+        RADIO.cb_fn_on_scan_comp = nullptr;
         RADIO.AP.clear();
         AP_INFO.clear();
     }
@@ -201,11 +201,11 @@ public:
 
         AP_INFO.reserve(10);
 
-        RADIO.adter_scan_ap_comp = up_date_cb_fn;
+        RADIO.cb_fn_on_scan_comp = up_date_cb_fn;
     };
 };
 
 BasePage *create_page_devices()
 {
-    return new L_DEVICES(Setting_devces_view);
+    return new L_DEVICES(Setting_devices_view);
 }

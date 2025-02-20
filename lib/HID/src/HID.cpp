@@ -6,6 +6,7 @@
 #include "controller.h"
 #include "WouoUI.h"
 #include "tool.h"
+#include "config.h"
 
 struct listener
 {
@@ -147,5 +148,6 @@ void hid_begin()
     }
   };
 
-  xTaskCreate(task_hid, "task_hid", 1024 * 3, NULL, 1, NULL);
+  xTaskCreatePinnedToCore(task_hid, "task_hid",
+                          1024 * 3, NULL, TP_HIGHEST, NULL, 1);
 }

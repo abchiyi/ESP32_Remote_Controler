@@ -43,7 +43,7 @@ bool LightTurnL = false;  // 左转灯
 bool LightTurnR = false;  // 右转灯
 bool HazardLight = false; // 危险报警灯
 
-void set_channel(radio_data_t *data)
+void set_channel(radio_packet_t *data)
 {
   static int BRAKE_KEY;
   static bool HOLD_RT;
@@ -90,7 +90,7 @@ void set_channel(radio_data_t *data)
 
 void car_control_start()
 {
-  RADIO.cb_fn_before_send = [&](radio_data_t &data)
+  RADIO.cb_fn_before_send = [&](radio_packet_t &data)
   {
     set_channel(&data);
   };

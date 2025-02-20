@@ -73,14 +73,14 @@ void task_power(void *pt)
       {
         Serial.println("isBattExitActivateIrq");
       }
-      if (PMU.isBatChagerStartIrq())
-      {
-        Serial.println("isBatChagerStartIrq");
-      }
-      if (PMU.isBatChagerDoneIrq())
-      {
-        Serial.println("isBatChagerDoneIrq");
-      }
+      // if (PMU.isBatChagerStartIrq())
+      // {
+      //   Serial.println("isBatChagerStartIrq");
+      // }
+      // if (PMU.isBatChagerDoneIrq())
+      // {
+      //   Serial.println("isBatChagerDoneIrq");
+      // }
       if (PMU.isBattTempHighIrq())
       {
         Serial.println("isBattTempHighIrq");

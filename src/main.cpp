@@ -87,7 +87,7 @@ void setup()
   /** 无线 **/
   RADIO.begin();
 
-  RADIO.cb_fn_arfter_recve = [&](radio_data_t data)
+  RADIO.cb_fn_after_recv = [&](radio_packet_t data)
   {
     read_power_info(&data);
   };

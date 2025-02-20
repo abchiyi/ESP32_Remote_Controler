@@ -31,3 +31,11 @@ float combineFloat(uint16_t pa1, uint16_t pa2);
 
 // 过滤摇杆输出到-2048~2047;
 int16_t analogHatFilter(int16_t value);
+
+/**
+ * @brief 计算给定数据的校验和。
+ * @param data 指向要计算校验和的数据的指针。
+ * @param len 数据的长度，以字节为单位。
+ * @return 返回计算得到的校验和，类型为 uint8_t。
+ */
+static uint8_t calculate_cksum(void *data, size_t len);

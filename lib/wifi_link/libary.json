@@ -1,0 +1,5 @@
+{
+  "name": "wifi_link",
+  "expo": ["include/*"],
+  "headers": ["wifi_link.h"]
+}

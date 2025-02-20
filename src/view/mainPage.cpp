@@ -19,7 +19,7 @@ float POWER_W;
 
 void read_power_info(void *radio_data)
 {
-  auto data = *(radio_data_t *)radio_data;
+  auto data = *(radio_packet_t *)radio_data;
 
   VBUS_V = combineFloat(data.channel[0], data.channel[1]);
   CURREN_A = combineFloat(data.channel[2], data.channel[3]);
