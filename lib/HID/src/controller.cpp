@@ -1,9 +1,11 @@
 #include <controller.h>
 #include <XBOXONE.h>
-#include <esp_log.h>
 #include <Usb.h>
 #include <radio.h>
 #include "FreeRTOS.h"
+#include "config.h"
+#include "tool.h"
+#include "esp_log.h"
 
 #include "pins.h"
 
@@ -39,11 +41,12 @@ void usbInit()
 void task_update(void *pt)
 {
   usbInit();
-  TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
-  const TickType_t xFrequency = pdMS_TO_TICKS(8); // 设置采样率 250hz
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xFrequency = pdMS_TO_TICKS(HZ2TICKS(250));
   while (true)
   {
     Usb.Task();
+    // ESP_LOGI(TAG, "XboxOneConnected: %d", Xbox.XboxOneConnected);
     Controller.update();
     xTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
@@ -69,7 +72,7 @@ void syncAnalogHat(int16_t _from, int16_t *_to)
 // 启动xbox控制器
 void CONTROLLER::begin()
 {
-  xTaskCreatePinnedToCore(task_update, "taskUSB", 4096, NULL, configMAX_PRIORITIES - 1, NULL, 0);
+  xTaskCreate(task_update, "taskUSB", 1204 * 5, NULL, TP_HIGHEST, NULL);
 }
 
 void CONTROLLER::update()

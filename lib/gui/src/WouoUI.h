@@ -236,7 +236,7 @@ protected:
   void draw_cursor()
   {
     CURSOR.x = cursor_position_x;
-    CURSOR.y = cursor_position_y + LIST_LINE_H;
+    CURSOR.y = cursor_position_y;
 
     animation(&CURSOR.width, &CURSOR.min_width, CURSOR.transition);
     animation(&CURSOR.height, &CURSOR.min_height, CURSOR.transition);

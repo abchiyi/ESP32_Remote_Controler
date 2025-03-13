@@ -2,11 +2,12 @@
 #include <view/menu.h>
 #include <controller.h>
 #include <radio.h>
-#include <car.h>
 #include <view/setting_devces.h>
 #include "view/about.h"
 #include "tool.h"
 #include "WiFi.h"
+#include "radio.h"
+#include "controller.h"
 
 #define slider_width 6
 #define slider_length 45
@@ -17,18 +18,16 @@ float VBUS_V;
 float CURREN_A;
 float POWER_W;
 
-void read_power_info(void *radio_data)
-{
-  auto data = *(radio_packet_t *)radio_data;
+void read_power_info(void *radio_data) {
+  // auto data = *(radio_packet_t *)radio_data;
 
-  VBUS_V = combineFloat(data.channel[0], data.channel[1]);
-  CURREN_A = combineFloat(data.channel[2], data.channel[3]);
-  POWER_W = combineFloat(data.channel[4], data.channel[5]);
+  // VBUS_V = combineFloat(data.channel[0], data.channel[1]);
+  // CURREN_A = combineFloat(data.channel[2], data.channel[3]);
+  // POWER_W = combineFloat(data.channel[4], data.channel[5]);
 };
 
 class MainPage : public BasePage
 {
-
 public:
   void create()
   {
@@ -45,74 +44,87 @@ public:
     u8g2->setDrawColor(2);
   }
 
-  void render_channel_view()
+  void draw_ico_connected(uint8_t x_start)
   {
-    // TODO 通道数据可配置，而非固定
-    float joy_l_x = Controller.joyLHori / 2048.0;
-    float joy_l_y = Controller.joyLVert / 2048.0;
+    static bool tr = true;
+    static int counter = 0;
 
-    float joy_r_x = Controller.joyRHori / 2048.0;
-    float joy_r_y = Controller.joyRVert / 2048.0;
+    auto ric = radio_is_connected();
 
-    // slider 1
-    this->draw_slider_y(joy_l_y,
-                        0,
-                        gui->DISPLAY_HEIGHT - slider_length - slider_width - 4,
-                        slider_width,
-                        slider_length,
-                        true);
+    u8g2->setFont(u8g2_font_siji_t_6x10);
+    if (ric || tr)
+      u8g2->drawGlyph(x_start, 10, 0x0e19c);
 
-    // slider 2
-    this->draw_slider_y(joy_r_y,
-                        gui->DISPLAY_WIDTH - slider_width,
-                        gui->DISPLAY_HEIGHT - slider_length - slider_width - 4,
-                        slider_width,
-                        slider_length,
-                        true);
+    if (ric)
+      return;
 
-    // slider 3
-    this->draw_slider_x(joy_l_x,
-                        0,
-                        gui->DISPLAY_HEIGHT - slider_width,
-                        slider_width,
-                        slider_length,
-                        true);
+    if (tr)
+    {
+      if (counter >= 20)
+        tr = false;
+      else
+        counter++;
+    }
+    else
+    {
+      if (counter == 0)
+        tr = true;
+      else
+        counter--;
+    }
+  }
+  void draw_ico_usb(uint8_t x_start)
+  {
+    static bool trc = true;
+    static int counter = 0;
 
-    // slider 4
-    this->draw_slider_x(joy_r_x,
-                        gui->DISPLAY_WIDTH - slider_length,
-                        gui->DISPLAY_HEIGHT - slider_width,
-                        slider_width,
-                        slider_length,
-                        true);
-  };
+    auto ric = Xbox.XboxOneConnected;
+
+    u8g2->setFont(u8g2_font_siji_t_6x10);
+    if (ric || trc)
+      u8g2->drawGlyph(x_start, 10, 0x0e00c);
+
+    if (ric)
+      return;
+
+    if (trc)
+    {
+      if (counter >= 20)
+        trc = false;
+      else
+        counter++;
+    }
+    else
+    {
+      if (counter == 0)
+        trc = true;
+      else
+        counter--;
+    }
+  }
 
   void render()
   {
-    static TickType_t last_run;
+    u8g2->setFont(u8g2_font_siji_t_6x10);
+    u8g2->drawGlyph(0, 10, 0x0e21a);
+    u8g2->drawGlyph(12, 10, 0x0e200);
 
-    auto tick = xTaskGetTickCount();
-    u8g2->setCursor(10, 10);
-    u8g2->printf("BAT %.2fV", VBUS_V);
-    u8g2->setCursor(10, 20);
-    u8g2->printf("CUR %.2fA ", CURREN_A);
-    u8g2->setCursor(10, 30);
-    u8g2->printf("POWER %.2fW ", POWER_W);
-    u8g2->setCursor(10, 40);
-    u8g2->printf("FQ %d ", RADIO.Frequency);
-    u8g2->setCursor(10, 50);
-    u8g2->printf("RSSI %d ", RADIO.RSSI);
-    last_run = tick;
+    this->draw_ico_connected(24);
+    this->draw_ico_usb(36);
 
-    this->render_channel_view();
-    // 连接状态
-    u8g2->setCursor((gui->DISPLAY_WIDTH - 6 * 5) / 2, gui->DISPLAY_HEIGHT);
-    // u8g2->printf("< %s >", RADIO.status == RADIO_CONNECTED
-    //                            ? "="
-    //                            : "x");
-    u8g2->printf("< %s >", WiFi.isConnected()
-                               ? "="
-                               : "x");
+    u8g2->setFont(u8g2_font_12x6LED_tf);
+    u8g2->setCursor(0, 32);
+    u8g2->println("READY");
+    // u8g2->println("LOCK");
+
+    u8g2->setCursor(80, 12);
+    u8g2->println("FF:EA:12");
+
+    u8g2->setFont(u8g2_font_9x6LED_tf);
+    auto w = 128 - u8g2->getStrWidth("12.75V");
+    u8g2->setCursor(w, 27);
+
+    u8g2->print("12.75V");
   };
 };
 

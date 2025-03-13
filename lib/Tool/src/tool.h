@@ -1,3 +1,6 @@
+#ifndef _TOOL_H_
+#define _TOOL_H_
+
 #include <cstddef>       // 用于 size_t
 #include <algorithm>     // 用于 std::equal
 #include "functional"    // std:func
@@ -38,4 +41,17 @@ int16_t analogHatFilter(int16_t value);
  * @param len 数据的长度，以字节为单位。
  * @return 返回计算得到的校验和，类型为 uint8_t。
  */
-static uint8_t calculate_cksum(void *data, size_t len);
+IRAM_ATTR uint8_t calculate_cksum(void *data, size_t len);
+
+/**
+ * @brief 将频率（Hz）转换为滴答数（Ticks）。
+ *
+ * 该函数用于将给定的频率值（以赫兹为单位）转换为对应的滴答数。
+ * 在 ESP32 ARDUINO 中，1 Tick 等于 1 毫秒。
+ *
+ * @param hz 频率值，单位为赫兹（Hz）。
+ * @return 返回转换后的滴答数（Ticks）。
+ */
+#define HZ2TICKS(hz) ((TickType_t)(1000.00f / hz))
+
+#endif

@@ -312,14 +312,14 @@ void WouoUI::begin(U8G2 *u8g2)
       sleep_cb                   // 回调函数
   );
 
-  if (xTimer_GUI_SLEEP == NULL)
-  {
-    ESP_LOGE(TAG, "xTimer_GUI_SLEEP creation failed!");
-    for (;;) //  报告错误并停止程序
-      ;
-  }
-  else
-    xTimerStart(xTimer_GUI_SLEEP, 10);
+  // if (xTimer_GUI_SLEEP == NULL)
+  // {
+  //   ESP_LOGE(TAG, "xTimer_GUI_SLEEP creation failed!");
+  //   for (;;) //  报告错误并停止程序
+  //     ;
+  // }
+  // else
+  //   xTimerStart(xTimer_GUI_SLEEP, 10);
 
   // 设置屏幕刷新任务
   auto taskUpdate = [](void *pt)
@@ -340,7 +340,7 @@ void WouoUI::begin(U8G2 *u8g2)
 void BasePage::__base_render()
 {
   this->render();
-  render_header(this);
+  // render_header(this);
 };
 
 void BasePage::draw_slider_y(float progress,

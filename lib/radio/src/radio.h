@@ -1,3 +1,6 @@
+#ifndef _RADIO_H_
+#define _RADIO_H_
+#pragma once
 #include <Arduino.h>
 #include <esp_now.h>
 #include <cstring>
@@ -28,35 +31,14 @@ typedef struct
   std::function<esp_err_t(void)> rest;             // 重置通讯链路
 } radio_link_operation_t;
 
-/**
- * @brief 无线通讯
- */
-class Radio
-{
-  friend void TaskRadioMainLoop(void *pt);
+typedef std::function<void(CRTPPacket *)> CRTPPacketHandler_fn_t;
 
-private:
-public:
-  int Frequency; // 主循环运行频率
+void init_radio(radio_link_operation_t *); // 初始化无线通讯
 
-  void begin();
+esp_err_t radio_send_packet(radio_packet_t *rp);
 
-  void update_loop_metrics()
-  {
-    static auto counter = 0;
-    static TickType_t last_run;
-    static auto buffer = 0;
-    auto now = xTaskGetTickCount();
-    buffer += (now - last_run);
-    counter++;
-    if (counter >= 100)
-    {
-      Frequency = 1000 / (buffer / 100);
-      counter = 0;
-      buffer = 0;
-    }
-    last_run = now;
-  };
-};
+extern radio_link_operation_t *RLOP;
 
-extern Radio RADIO;
+bool radio_is_connected();
+
+#endif

@@ -86,7 +86,7 @@ public:
 
         {"- Rest", [&](WouoUI *ui)
          {
-           RADIO.config_clear();
+           //  RADIO.config_clear();
          }},
 
         {"- [ About ]", [&](WouoUI *ui)

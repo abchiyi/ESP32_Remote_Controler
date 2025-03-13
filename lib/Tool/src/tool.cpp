@@ -1,5 +1,4 @@
 #include <tool.h>
-#include "radio.h"
 
 void nvs_call(const char *name_space, std::function<void(Preferences &)> cb_fn)
 {
@@ -52,7 +51,7 @@ int16_t analogHatFilter(int16_t value)
   return toValue < -2048 ? -2048 : toValue;
 }
 
-static uint8_t calculate_cksum(void *data, size_t len)
+IRAM_ATTR uint8_t calculate_cksum(void *data, size_t len)
 {
   auto c = (unsigned char *)data;
   unsigned char cksum = 0;

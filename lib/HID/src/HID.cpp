@@ -1,12 +1,12 @@
 /**
  * 控制器输入输出
  */
-
 #define TAG "HID"
 #include "controller.h"
 #include "WouoUI.h"
 #include "tool.h"
 #include "config.h"
+#include "radio.h"
 
 struct listener
 {
@@ -122,24 +122,28 @@ std::vector<std::tuple<ButtonEnum, key_id>> button = {
     {UP, KEY_UP},
 };
 
+// 绑定摇杆到GUI事件
 std::vector<std::tuple<AnalogHatEnum, key_id, key_id>> joystick = {
     {LeftHatY, KEY_UP, KEY_DOWN}};
 
+// 监听器队列
 std::vector<listener *> listeners;
+
 void hid_begin()
 {
 
-  // 注册监听器
+  // 注册监听器到队列
   for (const auto &[button, event_id] : button)
     listeners.push_back(new listenerButton(button, event_id));
 
   for (const auto &[joystick, event_id, event_id_sub] : joystick)
     listeners.push_back(new listenerJoystick(joystick, event_id, event_id_sub));
 
+  // 该任务通过扫描监听器队列，更新GUI事件
   auto task_hid = [](void *pt)
   {
-    TickType_t xLastWakeTime = xTaskGetTickCount(); // 最后唤醒时间
-    const TickType_t xFrequency = pdMS_TO_TICKS(8); // 设置采样率 250hz
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(HZ2TICKS(150));
     while (true)
     {
       for (auto &listener : listeners)
@@ -148,6 +152,46 @@ void hid_begin()
     }
   };
 
-  xTaskCreatePinnedToCore(task_hid, "task_hid",
-                          1024 * 3, NULL, TP_HIGHEST, NULL, 1);
+  xTaskCreatePinnedToCore(task_hid, "task_hid", 1024 * 3, NULL, TP_HIGHEST, NULL, 1);
+
+  auto task_send_control_data = [](void *pt)
+  {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(8);
+    static radio_packet_t rp;
+    auto crtp = (CRTPPacket *)rp.data;
+
+    static float ROLL;
+    static float PITCH;
+    static float YAW;
+    static uint16_t THRUST;
+
+    auto match_angl = [](uint8_t angl, int16_t joy)
+    {
+      auto step = angl / 2048.f;
+      return joy * step;
+    };
+
+    while (true)
+    {
+
+      ROLL = match_angl(40, Controller.joyLHori);
+      PITCH = match_angl(30, Controller.joyRVert) * -1;
+      YAW = match_angl(30, Controller.joyRHori);
+      THRUST = Controller.joyLVert * 32;
+      crtp->port = CRTP_PORT_SETPOINT;
+      crtp->channel = 0;
+
+      memcpy(&crtp->data[0], &ROLL, sizeof(ROLL));
+      memcpy(&crtp->data[4], &PITCH, sizeof(PITCH));
+      memcpy(&crtp->data[8], &YAW, sizeof(YAW));
+      memcpy(&crtp->data[12], &THRUST, sizeof(THRUST));
+
+      radio_send_packet(&rp);
+
+      xTaskDelayUntil(&xLastWakeTime, xFrequency);
+    }
+  };
+
+  xTaskCreate(task_send_control_data, "task_send_control_data", 1024 * 3, NULL, TP_HIGHEST, NULL);
 }

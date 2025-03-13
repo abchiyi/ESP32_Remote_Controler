@@ -1,3 +1,6 @@
+#ifndef CONTROLLER_H
+#define CONTROLLER_H
+
 #include <Arduino.h>
 #include <XBOXONE.h>
 
@@ -25,3 +28,5 @@ public:
 
 extern XBOXONE Xbox;
 extern CONTROLLER Controller;
+
+#endif

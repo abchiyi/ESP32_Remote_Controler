@@ -54,7 +54,8 @@ void ListPage::render()
     for (int i = 0; i < length; ++i)
     {
       // 绘制文本
-      text_y_temp = text_y + LIST_LINE_H * i + LIST_LINE_H;
+      // text_y_temp = text_y + LIST_LINE_H * i + LIST_LINE_H;
+      text_y_temp = text_y + LIST_LINE_H * i;
       text_x_temp = text_x * (!com_scr
                                   ? (abs(gui->get_history()->select - i) + 1)
                                   : (i + 1));
@@ -68,15 +69,15 @@ void ListPage::render()
     }
   };
 
-  auto render_bar = [&]()
+  // 绘制滚动指示器
+  [&]()
   {
     this->bar_h_trg = ceil(gui->get_history()->select *
                            ((float)gui->DISPLAY_HEIGHT / (length - 1)));
     animation(&this->bar_h, &this->bar_h_trg, list_ani);
     u8g2->drawBox(gui->DISPLAY_WIDTH - LIST_BAR_W, 0, LIST_BAR_W, this->bar_h);
-  };
+  }();
 
-  render_bar();
   render_list();
   render_cursor();
 };
@@ -109,7 +110,7 @@ void ListPage::cursorMoveDOWN(uint step)
       setCursorOS(box_x_os, CONFIG_UI[BOX_Y_OS]); // 光标轮廓扩大
       select += 1;                                // 选中行数下移一位
       // 光标到达屏幕底部
-      cursor_position_y < (gui->DISPLAY_HEIGHT - LIST_LINE_H - LIST_LINE_H)
+      cursor_position_y < (gui->DISPLAY_HEIGHT - LIST_LINE_H)
           ? cursor_position_y += LIST_LINE_H // 下移光标
           : text_y_trg -= LIST_LINE_H;       // 上翻列表
     }
