@@ -380,14 +380,14 @@ public:
     page->windows.push_back(window);
     window->before();
   };
-  void gui_sleep();                      // GUI进入睡眠
-  void gui_awake();                      // 唤醒GUI
-  void page_in_to(create_page_fn_t);     // 进入页面
-  void page_back();                      // 退出页面，返回到上一页
-  void pageSwitch(BasePage *);           // 切换页面
-  void setDefaultPage(create_page_fn_t); // 设置主页面
-  void uiUpdate();                       // 归刷
-  void begin(U8G2 *u8g2);                // 启动GUI
+  void gui_sleep();                                   // GUI进入睡眠
+  void gui_awake();                                   // 唤醒GUI
+  void page_in_to(create_page_fn_t);                  // 进入页面
+  void page_back();                                   // 退出页面，返回到上一页
+  void pageSwitch(BasePage *);                        // 切换页面
+  void setDefaultPage(create_page_fn_t);              // 设置主页面
+  void uiUpdate();                                    // 归刷
+  void begin(U8G2 *u8g2, create_page_fn_t home_page); // 初始化
 
   /*
    * @brief 获取历史路由

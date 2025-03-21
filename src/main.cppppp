@@ -1,10 +1,8 @@
-#include <controller.h>
-#include "FreeRTOS.h"
-#include "config.h"
-#include "tool.h"
-#include "esp_log.h"
-
-#define TAG "Controller"
+/*
+ * SPDX-FileCopyrightText: 2021 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Unlicense OR CC0-1.0
+ */
 
 #include "Arduino.h"
 #include <stdio.h>
@@ -30,56 +28,14 @@
 #include "esp_hidh.h"
 #include "esp_hid_gap.h"
 #include "esp_timer.h"
+static const char *TAG = "xbox";
 
 #define XBOX_CONTROLLER_INDEX_BUTTONS_DIR 12
 #define XBOX_CONTROLLER_INDEX_BUTTONS_MAIN 13
 #define XBOX_CONTROLLER_INDEX_BUTTONS_CENTER 14
 #define XBOX_CONTROLLER_INDEX_BUTTONS_SHARE 15
 
-CONTROLLER Controller;
-
-#define SCAN_DURATION_SECONDS 5
-
-void hid_task(void *pvParameters)
-{
-  size_t results_len = 0;
-  esp_hid_scan_result_t *results = NULL;
-  ESP_LOGI(TAG, "SCAN...");
-  // start scan for HID devices
-  esp_hid_scan(SCAN_DURATION_SECONDS, &results_len, &results);
-  ESP_LOGI(TAG, "SCAN: %u results", results_len);
-  if (results_len)
-  {
-    esp_hid_scan_result_t *r = results;
-    esp_hid_scan_result_t *cr = NULL;
-    while (r)
-    {
-      printf("  %s: " ESP_BD_ADDR_STR ", ", (r->transport == ESP_HID_TRANSPORT_BLE) ? "BLE" : "BT ", ESP_BD_ADDR_HEX(r->bda));
-      printf("RSSI: %d, ", r->rssi);
-      printf("USAGE: %s, ", esp_hid_usage_str(r->usage));
-
-      if (r->transport == ESP_HID_TRANSPORT_BLE)
-      {
-        cr = r;
-        printf("APPEARANCE: 0x%04x, ", r->ble.appearance);
-        printf("ADDR_TYPE: '%s', ", ble_addr_type_str(r->ble.addr_type));
-      }
-
-      printf("NAME: %s ", r->name ? r->name : "");
-      printf("\n");
-      r = r->next;
-    }
-    if (cr)
-    {
-      // open the last result
-      esp_hidh_dev_open(cr->bda, cr->transport, cr->ble.addr_type);
-    }
-    // free the results
-    esp_hid_scan_results_free(results);
-  }
-  ESP_LOGW(TAG, "SCAN: done, Task ended");
-  vTaskDelete(NULL);
-}
+void hid_task(void *pvParameters);
 
 void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
@@ -145,9 +101,26 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     uint16_t joyRVert;
     uint16_t trigLT, trigRT;
 
-    static uint8_t btnBits;
-
+    uint8_t btnBits;
     btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_MAIN];
+
+    // if (btnBits & 0b00000001) // btnA
+    //     ps4_report.buttons1 |= (1 << 5);
+
+    // if (btnBits & 0b00000010) // btnB
+    //     ps4_report.buttons1 |= (1 << 6);
+
+    // if (btnBits & 0b00001000) // btnX
+    //     ps4_report.buttons1 |= (1 << 4);
+
+    // if (btnBits & 0b00010000) // btnY
+    //     ps4_report.buttons1 |= (1 << 7);
+
+    // if (btnBits & 0b01000000) // btnLB
+    //     ps4_report.buttons2 |= (1 << 0);
+
+    // if (btnBits & 0b10000000) // btnRB
+    //     ps4_report.buttons2 |= (1 << 1);
 
     /*
     btnA = btnBits & 0b00000001;
@@ -157,13 +130,6 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     btnLB = btnBits & 0b01000000;
     btnRB = btnBits & 0b10000000;
     */
-
-    Controller.btnA = (btnBits & 0b00000001);
-    Controller.btnB = (btnBits & 0b00000010);
-    Controller.btnX = (btnBits & 0b00001000);
-    Controller.btnY = (btnBits & 0b00010000);
-    Controller.btnLB = (btnBits & 0b01000000);
-    Controller.btnRB = (btnBits & 0b10000000);
 
     btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_CENTER];
 
@@ -258,7 +224,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 
     trigLT = (uint16_t)param->input.data[8] | ((uint16_t)param->input.data[9] << 8); // 0-1024
 
-    ESP_LOGI(TAG, "Controller: A%d", Controller.btnA);
+    ESP_LOGI(TAG, "LT:%u", trigLT);
 
     // ESP_LOGI(TAG, "joyLHori:%u joyLVert:%u joyRHori:%u joyRVert:%u",
     //          joyLHori, joyLVert, joyRHori, joyRVert);
@@ -339,7 +305,50 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
   }
 }
 
-void bt_controller_init()
+#define SCAN_DURATION_SECONDS 5
+
+void hid_task(void *pvParameters)
+{
+  size_t results_len = 0;
+  esp_hid_scan_result_t *results = NULL;
+  ESP_LOGI(TAG, "SCAN...");
+  // start scan for HID devices
+  esp_hid_scan(SCAN_DURATION_SECONDS, &results_len, &results);
+  ESP_LOGI(TAG, "SCAN: %u results", results_len);
+  if (results_len)
+  {
+    esp_hid_scan_result_t *r = results;
+    esp_hid_scan_result_t *cr = NULL;
+    while (r)
+    {
+      printf("  %s: " ESP_BD_ADDR_STR ", ", (r->transport == ESP_HID_TRANSPORT_BLE) ? "BLE" : "BT ", ESP_BD_ADDR_HEX(r->bda));
+      printf("RSSI: %d, ", r->rssi);
+      printf("USAGE: %s, ", esp_hid_usage_str(r->usage));
+
+      if (r->transport == ESP_HID_TRANSPORT_BLE)
+      {
+        cr = r;
+        printf("APPEARANCE: 0x%04x, ", r->ble.appearance);
+        printf("ADDR_TYPE: '%s', ", ble_addr_type_str(r->ble.addr_type));
+      }
+
+      printf("NAME: %s ", r->name ? r->name : "");
+      printf("\n");
+      r = r->next;
+    }
+    if (cr)
+    {
+      // open the last result
+      esp_hidh_dev_open(cr->bda, cr->transport, cr->ble.addr_type);
+    }
+    // free the results
+    esp_hid_scan_results_free(results);
+  }
+  ESP_LOGW(TAG, "SCAN: done, Task ended");
+  vTaskDelete(NULL);
+}
+
+void setup(void)
 {
   esp_err_t ret;
 
@@ -351,9 +360,10 @@ void bt_controller_init()
   }
   ESP_ERROR_CHECK(ret);
 
-  ESP_LOGI(TAG, "BT controller init");
+  ESP_LOGI(TAG, "USB initialization");
 
   ESP_ERROR_CHECK(esp_hid_gap_init(HIDH_BLE_MODE));
+
   ESP_ERROR_CHECK(esp_ble_gattc_register_callback(esp_hidh_gattc_event_handler));
 
   esp_hidh_config_t config = {
@@ -364,111 +374,8 @@ void bt_controller_init()
   ESP_ERROR_CHECK(esp_hidh_init(&config));
 
   xTaskCreate(&hid_task, "hid_task", 6 * 1024, NULL, 2, NULL);
-};
-
-// 使用独立任务避免usb数据读取卡死
-void task_update(void *pt)
-{
-  bt_controller_init();
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = pdMS_TO_TICKS(HZ2TICKS(250));
-  while (true)
-  {
-    // ESP_LOGI(TAG, "XboxOneConnected: %d", Xbox.XboxOneConnected);
-    Controller.update();
-    xTaskDelayUntil(&xLastWakeTime, xFrequency);
-  }
 }
 
-// 0 ~ 2047
-const int deadZone = 8000;
-const int maxLength = 32768;
-const int resolution = 2048;
-const float_t step = (float_t)(maxLength - deadZone) / (float_t)resolution;
-void syncAnalogHat(int16_t _from, int16_t *_to)
+void loop(void)
 {
-  // 计算除去死区后摇杆的值
-  const int16_t t_from = _from < 0 ? _from - (deadZone * -1) : _from - deadZone;
-
-  int16_t toValue = _from < (deadZone * -1) || _from > deadZone
-                        ? (float_t)t_from / step
-                        : 0;
-
-  *_to = toValue < -2048 ? -2048 : toValue;
-}
-
-// 启动xbox控制器
-void CONTROLLER::begin()
-{
-  xTaskCreate(task_update, "taskUSB", 1204 * 5, NULL, TP_HIGHEST, NULL);
-}
-
-void CONTROLLER::update() {
-  // if (Xbox.XboxOneConnected)
-  // {
-  //   // 字母键
-  //   btnA = Xbox.getButtonPress(A);
-  //   btnB = Xbox.getButtonPress(B);
-  //   btnX = Xbox.getButtonPress(X);
-  //   btnY = Xbox.getButtonPress(Y);
-
-  //   // 功能键
-  //   btnStart = Xbox.getButtonPress(START);
-  //   // btnXbox = Xbox.getButtonPress(XBOX); // XXX 功能异常不使用
-  //   btnSelect = Xbox.getButtonPress(BACK);
-  //   btnShare = Xbox.getButtonPress(SYNC);
-
-  //   // 肩键
-  //   btnLB = Xbox.getButtonPress(L1);
-  //   btnRB = Xbox.getButtonPress(R1);
-
-  //   // 方向键
-  //   btnDirUp = Xbox.getButtonPress(UP);
-  //   btnDirDown = Xbox.getButtonPress(DOWN);
-  //   btnDirLeft = Xbox.getButtonPress(LEFT);
-  //   btnDirRight = Xbox.getButtonPress(RIGHT);
-
-  //   // 摇杆
-  //   syncAnalogHat(Xbox.getAnalogHat(LeftHatX), &joyLHori);
-  //   syncAnalogHat(Xbox.getAnalogHat(LeftHatY), &joyLVert);
-  //   btnLS = Xbox.getButtonPress(L3);
-
-  //   syncAnalogHat(Xbox.getAnalogHat(RightHatX), &joyRHori);
-  //   syncAnalogHat(Xbox.getAnalogHat(RightHatY), &joyRVert);
-  //   btnRS = Xbox.getButtonPress(R3);
-
-  //   // 扳机键
-  //   trigLT = Xbox.getButtonPress(L2);
-  //   trigRT = Xbox.getButtonPress(R2);
-  // }
-};
-
-// ↓this code from XboxControllerNotificationParser lib
-String CONTROLLER::toString()
-{
-  // clang-format off
-  String str = String("") +
-    "btnY: " + String(btnY) + " " +
-    "btnX: " + String(btnX) + " " +
-    "btnB: " + String(btnB) + " " +
-    "btnA: " + String(btnA) + " " +
-    "btnLB: " + String(btnLB) + " " +
-    "btnRB: " + String(btnRB) + "\n" +
-    "btnSelect: " + String(btnSelect) + " " +
-    "btnStart: " + String(btnStart) + " " +
-    "btnXbox: " + String(btnXbox) + " " +
-    "btnShare: " + String(btnShare) + " " +
-    "btnLS: " + String(btnLS) + " " +
-    "btnRS: " + String(btnRS) + "\n" +
-    "btnDirUp: " + String(btnDirUp) + " " +
-    "btnDirRight: " + String(btnDirRight) + " " +
-    "btnDirDown: " + String(btnDirDown) + " " +
-    "btnDirLeft: " + String(btnDirLeft) + "\n"
-    "joyLHori: " + String(joyLHori) + "\n" +
-    "joyLVert: " + String(joyLVert) + "\n" +
-    "joyRHori: " + String(joyRHori) + "\n" +
-    "joyRVert: " + String(joyRVert) + "\n" +
-    "trigLT: " + String(trigLT) + "\n" +
-    "trigRT: " + String(trigRT) + "\n";
-  return str;
 }

@@ -40,9 +40,11 @@
 #include <WouoUI.h>
 #include <cstdlib>
 #include <esp_log.h>
+#include <config.h>
+#include <tool.h>
 
 #define TAG "WouUI"
-constexpr TickType_t FRAME_SPACING = 13; // ms,每刷新一帧的间隔
+constexpr TickType_t FPS = HZ2TICKS(60); // 屏幕刷新率
 WouoUI WOUO_UI;                          // 定义gui对象
 BOX BasePage::CURSOR;                    // 声明静态 box 对象;
 
@@ -296,11 +298,14 @@ void sleep_cb(TimerHandle_t timer)
   WOUO_UI.page_in_to(page_sleep);
 };
 
-void WouoUI::begin(U8G2 *u8g2)
+void WouoUI::begin(U8G2 *u8g2, create_page_fn_t home_page)
 {
   // 初始化显示屏
   this->u8g2 = u8g2;
   this->oled_init();
+
+  // 设置主页面
+  this->setDefaultPage(home_page);
 
   // 配置休眠定时器
   xTimer_GUI_SLEEP = xTimerCreate(
@@ -324,16 +329,17 @@ void WouoUI::begin(U8G2 *u8g2)
   // 设置屏幕刷新任务
   auto taskUpdate = [](void *pt)
   {
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    WouoUI *gui = (WouoUI *)pt;
+    static TickType_t xLastWakeTime = xTaskGetTickCount();
+    static WouoUI *gui = (WouoUI *)pt;
     while (true)
     {
       gui->uiUpdate();
-      vTaskDelayUntil(&xLastWakeTime, FRAME_SPACING);
+      vTaskDelayUntil(&xLastWakeTime, FPS);
     }
   };
-  xTaskCreatePinnedToCore(taskUpdate, "WouoUI gui update", 1024 * 20, (void *)this, 1, NULL, 1);
-}
+
+  xTaskCreate(taskUpdate, "taskUpdate", 4096, this, TP_H, NULL);
+};
 
 #include "view/herder.h"
 /* ----------------- Base Page ----------------- */

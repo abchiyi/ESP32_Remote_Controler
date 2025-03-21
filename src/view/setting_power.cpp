@@ -30,8 +30,11 @@ public:
     // radio_2.init(&radio_v, 2);
     std::string rendered_content = std::to_string(
         static_cast<int>(PMU.getBattVoltage() / 10) / 100.0);
+  };
 
-    this->view = {
+  void render()
+  {
+    static LIST_VIEW view = {
         {"[ Power ]", create_page_jump_fn()},
         {
             "~ Dc3 sysV",
@@ -56,11 +59,24 @@ public:
         {
             "~ bat c cur",
             NULL,
-            create_render_content(String(PMU.getBatteryChargeCurrent() / 1000) + "a"),
+            create_render_content(String(PMU.getBatteryChargeCurrent())),
+        },
+        {
+            "~ bat d cur",
+            NULL,
+            create_render_content(String(PMU.getBattDischargeCurrent())),
+        },
+        {
+            "~ Coulomb",
+            NULL,
+            create_render_content(String(PMU.getCoulombData())),
         },
     };
-  };
 
+    this->view = view;
+
+    ListPage::render();
+  }
   void leave()
   {
     // TODO 执行需要保存配置的对象的 save_config 方法

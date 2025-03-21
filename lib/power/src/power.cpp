@@ -3,6 +3,7 @@
 #include "power.h"
 #include "pins.h"
 #include "esp_log.h"
+#include "config.h"
 
 #define TAG "PMU"
 
@@ -73,14 +74,14 @@ void task_power(void *pt)
       {
         Serial.println("isBattExitActivateIrq");
       }
-      // if (PMU.isBatChagerStartIrq())
-      // {
-      //   Serial.println("isBatChagerStartIrq");
-      // }
-      // if (PMU.isBatChagerDoneIrq())
-      // {
-      //   Serial.println("isBatChagerDoneIrq");
-      // }
+      if (PMU.isBatChargeStartIrq())
+      {
+        Serial.println("isBatChagerStartIrq");
+      }
+      if (PMU.isBatChargeDoneIrq())
+      {
+        Serial.println("isBatChagerDoneIrq");
+      }
       if (PMU.isBattTempHighIrq())
       {
         Serial.println("isBattTempHighIrq");
@@ -192,8 +193,7 @@ void power::begin()
   if (!PMU.begin(Wire, 0x34, SDA, SCL))
   {
     ESP_LOGE(TAG, "PMU IS NOT ONLINE...");
-    while (1)
-      delay(50);
+    return;
   }
   ESP_LOGI(TAG, "PMU ID 0x%x\n", PMU.getChipID());
   PMU.setSysPowerDownVoltage(2700);
@@ -227,23 +227,24 @@ void power::begin()
   PMU.enableExternalPin();
 
   ESP_LOGI(TAG, "EXTERN ON %d", PMU.isEnableExternalPin());
-  ESP_LOGI(TAG, "BTE V  %d", PMU.getBattVoltage());
+  ESP_LOGI(TAG, "BTE %.2fV", (PMU.getBattVoltage() / 1000.0f));
 
-  ESP_LOGI(TAG,
-           "DCDC=======================================================================");
-  ESP_LOGI(TAG, "DC2  :%s   Voltage:%u mV \n", PMU.isEnableDC2() ? "ENABLE" : "DISABLE", PMU.getDC2Voltage());
-  ESP_LOGI(TAG, "DC3  :%s   Voltage:%u mV \n", PMU.isEnableDC3() ? "ENABLE" : "DISABLE", PMU.getDC3Voltage());
-  ESP_LOGI(TAG, "LDO=======================================================================");
-  ESP_LOGI(TAG, "LDO2: %s   Voltage:%u mV\n", PMU.isEnableLDO2() ? "ENABLE" : "DISABLE", PMU.getLDO2Voltage());
-  ESP_LOGI(TAG, "LDO3: %s   Voltage:%u mV\n", PMU.isEnableLDO3() ? "ENABLE" : "DISABLE", PMU.getLDO3Voltage());
-  ESP_LOGI(TAG, "LDO4: %s   Voltage:%u mV\n", PMU.isEnableLDO4() ? "ENABLE" : "DISABLE", PMU.getLDO4Voltage());
-  ESP_LOGI(TAG, "LDOio: %s   Voltage:%u mV\n", PMU.isEnableLDOio() ? "ENABLE" : "DISABLE", PMU.getLDOioVoltage());
-  ESP_LOGI(TAG, "==========================================================================");
+  // ESP_LOGI(TAG,
+  //          "DCDC=======================================================================");
+  // ESP_LOGI(TAG, "DC2  :%s   Voltage:%u mV \n", PMU.isEnableDC2() ? "ENABLE" : "DISABLE", PMU.getDC2Voltage());
+  // ESP_LOGI(TAG, "DC3  :%s   Voltage:%u mV \n", PMU.isEnableDC3() ? "ENABLE" : "DISABLE", PMU.getDC3Voltage());
+  // ESP_LOGI(TAG, "LDO=======================================================================");
+  // ESP_LOGI(TAG, "LDO2: %s   Voltage:%u mV\n", PMU.isEnableLDO2() ? "ENABLE" : "DISABLE", PMU.getLDO2Voltage());
+  // ESP_LOGI(TAG, "LDO3: %s   Voltage:%u mV\n", PMU.isEnableLDO3() ? "ENABLE" : "DISABLE", PMU.getLDO3Voltage());
+  // ESP_LOGI(TAG, "LDO4: %s   Voltage:%u mV\n", PMU.isEnableLDO4() ? "ENABLE" : "DISABLE", PMU.getLDO4Voltage());
+  // ESP_LOGI(TAG, "LDOio: %s   Voltage:%u mV\n", PMU.isEnableLDOio() ? "ENABLE" : "DISABLE", PMU.getLDOioVoltage());
+  // ESP_LOGI(TAG, "==========================================================================");
   PMU.setPowerKeyPressOffTime(XPOWERS_AXP202_POWEROFF_4S);
 
-  xTaskCreate(task_power, "POWER", 1024 * 2, NULL, 1, NULL);
+  xTaskCreate(task_power, "POWER", 1024 * 2, NULL, TP_N, NULL);
   pinMode(10, INPUT);
   attachInterrupt(10, setFlag, FALLING);
+  attachInterrupt(10, setFlag, RISING);
 
   // while (1)
   // {

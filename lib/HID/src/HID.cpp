@@ -43,7 +43,8 @@ struct listenerButton : public listener
     // btn_LPT = CONFIG_UI[BTN_LPT];
     // btn_SPT = CONFIG_UI[BTN_SPT];
 
-    auto btn_Status = Xbox.getButtonPress(key);
+    auto btn_Status = 0;
+    // auto btn_Status = Xbox.getButtonPress(key);
 
     if (!btn_Status)
       send_count = 0; // 重置发送次数标记
@@ -54,7 +55,7 @@ struct listenerButton : public listener
 
     // 计算按钮按压时间
     press_count = 0;
-    while (Xbox.getButtonPress(key))
+    while (0)
     {
       if (press_count >= hold_time)
         break;
@@ -94,7 +95,8 @@ struct listenerJoystick : public listener
     int btn_SPT = 15;
     btn_LPT = CONFIG_UI[BTN_LPT];
     btn_SPT = CONFIG_UI[BTN_SPT];
-    auto analogHatStatus = analogHatFilter(Xbox.getAnalogHat(key));
+    auto analogHatStatus = analogHatFilter(0);
+    // auto analogHatStatus = analogHatFilter(Xbox.getAnalogHat(key));
     int hold_time = btn_LPT;
     hold_time = btn_LPT * (1.0f - (abs((float)analogHatStatus) / 2048.0f));
     hold_time = hold_time < btn_SPT ? btn_SPT : hold_time;
@@ -104,7 +106,8 @@ struct listenerJoystick : public listener
     {
       press_count++;
       joy_is_up = analogHatStatus > 0;
-      analogHatStatus = analogHatFilter(Xbox.getAnalogHat(key));
+      analogHatStatus = analogHatFilter(0);
+      // analogHatStatus = analogHatFilter(Xbox.getAnalogHat(key));
       vTaskDelay(1);
     }
     // 根据按压时间决定发出事件

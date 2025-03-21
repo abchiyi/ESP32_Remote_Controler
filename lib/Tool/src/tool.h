@@ -6,6 +6,7 @@
 #include "functional"    // std:func
 #include "Preferences.h" // 储存
 
+// TODO 待移除的
 template <typename T, std::size_t N>
 bool areArraysEqual(const T (&a)[N], const T (&b)[N])
 {
@@ -19,6 +20,7 @@ bool areArraysEqual(const T (&a)[N], const T (&b)[N])
  */
 void nvs_call(const char *name_space, std::function<void(Preferences &)> cb_fn);
 
+// TODO 待移除的
 typedef struct
 {
   float VBUS_V;
@@ -27,9 +29,11 @@ typedef struct
 } power_info_t;
 
 // 将一个32位浮点数拆分成两个16位的无符号整数
+// TODO 待移除的
 void splitFloat(float a, uint16_t *pa1, uint16_t *pa2);
 
 // 将两个16位的无符号整数组合成原始的32位浮点数
+// TODO 待移除的
 float combineFloat(uint16_t pa1, uint16_t pa2);
 
 // 过滤摇杆输出到-2048~2047;

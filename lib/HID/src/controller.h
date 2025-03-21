@@ -26,7 +26,6 @@ public:
   void begin();
 };
 
-extern XBOXONE Xbox;
 extern CONTROLLER Controller;
 
 #endif
