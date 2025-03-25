@@ -7,14 +7,7 @@
 #define TAG "Controller"
 
 #include "Arduino.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -36,9 +29,11 @@
 #define XBOX_CONTROLLER_INDEX_BUTTONS_CENTER 14
 #define XBOX_CONTROLLER_INDEX_BUTTONS_SHARE 15
 
-CONTROLLER Controller;
-
 #define SCAN_DURATION_SECONDS 5
+
+static auto Q_RECV = xQueueCreate(10, sizeof(xbox_control_data));
+
+CONTROLLER Controller;
 
 void hid_task(void *pvParameters)
 {
@@ -111,44 +106,12 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
   case ESP_HIDH_INPUT_EVENT:
   {
 
-#if CONFIG_LOG_DEFAULT_LEVEL == 3 // debug
-    if (esp_log_get_level() & ESP_LOG_DEBUG)
-    {
-      const uint8_t *bda = esp_hidh_dev_bda_get(param->input.dev);
+    // const uint8_t *bda = esp_hidh_dev_bda_get(param->input.dev);
+    // ESP_LOGI(TAG, ESP_BD_ADDR_STR " INPUT: %8s, MAP: %2u, ID: %3u, Len: %d, Data:", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->input.usage), param->input.map_index, param->input.report_id, param->input.length);
+    // ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
+    // ESP_LOGI(TAG, "id:%3u", param->input.report_id);
 
-      ESP_LOGI(TAG, ESP_BD_ADDR_STR " INPUT: %8s, MAP: %2u, ID: %3u, Len: %d, Data:", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->input.usage), param->input.map_index, param->input.report_id, param->input.length);
-
-      ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
-
-      ESP_LOGI(TAG, "id:%3u", param->input.report_id);
-    }
-#endif
-
-    /*
-    bool btnA, btnB, btnX, btnY;
-    bool btnShare, btnStart, btnSelect, btnXbox;
-    // side top button
-    bool btnLB, btnRB;
-    // button on joy stick
-    bool btnLS, btnRS;
-
-
-    uint16_t joyLHori = maxJoy / 2;
-    uint16_t joyLVert = maxJoy / 2;
-    uint16_t joyRHori = maxJoy / 2;
-    uint16_t joyRVert = maxJoy / 2;
-    */
-    bool btnDirUp, btnDirLeft, btnDirRight, btnDirDown;
-    uint16_t joyLHori;
-    uint16_t joyLVert;
-    uint16_t joyRHori;
-    uint16_t joyRVert;
-    uint16_t trigLT, trigRT;
-
-    static uint8_t btnBits;
-
-    btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_MAIN];
-
+    uint8_t btnBits;
     /*
     btnA = btnBits & 0b00000001;
     btnB = btnBits & 0b00000010;
@@ -157,161 +120,66 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     btnLB = btnBits & 0b01000000;
     btnRB = btnBits & 0b10000000;
     */
-
-    Controller.btnA = (btnBits & 0b00000001);
-    Controller.btnB = (btnBits & 0b00000010);
-    Controller.btnX = (btnBits & 0b00001000);
-    Controller.btnY = (btnBits & 0b00010000);
-    Controller.btnLB = (btnBits & 0b01000000);
-    Controller.btnRB = (btnBits & 0b10000000);
-
-    btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_CENTER];
-
-    // if (btnBits & 0b00000100) // Select
-    //     ps4_report.buttons2 |= (1 << 4);
-
-    // if (btnBits & 0b00001000) // Start
-    //     ps4_report.buttons2 |= (1 << 5);
-
-    // if (btnBits & 0b00010000) // Xbox
-    //     ps4_report.buttons3 |= (1 << 0);
-
-    // if (btnBits & 0b00100000) // LS
-    //     ps4_report.buttons2 |= (1 << 6);
-
-    // if (btnBits & 0b01000000) // RS
-    //     ps4_report.buttons2 |= (1 << 7);
+    btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_MAIN];
+    Controller.button_bits[btnA] = (btnBits & 0b00000001);
+    Controller.button_bits[btnB] = (btnBits & 0b00000010);
+    Controller.button_bits[btnX] = (btnBits & 0b00001000);
+    Controller.button_bits[btnY] = (btnBits & 0b00010000);
+    Controller.button_bits[btnLB] = (btnBits & 0b01000000);
+    Controller.button_bits[btnRB] = (btnBits & 0b10000000);
 
     /*
-           btnSelect = btnBits & 0b00000100;
-           btnStart = btnBits & 0b00001000;
-           btnXbox = btnBits & 0b00010000;
-           btnLS = btnBits & 0b00100000;
-           btnRS = btnBits & 0b01000000;
-           */
+    btnSelect = btnBits & 0b00000100;
+    btnStart = btnBits & 0b00001000;
+    btnXbox = btnBits & 0b00010000;
+    btnLS = btnBits & 0b00100000;
+    btnRS = btnBits & 0b01000000;
+    */
 
-    btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_SHARE]; // btnShare
-
-    // if (btnBits & 0b00000001)
-    //     ps4_report.buttons3 |= (1 << 1);
+    btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_CENTER];
+    Controller.button_bits[btnSelect] = (btnBits & 0b00000100);
+    Controller.button_bits[btnStart] = (btnBits & 0b00001000);
+    Controller.button_bits[btnXbox] = (btnBits & 0b00010000);
+    Controller.button_bits[btnLS] = (btnBits & 0b00100000);
+    Controller.button_bits[btnRS] = (btnBits & 0b01000000);
 
     /*
     btnShare = btnBits & 0b00000001;
     */
+    btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_SHARE];
+    Controller.button_bits[btnShare] = (btnBits & 0b00000001);
 
     btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_DIR];
-    btnDirUp = btnBits == 1 || btnBits == 2 || btnBits == 8;
-    btnDirRight = 2 <= btnBits && btnBits <= 4;
-    btnDirDown = 4 <= btnBits && btnBits <= 6;
-    btnDirLeft = 6 <= btnBits && btnBits <= 8;
+    auto dirUP = btnBits == 1 || btnBits == 2 || btnBits == 8;
+    auto dirRight = 2 <= btnBits && btnBits <= 4;
+    auto dirDown = 4 <= btnBits && btnBits <= 6;
+    auto dirLeft = 6 <= btnBits && btnBits <= 8;
 
-    // if (btnDirUp && btnDirRight)
-    // {
+    Controller.button_bits[btnDirUp] = dirUP;
+    Controller.button_bits[btnDirRight] = dirRight;
+    Controller.button_bits[btnDirDown] = dirDown;
+    Controller.button_bits[btnDirLeft] = dirLeft;
 
-    //     ps4_report.buttons1 |= 0x01;
-    // }
-    // else if (btnDirDown && btnDirLeft)
-    // {
+    /*
+     * joyLHori 0
+     * joyLVori 2
+     * joyRHori 4
+     * joyRVori 6
+     * trigLT   8
+     * trigRT   10
+     */
+    auto read_analog = [&](uint8_t index)
+    {
+      return (uint16_t)param->input.data[index] |
+             ((uint16_t)param->input.data[index + 1] << 8);
+    };
 
-    //     ps4_report.buttons1 |= 0x05;
-    // }
-    // else if (btnDirDown && btnDirRight)
-    // {
-
-    //     ps4_report.buttons1 |= 0x03;
-    // }
-    // else if (btnDirUp && btnDirLeft)
-    // {
-
-    //     ps4_report.buttons1 |= 0x07;
-    // }
-    // else if (btnDirUp)
-    // {
-
-    //     ps4_report.buttons1 |= 0x00;
-    // }
-    // else if (btnDirRight)
-    // {
-
-    //     ps4_report.buttons1 |= 0x02;
-    // }
-    // else if (btnDirDown)
-    // {
-
-    //     ps4_report.buttons1 |= 0x04;
-    // }
-    // else if (btnDirLeft)
-    // {
-
-    //     ps4_report.buttons1 |= 0x06;
-    // }
-    // else
-    // {
-
-    //     ps4_report.buttons1 |= 0x08;
-    // }
-
-    joyLHori = (uint16_t)param->input.data[0] | ((uint16_t)param->input.data[1] << 8); // 0-65535
-    joyLVert = (uint16_t)param->input.data[2] | ((uint16_t)param->input.data[3] << 8);
-    joyRHori = (uint16_t)param->input.data[4] | ((uint16_t)param->input.data[5] << 8);
-    joyRVert = (uint16_t)param->input.data[6] | ((uint16_t)param->input.data[7] << 8);
-
-    trigLT = (uint16_t)param->input.data[8] | ((uint16_t)param->input.data[9] << 8); // 0-1024
-
-    ESP_LOGI(TAG, "Controller: A%d", Controller.btnA);
-
-    // ESP_LOGI(TAG, "joyLHori:%u joyLVert:%u joyRHori:%u joyRVert:%u",
-    //          joyLHori, joyLVert, joyRHori, joyRVert);
-
-    trigRT = (uint16_t)param->input.data[10] | ((uint16_t)param->input.data[11] << 8);
-
-    // if (trigLT)
-    //     ps4_report.buttons2 |= (1 << 2);
-
-    // if (trigRT)
-    //     ps4_report.buttons2 |= (1 << 3);
-
-    // ps4_report.lt = trigLT / 4;
-    // ps4_report.rt = trigRT / 4;
-
-    // ps4_report.lx = joyLHori / 256;
-    // ps4_report.ly = joyLVert / 256;
-
-    // ps4_report.rx = joyRHori / 256;
-    // ps4_report.ry = joyRVert / 256;
-
-    // ps4_report.timestamp = last_timestamp;
-
-    // printf("A:%01x B:%01x X:%01x Y:%01x LB:%01x RB:%01x Select:%01x Start:%01x Xbox:%01x LS:%01x RS:%01x Share:%01x\n", btnA, btnB, btnX, btnY, btnLB, btnRB, btnSelect, btnStart, btnXbox, btnLS, btnRS, btnShare);
-
-    // printf("lx:%04x ly:%04x rx:%04x ry:%04x LT:%04x RT:%01x \n", joyLHori, joyLVert, joyRHori, joyRVert, trigLT, trigRT);
-
-    // memcpy(last_buf, param->input.data, 16);
-    // timer = esp_timer_get_time();
-
-    // ps4_report.battery = 0 | (1 << 4) | 11;
-
-    // ps4_report.gyrox = 0;
-    // ps4_report.gyroy = 0;
-    // ps4_report.gyroz = 0;
-    // ps4_report.accelx = 0;
-    // ps4_report.accely = 0;
-    // ps4_report.accelz = 0;
-
-    // ps4_report.extension = 0x01;
-
-    // ps4_report.touchpad_event_active = 0;
-    // ps4_report.touchpad_counter = 0;
-    // ps4_report.touchpad1_touches = (1 << 7);
-    // ps4_report.touchpad2_touches = (1 << 7);
-
-    // ps4_report.unknown3[1] = 0x80;
-    // ps4_report.unknown3[5] = 0x80;
-    // ps4_report.unknown3[10] = 0x80;
-    // ps4_report.unknown3[14] = 0x80;
-    // ps4_report.unknown3[19] = 0x80;
-
-    // send_hid_ps4_report(&ps4_report);
+    Controller.analog_hat[joyLHori] = analogHatFilter(read_analog(0));
+    Controller.analog_hat[joyLVert] = analogHatFilter(read_analog(2));
+    Controller.analog_hat[joyRHori] = analogHatFilter(read_analog(4));
+    Controller.analog_hat[joyRVert] = analogHatFilter(read_analog(6));
+    Controller.analog_hat[trigLT] = read_analog(8);
+    Controller.analog_hat[trigRT] = read_analog(10);
 
     break;
   }
@@ -366,109 +234,18 @@ void bt_controller_init()
   xTaskCreate(&hid_task, "hid_task", 6 * 1024, NULL, 2, NULL);
 };
 
-// 使用独立任务避免usb数据读取卡死
-void task_update(void *pt)
-{
-  bt_controller_init();
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = pdMS_TO_TICKS(HZ2TICKS(250));
-  while (true)
-  {
-    // ESP_LOGI(TAG, "XboxOneConnected: %d", Xbox.XboxOneConnected);
-    Controller.update();
-    xTaskDelayUntil(&xLastWakeTime, xFrequency);
-  }
-}
-
-// 0 ~ 2047
-const int deadZone = 8000;
-const int maxLength = 32768;
-const int resolution = 2048;
-const float_t step = (float_t)(maxLength - deadZone) / (float_t)resolution;
-void syncAnalogHat(int16_t _from, int16_t *_to)
-{
-  // 计算除去死区后摇杆的值
-  const int16_t t_from = _from < 0 ? _from - (deadZone * -1) : _from - deadZone;
-
-  int16_t toValue = _from < (deadZone * -1) || _from > deadZone
-                        ? (float_t)t_from / step
-                        : 0;
-
-  *_to = toValue < -2048 ? -2048 : toValue;
-}
-
 // 启动xbox控制器
 void CONTROLLER::begin()
 {
-  xTaskCreate(task_update, "taskUSB", 1204 * 5, NULL, TP_HIGHEST, NULL);
+  bt_controller_init();
 }
 
-void CONTROLLER::update() {
-  // if (Xbox.XboxOneConnected)
-  // {
-  //   // 字母键
-  //   btnA = Xbox.getButtonPress(A);
-  //   btnB = Xbox.getButtonPress(B);
-  //   btnX = Xbox.getButtonPress(X);
-  //   btnY = Xbox.getButtonPress(Y);
-
-  //   // 功能键
-  //   btnStart = Xbox.getButtonPress(START);
-  //   // btnXbox = Xbox.getButtonPress(XBOX); // XXX 功能异常不使用
-  //   btnSelect = Xbox.getButtonPress(BACK);
-  //   btnShare = Xbox.getButtonPress(SYNC);
-
-  //   // 肩键
-  //   btnLB = Xbox.getButtonPress(L1);
-  //   btnRB = Xbox.getButtonPress(R1);
-
-  //   // 方向键
-  //   btnDirUp = Xbox.getButtonPress(UP);
-  //   btnDirDown = Xbox.getButtonPress(DOWN);
-  //   btnDirLeft = Xbox.getButtonPress(LEFT);
-  //   btnDirRight = Xbox.getButtonPress(RIGHT);
-
-  //   // 摇杆
-  //   syncAnalogHat(Xbox.getAnalogHat(LeftHatX), &joyLHori);
-  //   syncAnalogHat(Xbox.getAnalogHat(LeftHatY), &joyLVert);
-  //   btnLS = Xbox.getButtonPress(L3);
-
-  //   syncAnalogHat(Xbox.getAnalogHat(RightHatX), &joyRHori);
-  //   syncAnalogHat(Xbox.getAnalogHat(RightHatY), &joyRVert);
-  //   btnRS = Xbox.getButtonPress(R3);
-
-  //   // 扳机键
-  //   trigLT = Xbox.getButtonPress(L2);
-  //   trigRT = Xbox.getButtonPress(R2);
-  // }
-};
-
-// ↓this code from XboxControllerNotificationParser lib
-String CONTROLLER::toString()
+bool CONTROLLER::getButtonPress(XBOX_BUTTON btn)
 {
-  // clang-format off
-  String str = String("") +
-    "btnY: " + String(btnY) + " " +
-    "btnX: " + String(btnX) + " " +
-    "btnB: " + String(btnB) + " " +
-    "btnA: " + String(btnA) + " " +
-    "btnLB: " + String(btnLB) + " " +
-    "btnRB: " + String(btnRB) + "\n" +
-    "btnSelect: " + String(btnSelect) + " " +
-    "btnStart: " + String(btnStart) + " " +
-    "btnXbox: " + String(btnXbox) + " " +
-    "btnShare: " + String(btnShare) + " " +
-    "btnLS: " + String(btnLS) + " " +
-    "btnRS: " + String(btnRS) + "\n" +
-    "btnDirUp: " + String(btnDirUp) + " " +
-    "btnDirRight: " + String(btnDirRight) + " " +
-    "btnDirDown: " + String(btnDirDown) + " " +
-    "btnDirLeft: " + String(btnDirLeft) + "\n"
-    "joyLHori: " + String(joyLHori) + "\n" +
-    "joyLVert: " + String(joyLVert) + "\n" +
-    "joyRHori: " + String(joyRHori) + "\n" +
-    "joyRVert: " + String(joyRVert) + "\n" +
-    "trigLT: " + String(trigLT) + "\n" +
-    "trigRT: " + String(trigRT) + "\n";
-  return str;
+  return this->button_bits[btn];
+}
+
+int16_t CONTROLLER::getAnalogHat(XBOX_ANALOG_HAT hat)
+{
+  return this->analog_hat[hat];
 }

@@ -27,9 +27,9 @@ struct listener
 
 struct listenerButton : public listener
 {
-  ButtonEnum key;
+  XBOX_BUTTON key;
 
-  listenerButton(ButtonEnum key, key_id event_id)
+  listenerButton(XBOX_BUTTON key, key_id event_id)
   {
     this->event_id = event_id;
     this->key = key;
@@ -43,9 +43,7 @@ struct listenerButton : public listener
     // btn_LPT = CONFIG_UI[BTN_LPT];
     // btn_SPT = CONFIG_UI[BTN_SPT];
 
-    auto btn_Status = 0;
-    // auto btn_Status = Xbox.getButtonPress(key);
-
+    auto btn_Status = Controller.getButtonPress(key);
     if (!btn_Status)
       send_count = 0; // 重置发送次数标记
 
@@ -55,7 +53,7 @@ struct listenerButton : public listener
 
     // 计算按钮按压时间
     press_count = 0;
-    while (0)
+    while (Controller.getButtonPress(key))
     {
       if (press_count >= hold_time)
         break;
@@ -70,10 +68,10 @@ struct listenerButton : public listener
 
 struct listenerJoystick : public listener
 {
-  AnalogHatEnum key;
+  XBOX_ANALOG_HAT key;
   bool joy_is_up;
 
-  listenerJoystick(AnalogHatEnum key, key_id joy_UP, key_id joy_DOWN)
+  listenerJoystick(XBOX_ANALOG_HAT key, key_id joy_UP, key_id joy_DOWN)
   {
     this->key = key;
     event_id = joy_UP;
@@ -95,8 +93,7 @@ struct listenerJoystick : public listener
     int btn_SPT = 15;
     btn_LPT = CONFIG_UI[BTN_LPT];
     btn_SPT = CONFIG_UI[BTN_SPT];
-    auto analogHatStatus = analogHatFilter(0);
-    // auto analogHatStatus = analogHatFilter(Xbox.getAnalogHat(key));
+    auto analogHatStatus = Controller.getAnalogHat(key);
     int hold_time = btn_LPT;
     hold_time = btn_LPT * (1.0f - (abs((float)analogHatStatus) / 2048.0f));
     hold_time = hold_time < btn_SPT ? btn_SPT : hold_time;
@@ -106,8 +103,7 @@ struct listenerJoystick : public listener
     {
       press_count++;
       joy_is_up = analogHatStatus > 0;
-      analogHatStatus = analogHatFilter(0);
-      // analogHatStatus = analogHatFilter(Xbox.getAnalogHat(key));
+      analogHatStatus = Controller.getAnalogHat(key);
       vTaskDelay(1);
     }
     // 根据按压时间决定发出事件
@@ -117,17 +113,17 @@ struct listenerJoystick : public listener
 };
 
 // 绑定按键到GUI事件
-std::vector<std::tuple<ButtonEnum, key_id>> button = {
-    {START, KEY_MENU},
-    {DOWN, KEY_DOWN},
-    {A, KEY_CONFIRM},
-    {B, KEY_BACK},
-    {UP, KEY_UP},
+std::vector<std::tuple<XBOX_BUTTON, key_id>> button = {
+    {btnStart, KEY_MENU},
+    {btnDirDown, KEY_DOWN},
+    {btnA, KEY_CONFIRM},
+    {btnB, KEY_BACK},
+    {btnDirUp, KEY_UP},
 };
 
 // 绑定摇杆到GUI事件
-std::vector<std::tuple<AnalogHatEnum, key_id, key_id>> joystick = {
-    {LeftHatY, KEY_UP, KEY_DOWN}};
+std::vector<std::tuple<XBOX_ANALOG_HAT, key_id, key_id>> joystick = {
+    {joyLVert, KEY_DOWN, KEY_UP}};
 
 // 监听器队列
 std::vector<listener *> listeners;
@@ -157,10 +153,10 @@ void hid_begin()
 
   xTaskCreatePinnedToCore(task_hid, "task_hid", 1024 * 3, NULL, TP_HIGHEST, NULL, 1);
 
-  auto task_send_control_data = [](void *pt)
+  auto taskCrtpPacket = [](void *pt)
   {
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(8);
+    const TickType_t xFrequency = HZ2TICKS(80);
     static radio_packet_t rp;
     auto crtp = (CRTPPacket *)rp.data;
 
@@ -178,10 +174,10 @@ void hid_begin()
     while (true)
     {
 
-      ROLL = match_angl(40, Controller.joyLHori);
-      PITCH = match_angl(30, Controller.joyRVert) * -1;
-      YAW = match_angl(30, Controller.joyRHori);
-      THRUST = Controller.joyLVert * 32;
+      ROLL = match_angl(40, Controller.getAnalogHat(joyLHori));
+      PITCH = match_angl(30, Controller.getAnalogHat(joyLVert));
+      YAW = match_angl(30, Controller.getAnalogHat(joyRHori));
+      THRUST = (Controller.getAnalogHat(trigLT) * 64) - 1;
       crtp->port = CRTP_PORT_SETPOINT;
       crtp->channel = 0;
 
@@ -196,5 +192,5 @@ void hid_begin()
     }
   };
 
-  xTaskCreate(task_send_control_data, "task_send_control_data", 1024 * 3, NULL, TP_HIGHEST, NULL);
+  xTaskCreate(taskCrtpPacket, "taskCrtpPacket", 1024 * 3, NULL, TP_H, NULL);
 }

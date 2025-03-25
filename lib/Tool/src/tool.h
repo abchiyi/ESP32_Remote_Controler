@@ -37,7 +37,7 @@ void splitFloat(float a, uint16_t *pa1, uint16_t *pa2);
 float combineFloat(uint16_t pa1, uint16_t pa2);
 
 // 过滤摇杆输出到-2048~2047;
-int16_t analogHatFilter(int16_t value);
+int16_t analogHatFilter(uint16_t value);
 
 /**
  * @brief 计算给定数据的校验和。

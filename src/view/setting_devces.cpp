@@ -71,10 +71,10 @@ void task_udp(void *)
     while (true)
     {
         auto _raw_d = cpr();
-        _raw_d.THRUST = Controller.joyLVert * 32;
-        _raw_d.YAW = match_angl(40, Controller.joyLHori);
-        _raw_d.PITCH = match_angl(30, Controller.joyRVert) * -1;
-        _raw_d.ROLL = match_angl(30, Controller.joyRHori);
+        // _raw_d.THRUST = Controller.joyLVert * 32;
+        // _raw_d.YAW = match_angl(40, Controller.joyLHori);
+        // _raw_d.PITCH = match_angl(30, Controller.joyRVert) * -1;
+        // _raw_d.ROLL = match_angl(30, Controller.joyRHori);
         _raw_d.channel = 0;
         _raw_d.port = 3;
 

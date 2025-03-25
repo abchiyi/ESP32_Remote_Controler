@@ -29,26 +29,46 @@ float combineFloat(uint16_t pa1, uint16_t pa2)
   return *((float *)(&p));
 }
 
-#include "XBOXONE.h"
-// 0 ~ 2047
-#define DEAD_ZONE 8000.0F
-const int maxLength = 32768;
-const int resolution = 2048;
-
-const float_t step = (float_t)(maxLength - DEAD_ZONE) / (float_t)resolution;
-
-int16_t analogHatFilter(int16_t value)
+short analogHatFilter(uint16_t rawValue)
 {
-  // 计算除去死区后摇杆的值
-  const int16_t t_from = value < 0
-                             ? value - -DEAD_ZONE
-                             : value - DEAD_ZONE;
+  const int mid = 32768;      // 摇杆中间原始值
+  const int deadzone = 4000;  // 虚位死区阈值（根据实际硬件调整）
+  const int maxOutput = 2048; // 目标最大输出值
 
-  int16_t toValue = value < (DEAD_ZONE * -1) || value > DEAD_ZONE
-                        ? (float_t)t_from / step
-                        : 0;
+  // 计算相对于中间值的偏移量（范围：-32768 ~ +32767）
+  int offset = (int)rawValue - mid;
 
-  return toValue < -2048 ? -2048 : toValue;
+  // 死区过滤：中间虚位部分直接返回0
+  if (abs(offset) <= deadzone)
+    return 0;
+
+  // 确定方向（正：右摇杆，负：左摇杆）
+  int direction = (offset > 0) ? 1 : -1;
+
+  // 计算有效偏移量（扣除死区后的实际偏移）
+  int effectiveOffset = abs(offset) - deadzone;
+
+  // 计算有效范围的最大偏移量（左/右可能不对称）
+  int maxEffectiveOffset;
+  if (direction == 1)
+  {
+    // 右侧有效范围：从 (mid + deadzone) 到 65535
+    maxEffectiveOffset = 65535 - (mid + deadzone);
+  }
+  else
+  {
+    // 左侧有效范围：从 0 到 (mid - deadzone)
+    maxEffectiveOffset = mid - deadzone;
+  }
+
+  // 线性缩放至目标范围 [-2048, 2048]
+  int scaledValue = (effectiveOffset * maxOutput) / maxEffectiveOffset;
+
+  // 确保不超出目标范围
+  scaledValue = (scaledValue > maxOutput) ? maxOutput : scaledValue;
+
+  // 返回带方向的最终值
+  return (short)(direction * scaledValue);
 }
 
 IRAM_ATTR uint8_t calculate_cksum(void *data, size_t len)

@@ -280,6 +280,7 @@ void WouoUI::uiUpdate()
     event_t event;
     if (xQueueReceive(Q_Event, &event, 2) == pdTRUE)
     {
+      ESP_LOGI(TAG, "event: %d", event.key_id);
       if (page->windows.size()) // 当有窗口显示时，顶部窗口接管按键
         get_top_window()->onUserInput(event);
       else

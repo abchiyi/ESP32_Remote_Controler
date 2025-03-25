@@ -124,7 +124,7 @@ public:
     static const uint8_t s_length = 21; // 滑动条长度
 
     // draw control data
-    float joy_l_y = Controller.joyLVert / 2048.0;
+    float joy_l_y = Controller.getAnalogHat(joyLVert) / 2048.0;
 
     auto r_draw_slider_y = [=](float data, uint8_t pos_x)
     {
