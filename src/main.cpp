@@ -47,47 +47,22 @@ void setup()
 {
   Serial.begin(115200);
   Power.begin();
-  vTaskDelay(100);
 
   start_wifi_link();
-  vTaskDelay(100);
 
-  /** 控制器输入 **/
+  /** 启动蓝牙控制器接入 **/
   Controller.begin();
-  hid_begin();
-  vTaskDelay(100);
-
   ESP_LOGI(TAG, "setup controller success");
-  /** GUI **/
+
+  /** 设置输入 */
+  hid_begin();
+
+  /** 启动 GUI */
   WOUO_UI.begin(&u8g2, create_page_main);
   u8g2.setContrast(255);
-  ESP_LOGI(TAG, "setup gui success");
 
-  pinMode(7, OUTPUT);
-
-  // vTaskDelete(NULL); // 干掉 loopTask
+  vTaskDelete(NULL); // 干掉 loopTask
 }
-static uint8_t pwm_value = 0;
-static bool increasing = true;
-
 void loop()
 {
-  // digitalWrite(7, !(bool)digitalRead(7));
-
-  if (increasing)
-  {
-    pwm_value++;
-    if (pwm_value >= 30)
-      increasing = false;
-  }
-  else
-  {
-    pwm_value--;
-    if (pwm_value <= 0)
-      increasing = true;
-  }
-
-  analogWrite(7, pwm_value);
-
-  vTaskDelay(15);
 }

@@ -1,79 +1,182 @@
 #include <controller.h>
+#include "nvs_flash.h"
 #include "FreeRTOS.h"
+#include "esp_log.h"
 #include "config.h"
 #include "tool.h"
-#include "esp_log.h"
-
-#define TAG "Controller"
-
-#include "Arduino.h"
-
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "nvs_flash.h"
-#include "esp_bt.h"
-#include "esp_bt_defs.h"
-#include "esp_gap_ble_api.h"
-#include "esp_gatts_api.h"
-#include "esp_gatt_defs.h"
-#include "esp_bt_main.h"
-#include "esp_bt_device.h"
 
 #include "esp_hidh.h"
 #include "esp_hid_gap.h"
-#include "esp_timer.h"
 
+#define TAG "Controller"
 #define XBOX_CONTROLLER_INDEX_BUTTONS_DIR 12
 #define XBOX_CONTROLLER_INDEX_BUTTONS_MAIN 13
 #define XBOX_CONTROLLER_INDEX_BUTTONS_CENTER 14
 #define XBOX_CONTROLLER_INDEX_BUTTONS_SHARE 15
 
-#define SCAN_DURATION_SECONDS 5
-
 static auto Q_RECV = xQueueCreate(10, sizeof(xbox_control_data));
 
+// NVS 储存
+#define NVS_NAMESPACE "bt_controller"
+#define NVS_KEY_LAST_DEV "last_dev"
+
+// BT 连接
+#define SCAN_DURATION_SECONDS 5       // 扫描时间
+static TaskHandle_t *th_cc = nullptr; // 连接手柄任务句柄
+bool IS_CONNECTED = false;            // 是否已连接
+bool SCAN_NEW = false;                // 是否连接新设备
+
+struct bt_dev // 蓝牙设备信息
+{
+  esp_bd_addr_t bda;
+  esp_hid_transport_t transport;
+  esp_ble_addr_type_t addr_type;
+};
+
+bt_dev devInfo; // 最后连接的设备信息
 CONTROLLER Controller;
 
-void hid_task(void *pvParameters)
+esp_err_t save_last_dev(bt_dev *bd)
 {
-  size_t results_len = 0;
-  esp_hid_scan_result_t *results = NULL;
-  ESP_LOGI(TAG, "SCAN...");
-  // start scan for HID devices
-  esp_hid_scan(SCAN_DURATION_SECONDS, &results_len, &results);
-  ESP_LOGI(TAG, "SCAN: %u results", results_len);
-  if (results_len)
+  esp_err_t ret;
+  nvs_handle_t nvs;
+  ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs);
+  if (ret != ESP_OK)
   {
-    esp_hid_scan_result_t *r = results;
-    esp_hid_scan_result_t *cr = NULL;
-    while (r)
-    {
-      printf("  %s: " ESP_BD_ADDR_STR ", ", (r->transport == ESP_HID_TRANSPORT_BLE) ? "BLE" : "BT ", ESP_BD_ADDR_HEX(r->bda));
-      printf("RSSI: %d, ", r->rssi);
-      printf("USAGE: %s, ", esp_hid_usage_str(r->usage));
+    ESP_LOGE(TAG, "nvs_open failed, error code = %s", esp_err_to_name(ret));
+    return ESP_FAIL;
+  }
 
-      if (r->transport == ESP_HID_TRANSPORT_BLE)
+  ret = nvs_set_blob(nvs, NVS_KEY_LAST_DEV, bd, sizeof(bt_dev));
+  if (ret == ESP_OK)
+  {
+    ret = nvs_commit(nvs);
+    ESP_LOGE(TAG, "nvs_commit failed, error code = %s", esp_err_to_name(ret));
+  }
+  else
+    ESP_LOGE(TAG, "nvs_set_blob failed, error code = %s", esp_err_to_name(ret));
+
+  nvs_close(nvs);
+  return ESP_OK;
+}
+
+esp_err_t read_last_dev(bt_dev *bd)
+{
+  esp_err_t ret;
+  nvs_handle_t nvs;
+  ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs);
+  if (ret != ESP_OK)
+  {
+    ESP_LOGE(TAG, "nvs_open failed, error code = %s", esp_err_to_name(ret));
+    return ESP_FAIL;
+  }
+
+  size_t req_size = sizeof(bt_dev);
+  ret = nvs_get_blob(nvs, NVS_KEY_LAST_DEV, bd, &req_size);
+  if (ret != ESP_OK)
+  {
+    ESP_LOGE(TAG, "nvs_get_blob failed, error code = %s", esp_err_to_name(ret));
+    return ESP_FAIL;
+  }
+
+  return ESP_OK;
+}
+
+/**
+ * 启动一个异步任务处理连接到控制器相关事务
+ *
+ * @return esp_err_t ESP_OK 成功
+ */
+esp_err_t connect_controller()
+{
+  static auto task = [](void *pt)
+  {
+    static bool task_is_running = false;
+    esp_err_t ret;
+
+    /**
+     * 当scan_new为true时，从flash读取设备信息，否则从flash读取设备信息
+     * 从flash读取设备信息失败时会启动扫描
+     */
+    while (!SCAN_NEW)
+    {
+      ret = read_last_dev(&devInfo);
+      if (ret == ESP_OK)
       {
-        cr = r;
-        printf("APPEARANCE: 0x%04x, ", r->ble.appearance);
-        printf("ADDR_TYPE: '%s', ", ble_addr_type_str(r->ble.addr_type));
+        ESP_LOGI(TAG, "Connected to last device");
+        esp_hidh_dev_open(devInfo.bda, devInfo.transport, devInfo.addr_type);
+      }
+      else
+        ESP_LOGE(TAG, "read_last_dev failed, error = %s", esp_err_to_name(ret));
+
+      if (IS_CONNECTED)
+      {
+        ESP_LOGW(TAG, "Connected,Scan Task ended");
+        vTaskDelete(NULL);
+      }
+    }
+
+    while (true)
+    {
+      size_t results_len = 0;
+      esp_hid_scan_result_t *results = NULL;
+
+      ESP_LOGI(TAG, "SCAN...");
+      // start scan for HID devices
+      esp_hid_scan(SCAN_DURATION_SECONDS, &results_len, &results);
+      ESP_LOGI(TAG, "SCAN: %u results", results_len);
+      if (results_len)
+      {
+        esp_hid_scan_result_t *r = results;
+        esp_hid_scan_result_t *cr = NULL;
+        while (r)
+        {
+          printf("  %s: " ESP_BD_ADDR_STR ", ", (r->transport == ESP_HID_TRANSPORT_BLE) ? "BLE" : "BT ", ESP_BD_ADDR_HEX(r->bda));
+          printf("RSSI: %d, ", r->rssi);
+          printf("USAGE: %s, ", esp_hid_usage_str(r->usage));
+
+          // TODO 检测 是否等于 0x03C4|0x03C2 判断类型是否为手柄
+          if (r->transport == ESP_HID_TRANSPORT_BLE)
+          {
+            cr = r;
+            printf("APPEARANCE: 0x%04x, ", r->ble.appearance);
+            printf("ADDR_TYPE: '%s', ", ble_addr_type_str(r->ble.addr_type));
+          }
+
+          printf("NAME: %s ", r->name ? r->name : "");
+          printf("\n");
+          r = r->next;
+        }
+        if (cr)
+        {
+          // open the last result
+          esp_hidh_dev_open(cr->bda, cr->transport, cr->ble.addr_type);
+
+          // save the last result
+          memcpy(&devInfo.bda, cr->bda, sizeof(devInfo.bda));
+          devInfo.transport = cr->transport;
+          devInfo.addr_type = cr->ble.addr_type;
+          save_last_dev(&devInfo);
+        }
+        // free the results
+        esp_hid_scan_results_free(results);
       }
 
-      printf("NAME: %s ", r->name ? r->name : "");
-      printf("\n");
-      r = r->next;
+      if (IS_CONNECTED)
+      {
+        ESP_LOGW(TAG, "Connected,Scan Task ended");
+        vTaskDelete(NULL);
+      }
     }
-    if (cr)
-    {
-      // open the last result
-      esp_hidh_dev_open(cr->bda, cr->transport, cr->ble.addr_type);
-    }
-    // free the results
-    esp_hid_scan_results_free(results);
+  };
+
+  auto ret = xTaskCreate(task, "connect_controller", 4096, NULL, 5, th_cc);
+  if (ret != pdPASS)
+  {
+    ESP_LOGE(TAG, "xTaskCreate failed");
+    return ESP_FAIL;
   }
-  ESP_LOGW(TAG, "SCAN: done, Task ended");
-  vTaskDelete(NULL);
+  return ESP_OK;
 }
 
 void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
@@ -87,6 +190,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
   {
     if (param->open.status == ESP_OK)
     {
+      IS_CONNECTED = true;
       const uint8_t *bda = esp_hidh_dev_bda_get(param->open.dev);
       ESP_LOGI(TAG, ESP_BD_ADDR_STR " OPEN: %s", ESP_BD_ADDR_HEX(bda), esp_hidh_dev_name_get(param->open.dev));
       esp_hidh_dev_dump(param->open.dev, stdout);
@@ -196,9 +300,8 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
   {
     const uint8_t *bda = esp_hidh_dev_bda_get(param->close.dev);
     ESP_LOGI(TAG, ESP_BD_ADDR_STR " CLOSE: %s", ESP_BD_ADDR_HEX(bda), esp_hidh_dev_name_get(param->close.dev));
-
-    xTaskCreate(&hid_task, "hid_task", 6 * 1024, NULL, 2, NULL);
-
+    ESP_ERROR_CHECK(connect_controller());
+    IS_CONNECTED = false;
     break;
   }
   default:
@@ -230,14 +333,14 @@ void bt_controller_init()
       .callback_arg = NULL,
   };
   ESP_ERROR_CHECK(esp_hidh_init(&config));
-
-  xTaskCreate(&hid_task, "hid_task", 6 * 1024, NULL, 2, NULL);
 };
 
 // 启动xbox控制器
 void CONTROLLER::begin()
 {
   bt_controller_init();
+  ESP_LOGI(TAG, "connect to controller");
+  ESP_ERROR_CHECK(connect_controller());
 }
 
 bool CONTROLLER::getButtonPress(XBOX_BUTTON btn)
