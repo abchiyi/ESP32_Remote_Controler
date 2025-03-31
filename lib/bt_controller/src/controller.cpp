@@ -301,6 +301,8 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     const uint8_t *bda = esp_hidh_dev_bda_get(param->close.dev);
     ESP_LOGI(TAG, ESP_BD_ADDR_STR " CLOSE: %s", ESP_BD_ADDR_HEX(bda), esp_hidh_dev_name_get(param->close.dev));
     ESP_ERROR_CHECK(connect_controller());
+    memset(Controller.analog_hat, 0, sizeof(Controller.analog_hat));
+    memset(Controller.button_bits, 0, sizeof(Controller.button_bits));
     IS_CONNECTED = false;
     break;
   }
