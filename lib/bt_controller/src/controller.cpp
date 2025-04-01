@@ -4,9 +4,15 @@
 #include "esp_log.h"
 #include "config.h"
 #include "tool.h"
+#include "atomic"
+#include "freertos/atomic.h"
+#include "freertos/semphr.h"
+#include "rw_lock.h"
 
 #include "esp_hidh.h"
 #include "esp_hid_gap.h"
+
+rwlock_t rwlock; // 读写锁
 
 #define TAG "Controller"
 #define XBOX_CONTROLLER_INDEX_BUTTONS_DIR 12
@@ -21,10 +27,10 @@ static auto Q_RECV = xQueueCreate(10, sizeof(xbox_control_data));
 #define NVS_KEY_LAST_DEV "last_dev"
 
 // BT 连接
-#define SCAN_DURATION_SECONDS 5       // 扫描时间
-static TaskHandle_t *th_cc = nullptr; // 连接手柄任务句柄
-bool IS_CONNECTED = false;            // 是否已连接
-bool SCAN_NEW = false;                // 是否连接新设备
+#define SCAN_DURATION_SECONDS 5        // 扫描时间
+static TaskHandle_t *th_cc = nullptr;  // 连接手柄任务句柄
+std::atomic<bool> SCAN_NEW(false);     // 是否连接新设备
+std::atomic<bool> IS_CONNECTED(false); // 是否已连接
 
 struct bt_dev // 蓝牙设备信息
 {
@@ -98,7 +104,7 @@ esp_err_t connect_controller()
      * 当scan_new为true时，从flash读取设备信息，否则从flash读取设备信息
      * 从flash读取设备信息失败时会启动扫描
      */
-    while (!SCAN_NEW)
+    while (!SCAN_NEW.load())
     {
       ret = read_last_dev(&devInfo);
       if (ret == ESP_OK)
@@ -109,7 +115,7 @@ esp_err_t connect_controller()
       else
         ESP_LOGE(TAG, "read_last_dev failed, error = %s", esp_err_to_name(ret));
 
-      if (IS_CONNECTED)
+      if (IS_CONNECTED.load())
       {
         ESP_LOGW(TAG, "Connected,Scan Task ended");
         vTaskDelete(NULL);
@@ -162,7 +168,7 @@ esp_err_t connect_controller()
         esp_hid_scan_results_free(results);
       }
 
-      if (IS_CONNECTED)
+      if (IS_CONNECTED.load())
       {
         ESP_LOGW(TAG, "Connected,Scan Task ended");
         vTaskDelete(NULL);
@@ -190,7 +196,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
   {
     if (param->open.status == ESP_OK)
     {
-      IS_CONNECTED = true;
+      IS_CONNECTED.store(true);
       const uint8_t *bda = esp_hidh_dev_bda_get(param->open.dev);
       ESP_LOGI(TAG, ESP_BD_ADDR_STR " OPEN: %s", ESP_BD_ADDR_HEX(bda), esp_hidh_dev_name_get(param->open.dev));
       esp_hidh_dev_dump(param->open.dev, stdout);
@@ -215,6 +221,9 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     // ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
     // ESP_LOGI(TAG, "id:%3u", param->input.report_id);
 
+    bool button_bits[16] = {};  // bool
+    int16_t analog_hat[6] = {}; // 0 ~ 2047
+
     uint8_t btnBits;
     /*
     btnA = btnBits & 0b00000001;
@@ -225,12 +234,12 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     btnRB = btnBits & 0b10000000;
     */
     btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_MAIN];
-    Controller.button_bits[btnA] = (btnBits & 0b00000001);
-    Controller.button_bits[btnB] = (btnBits & 0b00000010);
-    Controller.button_bits[btnX] = (btnBits & 0b00001000);
-    Controller.button_bits[btnY] = (btnBits & 0b00010000);
-    Controller.button_bits[btnLB] = (btnBits & 0b01000000);
-    Controller.button_bits[btnRB] = (btnBits & 0b10000000);
+    button_bits[btnA] = (btnBits & 0b00000001);
+    button_bits[btnB] = (btnBits & 0b00000010);
+    button_bits[btnX] = (btnBits & 0b00001000);
+    button_bits[btnY] = (btnBits & 0b00010000);
+    button_bits[btnLB] = (btnBits & 0b01000000);
+    button_bits[btnRB] = (btnBits & 0b10000000);
 
     /*
     btnSelect = btnBits & 0b00000100;
@@ -241,17 +250,17 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     */
 
     btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_CENTER];
-    Controller.button_bits[btnSelect] = (btnBits & 0b00000100);
-    Controller.button_bits[btnStart] = (btnBits & 0b00001000);
-    Controller.button_bits[btnXbox] = (btnBits & 0b00010000);
-    Controller.button_bits[btnLS] = (btnBits & 0b00100000);
-    Controller.button_bits[btnRS] = (btnBits & 0b01000000);
+    button_bits[btnSelect] = (btnBits & 0b00000100);
+    button_bits[btnStart] = (btnBits & 0b00001000);
+    button_bits[btnXbox] = (btnBits & 0b00010000);
+    button_bits[btnLS] = (btnBits & 0b00100000);
+    button_bits[btnRS] = (btnBits & 0b01000000);
 
     /*
     btnShare = btnBits & 0b00000001;
     */
     btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_SHARE];
-    Controller.button_bits[btnShare] = (btnBits & 0b00000001);
+    button_bits[btnShare] = (btnBits & 0b00000001);
 
     btnBits = param->input.data[XBOX_CONTROLLER_INDEX_BUTTONS_DIR];
     auto dirUP = btnBits == 1 || btnBits == 2 || btnBits == 8;
@@ -259,10 +268,10 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     auto dirDown = 4 <= btnBits && btnBits <= 6;
     auto dirLeft = 6 <= btnBits && btnBits <= 8;
 
-    Controller.button_bits[btnDirUp] = dirUP;
-    Controller.button_bits[btnDirRight] = dirRight;
-    Controller.button_bits[btnDirDown] = dirDown;
-    Controller.button_bits[btnDirLeft] = dirLeft;
+    button_bits[btnDirUp] = dirUP;
+    button_bits[btnDirRight] = dirRight;
+    button_bits[btnDirDown] = dirDown;
+    button_bits[btnDirLeft] = dirLeft;
 
     /*
      * joyLHori 0
@@ -278,12 +287,18 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
              ((uint16_t)param->input.data[index + 1] << 8);
     };
 
-    Controller.analog_hat[joyLHori] = analogHatFilter(read_analog(0));
-    Controller.analog_hat[joyLVert] = analogHatFilter(read_analog(2));
-    Controller.analog_hat[joyRHori] = analogHatFilter(read_analog(4));
-    Controller.analog_hat[joyRVert] = analogHatFilter(read_analog(6));
-    Controller.analog_hat[trigLT] = read_analog(8);
-    Controller.analog_hat[trigRT] = read_analog(10);
+    analog_hat[joyLHori] = analogHatFilter(read_analog(0));
+    analog_hat[joyLVert] = analogHatFilter(read_analog(2));
+    analog_hat[joyRHori] = analogHatFilter(read_analog(4));
+    analog_hat[joyRVert] = analogHatFilter(read_analog(6));
+    analog_hat[trigLT] = read_analog(8);
+    analog_hat[trigRT] = read_analog(10);
+
+    // 将组装好的数据写入
+    rwlock_write_lock(&rwlock);
+    memcpy(Controller.analog_hat, analog_hat, sizeof(Controller.analog_hat));
+    memcpy(Controller.button_bits, button_bits, sizeof(Controller.button_bits));
+    rwlock_write_unlock(&rwlock);
 
     break;
   }
@@ -303,7 +318,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     ESP_ERROR_CHECK(connect_controller());
     memset(Controller.analog_hat, 0, sizeof(Controller.analog_hat));
     memset(Controller.button_bits, 0, sizeof(Controller.button_bits));
-    IS_CONNECTED = false;
+    IS_CONNECTED.store(false);
     break;
   }
   default:
@@ -340,6 +355,10 @@ void bt_controller_init()
 // 启动xbox控制器
 void CONTROLLER::begin()
 {
+  ESP_LOGI(TAG, " init controller");
+
+  rwlock_init(&rwlock); // 初始化读写锁
+
   bt_controller_init();
   ESP_LOGI(TAG, "connect to controller");
   ESP_ERROR_CHECK(connect_controller());
@@ -347,10 +366,16 @@ void CONTROLLER::begin()
 
 bool CONTROLLER::getButtonPress(XBOX_BUTTON btn)
 {
-  return this->button_bits[btn];
+  rwlock_read_lock(&rwlock);
+  auto v = this->button_bits[btn];
+  rwlock_read_unlock(&rwlock);
+  return v;
 }
 
 int16_t CONTROLLER::getAnalogHat(XBOX_ANALOG_HAT hat)
 {
-  return this->analog_hat[hat];
+  rwlock_read_lock(&rwlock);
+  auto v = this->analog_hat[hat];
+  rwlock_read_unlock(&rwlock);
+  return v;
 }
