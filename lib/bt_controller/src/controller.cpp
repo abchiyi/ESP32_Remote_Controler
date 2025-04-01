@@ -112,9 +112,8 @@ esp_err_t connect_controller()
         ESP_LOGI(TAG, "Connected to last device");
         esp_hidh_dev_open(devInfo.bda, devInfo.transport, devInfo.addr_type);
       }
-      else
-        ESP_LOGE(TAG, "read_last_dev failed, error = %s", esp_err_to_name(ret));
-
+      else // 没有从nvs分区中读取到设备信息时，跳转到扫描循环
+        break;
       if (IS_CONNECTED.load())
       {
         ESP_LOGW(TAG, "Connected,Scan Task ended");
@@ -357,9 +356,13 @@ void CONTROLLER::begin()
 {
   ESP_LOGI(TAG, " init controller");
 
-  rwlock_init(&rwlock); // 初始化读写锁
+  // 初始化读写锁
+  rwlock_init(&rwlock);
 
+  // 初始化蓝牙控制器
   bt_controller_init();
+
+  // 连接蓝牙控制器
   ESP_LOGI(TAG, "connect to controller");
   ESP_ERROR_CHECK(connect_controller());
 }
