@@ -33,12 +33,6 @@ typedef enum
   trigRT
 } XBOX_ANALOG_HAT;
 
-struct xbox_control_data
-{
-  bool button_bits[16];  // bool
-  int16_t analog_hat[6]; // 0 ~ 2047
-};
-
 class CONTROLLER
 {
 private:
@@ -50,6 +44,8 @@ public:
   void begin();
   bool getButtonPress(XBOX_BUTTON);
   int16_t getAnalogHat(XBOX_ANALOG_HAT);
+
+  bool is_connected();
 };
 
 extern CONTROLLER Controller;

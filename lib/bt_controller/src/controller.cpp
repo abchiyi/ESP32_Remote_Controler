@@ -12,15 +12,13 @@
 #include "esp_hidh.h"
 #include "esp_hid_gap.h"
 
-rwlock_t rwlock; // 读写锁
-
 #define TAG "Controller"
 #define XBOX_CONTROLLER_INDEX_BUTTONS_DIR 12
 #define XBOX_CONTROLLER_INDEX_BUTTONS_MAIN 13
 #define XBOX_CONTROLLER_INDEX_BUTTONS_CENTER 14
 #define XBOX_CONTROLLER_INDEX_BUTTONS_SHARE 15
-
-static auto Q_RECV = xQueueCreate(10, sizeof(xbox_control_data));
+CONTROLLER Controller; // 控制器对象
+rwlock_t rwlock;       // 读写锁
 
 // NVS 储存
 #define NVS_NAMESPACE "bt_controller"
@@ -37,10 +35,7 @@ struct bt_dev // 蓝牙设备信息
   esp_bd_addr_t bda;
   esp_hid_transport_t transport;
   esp_ble_addr_type_t addr_type;
-};
-
-bt_dev devInfo; // 最后连接的设备信息
-CONTROLLER Controller;
+} devInfo;
 
 esp_err_t save_last_dev(bt_dev *bd)
 {
@@ -367,6 +362,11 @@ void CONTROLLER::begin()
   ESP_ERROR_CHECK(connect_controller());
 }
 
+/**
+ * @brief 获取指定按钮的按压状态
+ * @param btn 要检查的按钮枚举值
+ * @return bool 如果按钮被按下返回true,否则返回false
+ */
 bool CONTROLLER::getButtonPress(XBOX_BUTTON btn)
 {
   rwlock_read_lock(&rwlock);
@@ -375,10 +375,24 @@ bool CONTROLLER::getButtonPress(XBOX_BUTTON btn)
   return v;
 }
 
+/**
+ * @brief 获取 Xbox 控制器模拟摇杆的值
+ * @param hat 模拟摇杆的类型(枚举值 XBOX_ANALOG_HAT)
+ * @return 返回模拟摇杆的当前值(-2048 到 2047), trig 为 (0 到 2047)
+ */
 int16_t CONTROLLER::getAnalogHat(XBOX_ANALOG_HAT hat)
 {
   rwlock_read_lock(&rwlock);
   auto v = this->analog_hat[hat];
   rwlock_read_unlock(&rwlock);
   return v;
+}
+
+/**
+ * @brief 检查蓝牙控制器的连接状态
+ * @return 如果控制器已连接返回 true，否则返回 false
+ */
+bool CONTROLLER::is_connected()
+{
+  return IS_CONNECTED.load();
 }
