@@ -43,6 +43,11 @@ U8G2_SH1107_PIMORONI_128X128_F_4W_HW_SPI u8g2(U8G2_R3, CS, DC, RES);
 // U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, SCL, SDA);
 // U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, SCL, SDA);
 
+void cb()
+{
+  ESP_LOGI(TAG, "IO0 low level interrupt triggered");
+  Controller.connect_new();
+}
 void setup()
 {
   Serial.begin(115200);
@@ -60,6 +65,10 @@ void setup()
   /** 启动 GUI */
   WOUO_UI.begin(&u8g2, create_page_main);
   u8g2.setContrast(255);
+
+  // 设置IO0为输入并启用中断
+  pinMode(0, INPUT_PULLUP);
+  attachInterrupt(0, cb, FALLING);
 
   vTaskDelete(NULL); // 干掉 loopTask
 }

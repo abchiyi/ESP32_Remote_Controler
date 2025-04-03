@@ -1,3 +1,6 @@
 [submodule "lib/esp_crtp"]
 	path = lib/esp_crtp
 	url = https://github.com/abchiyi/ESP_CRTP.git
+[submodule "lib/ESP_BT_Controller"]
+	path = lib/ESP_BT_Controller
+	url = https://github.com/abchiyi/ESP_BT_Controller.git
