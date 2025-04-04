@@ -14,32 +14,6 @@ bool areArraysEqual(const T (&a)[N], const T (&b)[N])
 };
 
 /**
- * @brief 简化运行 Preferences 上下文
- * @param name_space 命名空间
- * @param cb_fn 执行回调
- */
-void nvs_call(const char *name_space, std::function<void(Preferences &)> cb_fn);
-
-// TODO 待移除的
-typedef struct
-{
-  float VBUS_V;
-  float POWER_W;
-  float CURREN_A;
-} power_info_t;
-
-// 将一个32位浮点数拆分成两个16位的无符号整数
-// TODO 待移除的
-void splitFloat(float a, uint16_t *pa1, uint16_t *pa2);
-
-// 将两个16位的无符号整数组合成原始的32位浮点数
-// TODO 待移除的
-float combineFloat(uint16_t pa1, uint16_t pa2);
-
-// 过滤摇杆输出到-2048~2047;
-int16_t analogHatFilter(uint16_t value);
-
-/**
  * @brief 计算给定数据的校验和。
  * @param data 指向要计算校验和的数据的指针。
  * @param len 数据的长度，以字节为单位。
