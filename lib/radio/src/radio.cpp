@@ -138,6 +138,17 @@ esp_err_t radio_set_port_callback(CRTPPort port, CRTPPacketHandler_fn_t fn)
   return ESP_FAIL;
 }
 
+/**
+ * @brief 更新循环频率指标
+ *
+ * 该函数用于计算和更新程序循环的执行频率。每100次循环计算一次平均频率。
+ * 使用FreeRTOS的tick计数器来测量时间间隔。
+ *
+ * @param Frequency 指向存储频率结果的整型指针，单位为Hz
+ *
+ * @note 频率计算公式：f = 1000 / (平均时间间隔)
+ *       采样周期为100次循环
+ */
 void update_loop_metrics(int *Frequency)
 {
   static auto counter = 0;

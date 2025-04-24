@@ -1,0 +1,12 @@
+{
+  "name": "LED",
+  "expo": ["src/*"],
+  "headers": ["led.h"],
+  "dependencies": [
+    {
+      "owner": "fastled",
+      "name": "FastLED",
+      "version": "^3.9.16"
+    }
+  ]
+}

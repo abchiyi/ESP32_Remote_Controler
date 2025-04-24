@@ -1,5 +1,0 @@
-{
-  "name": "power",
-  "expo": ["src/*"],
-  "headers": ["power.h"]
-}

@@ -173,7 +173,7 @@ void wifi_link_task(void *pvParameters)
                 }
 
                 std::sort(aps.begin(), aps.end());
-                *AP = aps.front();
+                *AP = aps[aps.size() - 1]; // 选择信号最强的AP
 
                 ESP_LOGI(TAG, "WL_FIND_DEVICE: %s, RSSI: %d, CHANNEL: %d",
                          AP->SSID.c_str(), AP->RSSI, AP->CHANNEL);
@@ -222,7 +222,7 @@ void wifi_link_init()
 {
     // set wifi
     ESP_LOGI(TAG, "Init wifi");
-    // WiFi.enableLongRange(true);
+    WiFi.enableLongRange(true);
 
     // 设置模式 STA
     if (WiFi.mode(WIFI_STA))
@@ -327,3 +327,8 @@ esp_err_t rest()
 
     return ESP_OK;
 };
+
+radio_link_operation_t *get_link()
+{
+    return &_RLOP;
+}

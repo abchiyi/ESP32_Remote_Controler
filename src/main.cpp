@@ -5,73 +5,94 @@
 #include "pins_arduino.h"
 // 无线依赖
 #include "wifi_link.h"
+#include "radio.h"
+#include "tool.h"
+#include "config.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
 // 控制器依赖
-#include <controller.h>
+#include "XBOX.h"
 #include <pins_arduino.h>
-#include "HID.h"
 
-// 显示
-// gui
-#include <U8g2lib.h>
-#include <WouoUI.h>
-// page
-#include "view/mainPage.h"
-#include "view/setting.h"
-#include "pins_arduino.h"
+// LED
+#include "led.h"
 
 #define TAG "Main ESP32 RC"
 
-// 电源
-#include "power.h"
+// #include "FastLED.h"
 
-// // 显示器引脚
-// #define SCL 22
-// #define SDA 21
+#define NUM_LED 1
+#define LED_PIN 10
+// CRGB leds[NUM_LED];
 
-#define RES 6
-#define DC 5
-#define CS 4
-
-// Screen
-// U8G2_SSD1306_128X32_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, CS, DC, RES);
-U8G2_SH1107_PIMORONI_128X128_F_4W_HW_SPI u8g2(U8G2_R3, CS, DC, RES);
-
-// U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, SCL, SDA);
-// U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, SCL, SDA);
-
-void cb()
-{
-  ESP_LOGI(TAG, "IO0 low level interrupt triggered");
-  Controller.connect_new();
-}
 void setup()
 {
   Serial.begin(115200);
-  Power.begin();
 
-  start_wifi_link();
+  // ** 初始化 LED **
+  init_led();
+
+  // ** 无线初始化 **/
+  init_radio(get_link());
 
   /** 启动蓝牙控制器接入 **/
   Controller.begin();
   ESP_LOGI(TAG, "setup controller success");
 
-  /** 设置输入 */
-  hid_begin();
+  auto taskCrtpPacket = [](void *pt)
+  {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = HZ2TICKS(200);
+    static radio_packet_t rp;
+    auto crtp = (CRTPPacket *)rp.data;
 
-  /** 启动 GUI */
-  WOUO_UI.begin(&u8g2, create_page_main);
-  u8g2.setContrast(255);
+    static float ROLL;
+    static float PITCH;
+    static float YAW;
+    static uint16_t THRUST;
 
-  // 设置IO0为输入并启用中断
-  pinMode(0, INPUT_PULLUP);
-  attachInterrupt(0, cb, FALLING);
+    auto match_angl = [](uint8_t angl, int16_t joy)
+    {
+      auto step = angl / 2048.f;
+      return joy * step;
+    };
+
+    while (true)
+    {
+
+      ROLL = match_angl(40, Controller.getAnalogHat(joyLHori));
+      PITCH = match_angl(255, Controller.getAnalogHat(joyLVert));
+      YAW = match_angl(60, Controller.getAnalogHat(joyRHori));
+      THRUST = (Controller.getAnalogHat(trigLT));
+      crtp->port = CRTP_PORT_SETPOINT;
+      crtp->channel = 0;
+
+      memcpy(&crtp->data[0], &ROLL, sizeof(ROLL));
+      memcpy(&crtp->data[4], &PITCH, sizeof(PITCH));
+      memcpy(&crtp->data[8], &YAW, sizeof(YAW));
+      memcpy(&crtp->data[12], &THRUST, sizeof(THRUST));
+
+      radio_send_packet(&rp);
+
+      xTaskDelayUntil(&xLastWakeTime, xFrequency);
+    }
+  };
+
+  xTaskCreate(taskCrtpPacket, "taskCrtpPacket", 1024 * 3, NULL, TP_H, NULL);
+
+  // FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LED);
+  // FastLED.setBrightness(255);
+  // FastLED.show();
 
   vTaskDelete(NULL); // 干掉 loopTask
 }
 void loop()
 {
+  // auto i = Controller.getAnalogHat(trigLT) / 4;
+  // FastLED.setBrightness(i);
+  // leds[0] = CHSV(80, 204, i);
+  // FastLED.show();
+  // vTaskDelay(50);
 }
