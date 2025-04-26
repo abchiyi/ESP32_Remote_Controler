@@ -1,8 +1,5 @@
 #include <Arduino.h>
-#include <variant>
 #include <esp_log.h>
-#include "EEPROM.h"
-#include "pins_arduino.h"
 // 无线依赖
 #include "wifi_link.h"
 #include "radio.h"
@@ -18,6 +15,13 @@
 
 // LED
 #include "led.h"
+
+#include "Wifi.h"
+#include "FS.h"
+// #include "AsyncTCP.h"
+#include "ESPAsyncWebServer.h"
+
+#include "WebServer.h"
 
 #define TAG "Main ESP32 RC"
 
