@@ -1,0 +1,6 @@
+{
+  "name": "BAT",
+  "expo": ["src/*"],
+  "headers": ["bat.h"],
+  "dependencies": []
+}

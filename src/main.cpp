@@ -16,12 +16,7 @@
 // LED
 #include "led.h"
 
-#include "Wifi.h"
-#include "FS.h"
-// #include "AsyncTCP.h"
-#include "ESPAsyncWebServer.h"
-
-#include "WebServer.h"
+#include "bat.h"
 
 #define TAG "Main ESP32 RC"
 
@@ -35,8 +30,11 @@ void setup()
 {
   Serial.begin(115200);
 
-  // ** 初始化 LED **
+  // ** LED初始化 **
   init_led();
+
+  // ** 电池初始化 **
+  init_bat();
 
   // ** 无线初始化 **/
   init_radio(get_link());
