@@ -4,3 +4,6 @@
 [submodule "lib/ESP_BT_Controller"]
 	path = lib/ESP_BT_Controller
 	url = https://github.com/abchiyi/ESP_BT_Controller.git
+[submodule "ESP_Receiver_WEB_colsole"]
+	path = ESP_Receiver_WEB_colsole
+	url = https://github.com/abchiyi/ESP_Receiver_WEB_colsole.git
