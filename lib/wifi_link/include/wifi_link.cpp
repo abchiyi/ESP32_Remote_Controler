@@ -222,7 +222,7 @@ void wifi_link_init()
 {
     // set wifi
     ESP_LOGI(TAG, "Init wifi");
-    WiFi.enableLongRange(true);
+    // WiFi.enableLongRange(true);
 
     // 设置模式 STA
     if (WiFi.mode(WIFI_STA))

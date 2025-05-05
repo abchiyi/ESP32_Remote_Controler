@@ -1,0 +1,17 @@
+{
+  "name": "web_console",
+  "expo": ["src/*"],
+  "headers": ["web_console.h"],
+  "dependencies": [
+    {
+      "owner": "links2004",
+      "name": "WebSockets",
+      "version": "^2.6.1"
+    },
+    {
+      "owner": "esphome",
+      "name": "ESPAsyncWebServer-esphome",
+      "version": "^3.3.0"
+    }
+  ]
+}

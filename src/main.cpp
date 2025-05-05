@@ -16,28 +16,28 @@
 // LED
 #include "led.h"
 
+#include "web_console.h"
+
 #include "bat.h"
 
 #define TAG "Main ESP32 RC"
-
-// #include "FastLED.h"
-
-#define NUM_LED 1
-#define LED_PIN 10
-// CRGB leds[NUM_LED];
 
 void setup()
 {
   Serial.begin(115200);
 
+  // ** 电池初始化 **
+  init_bat();
+  vTaskDelay(300); // 等待电池电压稳定
+
   // ** LED初始化 **
   init_led();
 
-  // ** 电池初始化 **
-  init_bat();
+  // ** Web控制台初始化 **
+  init_web_console(); // 启动Web控制台
 
   // ** 无线初始化 **/
-  init_radio(get_link());
+  // init_radio(get_link());
 
   /** 启动蓝牙控制器接入 **/
   Controller.begin();
@@ -84,17 +84,8 @@ void setup()
 
   xTaskCreate(taskCrtpPacket, "taskCrtpPacket", 1024 * 3, NULL, TP_H, NULL);
 
-  // FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LED);
-  // FastLED.setBrightness(255);
-  // FastLED.show();
-
   vTaskDelete(NULL); // 干掉 loopTask
 }
 void loop()
 {
-  // auto i = Controller.getAnalogHat(trigLT) / 4;
-  // FastLED.setBrightness(i);
-  // leds[0] = CHSV(80, 204, i);
-  // FastLED.show();
-  // vTaskDelay(50);
 }

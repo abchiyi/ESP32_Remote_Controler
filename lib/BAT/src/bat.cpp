@@ -25,16 +25,12 @@ static float bat_low_vot = 0;                      // 电池低电压阈值
  */
 uint8_t detect_cell_count(uint32_t total_voltage_mv)
 {
-    // 单节锂电池电压范围（单位：mV）
-    const uint32_t CELL_MIN_MV = 2500; // 2.5V = 2500mV
-    const uint32_t CELL_MAX_MV = 4350; // 4.35V = 4350mV
-
     // 检查1-3串的可能性（全部用整数运算）
     for (uint8_t cells = 1; cells <= 3; cells++)
     {
         // 计算当前串数的合理范围（±10%容差）
-        uint32_t min_valid = (cells * CELL_MIN_MV * 9) / 10;  // cells*CELL_MIN*0.9
-        uint32_t max_valid = (cells * CELL_MAX_MV * 11) / 10; // cells*CELL_MAX*1.1
+        uint32_t min_valid = (cells * VOLTAGE_EMPTY * 9) / 10; // cells*CELL_MIN*0.9
+        uint32_t max_valid = (cells * VOLTAGE_FULL * 11) / 10; // cells*CELL_MAX*1.1
 
         if (total_voltage_mv >= min_valid && total_voltage_mv <= max_valid)
             return cells;
@@ -66,7 +62,7 @@ void task_read_vot(void *pt)
 void init_bat()
 {
     xTaskCreate(task_read_vot, "task_read_vot", 1024 * 3, NULL, TP_L, NULL);
-
+    analogSetAttenuation(ADC_11db);
     vTaskDelay(300); // 等待检测电压稳定
 
     // 检测电池串联数量,
@@ -75,7 +71,6 @@ void init_bat()
     BAT_CELL = detect_cell_count(BAT_MV.load());
     //     vTaskDelay(10);
     // }
-    ESP_LOGI(TAG, "BAT_CELL:%d", BAT_CELL);
 }
 
 uint32_t get_bat_mv()
@@ -85,5 +80,28 @@ uint32_t get_bat_mv()
 
 uint8_t get_bat_cell()
 {
-    return BAT_CELL;
+    return detect_cell_count(BAT_MV.load());
+}
+
+/**
+ * @brief 根据电池串数和电压计算电量百分比（0-255）
+ * @return 电量百分比（0-255），255=100%，0=0%
+ */
+uint8_t get_battery_percentage()
+{
+    const uint32_t voltage = BAT_MV.load();
+    const uint32_t total_min_mv = BAT_CELL * VOLTAGE_EMPTY;
+    const uint32_t total_max_mv = BAT_CELL * VOLTAGE_FULL;
+
+    // 边界检查（避免除零和溢出）
+    if (BAT_CELL == 0 || total_min_mv >= total_max_mv)
+        return 0;
+
+    // 快速区间判断
+    if (voltage <= total_min_mv)
+        return 0;
+    if (voltage >= total_max_mv)
+        return 255;
+
+    return (voltage - total_min_mv) * 255UL / (total_max_mv - total_min_mv);
 }
