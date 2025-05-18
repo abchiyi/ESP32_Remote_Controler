@@ -11,8 +11,7 @@ typedef enum
     ON_LOW_BATTERY,
 } bat_irq_t;
 
-uint32_t
-get_bat_mv();
+uint32_t get_bat_mv();
 
 uint8_t get_bat_cell();
 

@@ -33,11 +33,11 @@ void setup()
   // ** LED初始化 **
   init_led();
 
+  // ** 无线初始化 **/
+  init_radio(get_link());
+
   // ** Web控制台初始化 **
   init_web_console(); // 启动Web控制台
-
-  // ** 无线初始化 **/
-  // init_radio(get_link());
 
   /** 启动蓝牙控制器接入 **/
   Controller.begin();

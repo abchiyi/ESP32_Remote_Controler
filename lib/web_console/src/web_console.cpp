@@ -9,59 +9,84 @@
 #include "ESPAsyncWebServer.h"
 #include "SPIFFS.h"
 
+#include "bat.h"
+
+#include "vector"
+
 #define TAG "Web Console"
 #define PORT_HTTP 80
 #define PORT_WS 81
+#define WEB_SOCKET_FEQ 60 // Hz
 
-#define SSID "CCCP"
-#define PASS "Madin133"
-
-WebSocketsServer webSocket = WebSocketsServer(PORT_WS);
-// WebServer server(PORT_HTTP);
-AsyncWebServer server(PORT_HTTP);
-
-// 内容类型映射表
-const char *getContentType(String filename)
+void if_call(const json_doc &doc, std::function<void()> cb_fn,
+             const std::vector<const char *> &indices)
 {
-    if (filename.endsWith(".html"))
-        return "text/html";
-    if (filename.endsWith(".css"))
-        return "text/css";
-    if (filename.endsWith(".js"))
-        return "application/javascript";
-    if (filename.endsWith(".webp"))
-        return "image/webp";
-    if (filename.endsWith(".jpg") || filename.endsWith(".jpeg"))
-        return "image/jpeg";
-    if (filename.endsWith(".png"))
-        return "image/png";
-    if (filename.endsWith(".gif"))
-        return "image/gif";
-    if (filename.endsWith(".ico"))
-        return "image/x-icon";
-    if (filename.endsWith(".svg"))
-        return "image/svg+xml";
-    return "text/plain";
+    bool all_present = true;
+
+    for (const auto &key : indices)
+        if (doc[key].isNull())
+        {
+            all_present = false;
+            break;
+        }
+
+    if (all_present)
+        cb_fn();
 }
 
-// // 处理静态文件请求
-// bool handleFileRead(String path)
-// {
-//     if (path.endsWith("/"))
-//         path += "index.html";
+/**
+ * 一个二维数组，第一维表示端口号，第二维表示回调函数列表，
+ * 可以支持在任意端口注册多个回调函数
+ */
+typedef std::vector<web_console_callback_t> callback_list_t;
+callback_list_t web_console_callback[__PORT_MAX];
 
-//     String contentType = getContentType(path);
-//     ESP_LOGI(TAG, "contentType: %s", contentType.c_str());
-//     if (SPIFFS.exists(path))
-//     {
-//         File file = SPIFFS.open(path, "r");
-//         server.streamFile(file, contentType);
-//         file.close();
-//         return true;
-//     }
-//     return false;
-// }
+/**
+ * * @brief 注册回调函数
+ */
+bool register_web_console_callback(web_console_port port, web_console_callback_t cb)
+{
+    if (port >= __PORT_MAX)
+    {
+        ESP_LOGE(TAG, "端口号错误 %d", port);
+        return false;
+    }
+    web_console_callback[port].push_back(cb);
+    return true;
+}
 
+/**
+ * web console 服务器
+ */
+WebSocketsServer webSocket = WebSocketsServer(PORT_WS);
+AsyncWebServer server(PORT_HTTP);
+
+/**
+ * 在这里处理收到的数据 & 处理回调
+ */
+void handleIncomingJson(uint8_t num, const char *jsonString)
+{
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, jsonString);
+
+    if (error)
+    {
+        Serial.printf("JSON解析失败: %s\n", error.c_str());
+        return;
+    }
+
+    if (doc["port"].isNull())
+        ESP_LOGE(TAG, "未知数据格式: %s", jsonString);
+    else
+    {
+        int port = doc["port"];
+        if (port < __PORT_MAX)
+            for (auto &callback : web_console_callback[port])
+                callback(doc);
+        else
+            ESP_LOGE(TAG, "无效的端口号: %d", port);
+    }
+}
 // WS 事件处理函数
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
 {
@@ -76,19 +101,25 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
         Serial.printf("[%u] 已连接 from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
     }
     break;
+
     case WStype_TEXT:
-        // 可以在此处理客户端发送的消息
+        handleIncomingJson(num, (const char *)payload);
         break;
     }
 }
 
-// // HTTP 静态资源路由
-// void match_all()
-// {
-//     ESP_LOGI(TAG, "url: %s", server.uri().c_str());
-//     if (!handleFileRead(server.uri()))
-//         server.send(404, "text/html", "404 not found");
-// };
+bool broadcast_data()
+{
+    JsonDocument doc;
+    doc["bat_v"] = get_bat_mv();
+    doc["bat_cell"] = get_bat_cell();
+
+    //**转换成JSON字符串，并广播 */
+    String jsonString;
+    serializeJson(doc, jsonString);
+    webSocket.broadcastPing();
+    return webSocket.broadcastTXT(jsonString);
+}
 
 void init_web_console()
 {
@@ -98,67 +129,37 @@ void init_web_console()
         return;
     }
 
-    // 连接WiFi
-    WiFi.begin(SSID, PASS);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-    }
-    ESP_LOGI(TAG, "WiFi connected");
-    ESP_LOGI(TAG, "Console on http://%s", WiFi.localIP().toString().c_str());
-
     // 设置静态资源服务器
     server
         .serveStatic("/", SPIFFS, "/")   // 设置静态文件目录
         .setCacheControl("max-age=3600") // 设置缓存时间
-        .setDefaultFile("index.html");
+        .setDefaultFile("index.html");   // 页面入口
 
     server.onNotFound([](AsyncWebServerRequest *request) // 处理404错误
                       { request->send(404, "text/plain", "404 Not Found"); });
     server.begin(); // 启动HTTP服务器
 
-    ESP_LOGI(TAG, "HTTP server started, listening on port %d", PORT_HTTP);
     webSocket.onEvent(webSocketEvent); // 设置WebSocket事件处理函数
     webSocket.begin();                 // 启动WebSocket服务器
 
-    // WEB 控制台任务
+    // WS 通讯任务
     auto wct = [](void *pvParameters)
     {
         TickType_t xLastWakeTime = xTaskGetTickCount();
-        const TickType_t xFrequency = HZ2TICKS(200);
+        const TickType_t xFrequency = HZ2TICKS(WEB_SOCKET_FEQ);
         while (true)
         {
-            webSocket.loop();
-            // server.handleClient();
+            webSocket.loop(); // 处理WebSocket事件
+            broadcast_data(); // 广播数据
             vTaskDelayUntil(&xLastWakeTime, xFrequency);
         }
     };
-    auto ret = xTaskCreate(wct, "WebConsole", 4096, NULL, TP_HIGHEST, NULL);
+
+    auto ret = xTaskCreate(wct, "WebConsole", 4096, NULL, TP_N, NULL);
     ESP_ERROR_CHECK(ret == pdPASS ? ESP_OK : ESP_FAIL);
-}
 
-/**
- *
- *
- *
- *
- *
- * void sendToAllClients(const char *message)
-{
-  webSocket.broadcastTXT(message);
+    auto ip = WiFi.getMode() == WIFI_MODE_STA
+                  ? WiFi.localIP()
+                  : WiFi.softAPIP();
+    ESP_LOGI(TAG, "On http://%s", ip.toString().c_str());
 }
- *
- *
- *  webSocket.loop();
-  server.handleClient();
-
-  // 模拟数据发送（实际使用时替换为真实传感器数据）
-  static unsigned long lastSend = 0;
-  if (millis() - lastSend > 1000)
-  {
-    String data = "当前值: " + String(random(0, 100));
-    webSocket.broadcastTXT(data);
-    lastSend = millis();
-  }
- *
- */
