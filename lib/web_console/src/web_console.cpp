@@ -16,10 +16,10 @@
 #define TAG "Web Console"
 #define PORT_HTTP 80
 #define PORT_WS 81
-#define WEB_SOCKET_FEQ 60 // Hz
+#define WEB_SOCKET_FEQ 120 // Hz
 
-void if_call(const json_doc &doc, std::function<void()> cb_fn,
-             const std::vector<const char *> &indices)
+bool areAllKeysPresent(const json_doc &doc,
+                       const std::vector<const char *> &indices)
 {
     bool all_present = true;
 
@@ -30,8 +30,7 @@ void if_call(const json_doc &doc, std::function<void()> cb_fn,
             break;
         }
 
-    if (all_present)
-        cb_fn();
+    return all_present;
 }
 
 /**
@@ -76,7 +75,7 @@ void handleIncomingJson(uint8_t num, const char *jsonString)
     }
 
     if (doc["port"].isNull())
-        ESP_LOGE(TAG, "未知数据格式: %s", jsonString);
+        ESP_LOGE(TAG, "未知数据格式: \"%s\"(String)", jsonString);
     else
     {
         int port = doc["port"];
@@ -108,17 +107,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
     }
 }
 
-bool broadcast_data()
+void web_console_send(String &jsonString)
 {
-    JsonDocument doc;
-    doc["bat_v"] = get_bat_mv();
-    doc["bat_cell"] = get_bat_cell();
-
-    //**转换成JSON字符串，并广播 */
-    String jsonString;
-    serializeJson(doc, jsonString);
-    webSocket.broadcastPing();
-    return webSocket.broadcastTXT(jsonString);
+    webSocket.broadcastTXT(jsonString);
 }
 
 void init_web_console()
@@ -150,7 +141,6 @@ void init_web_console()
         while (true)
         {
             webSocket.loop(); // 处理WebSocket事件
-            broadcast_data(); // 广播数据
             vTaskDelayUntil(&xLastWakeTime, xFrequency);
         }
     };

@@ -11,9 +11,13 @@ enum TASK_PRIORITY
 };
 typedef enum
 {
-    ESP_NOW_AIR,
-    ESP_NOW_GROUND,
+    ESP_NOW,
 } radio_mode_t;
+typedef enum
+{
+    SLAVE,
+    MASTER,
+} control_mode_t;
 
 #define WIFI_SSID_MAX 32
 #define WIFI_PASS_MAX 64
@@ -31,15 +35,18 @@ public:
     {
         struct
         {
-            uint8_t data_is_alive;                 // 数据是否有效
-            char WIFI_SSID[WIFI_SSID_MAX];         // Wi-Fi SSID
-            char WIFI_PASS[WIFI_PASS_MAX];         // Wi-Fi 密码
-            radio_mode_t radio_mode = ESP_NOW_AIR; // 无线模式
+            uint8_t data_is_alive;         // 数据是否有效
+            char WIFI_SSID[WIFI_SSID_MAX]; // Wi-Fi SSID
+            char WIFI_PASS[WIFI_PASS_MAX]; // Wi-Fi 密码
+            radio_mode_t radio_mode;       // 无线模式
+            control_mode_t control_mode;   // 控制模式
         };
         uint8_t raw[128];
     };
 
     void begin();
+
+    Config() : radio_mode(ESP_NOW), control_mode(SLAVE) {};
     ~Config(); // 析构函数用于清理任务
 
     bool save();

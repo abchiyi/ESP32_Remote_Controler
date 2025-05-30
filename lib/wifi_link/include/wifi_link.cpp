@@ -14,6 +14,9 @@
 
 #include "WiFi.h"
 
+#include "Arduino.h"
+#include "QuickEspNow.h"
+
 #define TAG "wifi_link"
 #define TimeOutMs 80 // 链路通信超时
 
@@ -86,43 +89,34 @@ radio_link_operation_t _RLOP{
     .start = start,
     .rest = rest};
 
-void promiscuous_rx_cb(void *buff, wifi_promiscuous_pkt_type_t type);
-
-void esp_now_on_recv(const uint8_t *mac, const uint8_t *incomingData, int len)
+void data_recv(uint8_t *mac, const uint8_t *data, uint8_t len, signed int rssi, bool broadcast)
 {
-    if (incomingData == nullptr)
+    if (data == nullptr)
         return;
 
-    ESP_LOGD(TAG, "Recv on " MACSTR "", MAC2STR(mac));
+    ESP_LOGI(TAG, "From " MACSTR ", len:%d, rssi:%d, isBroadcast:%d",
+             MAC2STR(mac), len, rssi, broadcast);
 
-    static radio_packet_t rp;
-    if (len > sizeof(rp))
+    if (len > sizeof(radio_packet_t))
     {
-        ESP_LOGD(TAG, "Recv data 长度超过 32字节, len:%d", len);
+        ESP_LOGW(TAG, "Recv data 长度超过 32字节, len:%d", len);
         return;
     }
 
-    memset(&rp, 0, sizeof(rp));
-    memcpy(&rp, incomingData, sizeof(rp));
-
-    static auto ret = xQueueSend(queue_recv, &rp, 0);
+    static auto ret = xQueueSend(queue_recv, (radio_packet_t *)data, 0);
     if (ret != pdPASS)
         ESP_LOGE(TAG, "发送到队列失败, error code:%s", esp_err_to_name(ret));
 }
 
-void esp_now_on_send(const uint8_t *mac_addr, esp_now_send_status_t status)
+void data_sent(uint8_t *address, uint8_t status)
 {
     static TickType_t lastRecvTime = 0;
     TickType_t currentTime = xTaskGetTickCount();
 
     if (lastRecvTime != 0)
         wifiSendInterval = currentTime - lastRecvTime;
-    if (status == ESP_NOW_SEND_SUCCESS)
+    if (status == COMMS_SEND_OK)
         lastRecvTime = currentTime;
-    // else
-    //     ESP_LOGE(TAG, "Send to " MACSTR " FAIl", MAC2STR(mac_addr));
-
-    // ESP_LOGI(TAG, "Send to " MACSTR " SUCCESS", MAC2STR(mac_addr));
 }
 
 /**
@@ -139,6 +133,8 @@ void wifi_link_task(void *pvParameters)
         switch (LINK_INFO.status)
         {
         case wl_DISCONNECTED: // 没有连接时寻找设备连接
+            vTaskDelay(500);
+            break;
             [&]()
             {
                 std::vector<ap_info_t> aps;
@@ -191,8 +187,11 @@ void wifi_link_task(void *pvParameters)
                     memset(&peer_info, 0, sizeof(esp_now_peer_info_t));
                 }
 
-                ESP_ERROR_CHECK(
-                    esp_wifi_set_channel(AP->CHANNEL, WIFI_SECOND_CHAN_NONE));
+                ret = esp_wifi_set_channel(AP->CHANNEL, WIFI_SECOND_CHAN_NONE);
+                if (ret != ESP_OK)
+                    ESP_LOGE(TAG, "Set channel fail, error code:%s", esp_err_to_name(ret));
+                // ESP_ERROR_CHECK(
+                //     esp_wifi_set_channel(AP->CHANNEL, WIFI_SECOND_CHAN_NONE));
 
                 LINK_INFO.status = wl_CONNECTED; // 连接成功
                 ESP_LOGI(TAG, "Connected devices '%s' success",
@@ -220,55 +219,71 @@ void wifi_link_task(void *pvParameters)
 
 void wifi_link_init()
 {
-    // set wifi
-    ESP_LOGI(TAG, "Init wifi");
-    // WiFi.enableLongRange(true);
+    /*** WiFi ***/
+    /**
+     *  选择WiFi 启动模式
+     *   1. 未配置SSID和密码，启动AP模式
+     *   2. 配置了SSID和密码，启动STA模式
+     *   3. STA模式下连接失败，启动AP模式
+     */
 
-    // 设置模式 STA
-    if (WiFi.mode(WIFI_STA))
-        ESP_LOGI(TAG, "WIFI Start in STA,MAC: %s, CHANNEL: %u",
-                 WiFi.macAddress().c_str(), WiFi.channel());
+    auto start_on_AP = [&]()
+    {
+        mac_t mac = {0};
+        char ssid[32] = {0};
+        ESP_ERROR_CHECK(WiFi.mode(WIFI_AP) ? ESP_OK : ESP_FAIL);
+        WiFi.softAPmacAddress(mac.data()); // 设置AP的MAC地址
+        sprintf(ssid, "ESP32-%02X:%02X:%02X", mac[3], mac[4], mac[5]);
+        WiFi.softAP(ssid, NULL, 1, 0, 4, 0);
+        ESP_LOGI(TAG, "Create open AP: %s, on channel: 1", ssid);
+    };
+
+    ESP_LOGI(TAG, "WiFi SSID: %s, PASS: %s",
+             CONFIG.WIFI_SSID, CONFIG.WIFI_PASS);
+    if (CONFIG.WIFI_SSID[0] != '\0')
+    {
+        ESP_ERROR_CHECK(WiFi.mode(WIFI_STA) ? ESP_OK : ESP_FAIL);
+        WiFi.begin(CONFIG.WIFI_SSID, CONFIG.WIFI_PASS);
+
+        uint8_t counter = 10;
+        Serial.printf("Connecting to WiFi: %s", CONFIG.WIFI_SSID);
+        while (WiFi.status() != WL_CONNECTED)
+        {
+            delay(500);
+            counter--;
+            if (!counter)
+                break;
+        }
+        if (counter)
+            ESP_LOGI(TAG, "Connected to WiFi: %s", CONFIG.WIFI_SSID);
+        else
+            start_on_AP();
+    }
     else
-        esp_system_abort("WIFI Start FAIL");
+        start_on_AP();
 
-    // 开启混杂模式
-    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
-    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(&promiscuous_rx_cb));
+    WiFi.setTxPower(WIFI_POWER_19_5dBm); // 设置最大 TX Power 到 20db
 
-    // 设置最大 TX Power 到 20db
-    ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(84));
+    /*** ESP-NOW ***/
+    quickEspNow.onDataRcvd(data_recv);
+    quickEspNow.onDataSent(data_sent);
 
-    // 设置 ESPNOW 通讯速率
-    esp_wifi_config_espnow_rate(WIFI_IF_STA, WIFI_PHY_RATE_LORA_500K) == ESP_OK
-        ? ESP_LOGI(TAG, "Set ESPNOW WIFI_PHY_RATE_LORA_500K")
-        : ESP_LOGI(TAG, "Set ESPNOW RATE FAIL");
+    if (WiFi.getMode() == WIFI_AP)
+        quickEspNow.begin(CURRENT_WIFI_CHANNEL, WIFI_IF_AP);
+    else
+        quickEspNow.begin();
 
+    // // 设置 ESPNOW 通讯速率
+    // esp_wifi_config_espnow_rate(WIFI_IF_STA, WIFI_PHY_RATE_LORA_500K) == ESP_OK
+    //     ? ESP_LOGI(TAG, "Set ESPNOW WIFI_PHY_RATE_LORA_500K")
+    //     : ESP_LOGI(TAG, "Set ESPNOW RATE FAIL");
     // 设置 ESPNOW
-    ESP_ERROR_CHECK(esp_now_init());
-    ESP_ERROR_CHECK(esp_now_register_recv_cb(esp_now_on_recv));
-    ESP_ERROR_CHECK(esp_now_register_send_cb(esp_now_on_send));
 
     queue_recv = xQueueCreate(10, sizeof(radio_packet_t));
     if (queue_recv == nullptr)
         esp_system_abort("Create queue_recv fail");
 
     xTaskCreate(wifi_link_task, "wifi_link_task", 4096, NULL, TP_H, NULL);
-
-    ESP_LOGI(TAG, "wifi link init success");
-}
-
-IRAM_ATTR void promiscuous_rx_cb(void *buff, wifi_promiscuous_pkt_type_t type)
-{
-    if (type != WIFI_PKT_MGMT)
-        return;
-
-    static wifi_promiscuous_pkt_t *ppkt = (wifi_promiscuous_pkt_t *)buff;
-    static mac_t mac = {};
-
-    memcpy(mac.data(), (ppkt->payload + 10), sizeof(mac_t));
-    // 满足条件时更新 RSSI
-    if (DeviceAPInfo.isValidMac() && DeviceAPInfo.MAC == mac)
-        LINK_INFO.RSSI = ppkt->rx_ctrl.rssi;
 }
 
 // link operation
@@ -315,11 +330,6 @@ esp_err_t start()
 bool is_connected()
 {
     return wifiSendInterval <= TimeOutMs && wifiSendInterval;
-}
-
-void start_wifi_link()
-{
-    init_radio(&_RLOP);
 }
 
 esp_err_t rest()

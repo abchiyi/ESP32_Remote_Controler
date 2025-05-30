@@ -16,11 +16,15 @@ typedef enum
 
 typedef JsonDocument json_doc;
 typedef std::function<void(json_doc)> web_console_callback_t;
-
-void if_call(const json_doc &doc, std::function<void()> cb_fn,
-             const std::vector<const char *> &indices);
+bool areAllKeysPresent(const json_doc &doc,
+                       const std::vector<const char *> &indices);
 
 bool register_web_console_callback(web_console_port, web_console_callback_t);
 void init_web_console(void);
+
+/**
+ * * @brief 发送数据到
+ */
+void web_console_send(String &JsonString);
 
 #endif

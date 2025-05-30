@@ -137,20 +137,49 @@ void Config::begin()
     // 初始化previous_raw
     memcpy(previous_raw, raw, sizeof(raw));
 
+    /**
+     * 注册web控制台回调函数
+     */
     auto web_cbfn = [](json_doc doc)
     {
-        auto cb_fn = [&]()
+        if (!areAllKeysPresent(doc, {"port", "rw"}))
         {
-            strlcpy(CONFIG.WIFI_SSID, doc["ssid"], sizeof(CONFIG.WIFI_SSID));
-            strlcpy(CONFIG.WIFI_PASS, doc["pass"], sizeof(CONFIG.WIFI_PASS));
+            ESP_LOGE(TAG, "未知数据, %s", doc.as<String>().c_str());
+            return;
+        }
+
+        if (doc["rw"] == WEB_CONSOLE_W)
+        {
+            if (!areAllKeysPresent(doc, {"ssid", "pass"}))
+            {
+                ESP_LOGE(TAG, "未知数据, %s", doc.as<String>().c_str());
+                return;
+            }
+
+            strlcpy(CONFIG.WIFI_SSID,
+                    doc["ssid"],
+                    sizeof(CONFIG.WIFI_SSID));
+
+            strlcpy(CONFIG.WIFI_PASS,
+                    doc["pass"],
+                    sizeof(CONFIG.WIFI_PASS));
+
             ESP_LOGI(TAG, "SSID: %s, PASS: %s",
                      CONFIG.WIFI_SSID, CONFIG.WIFI_PASS);
 
             CONFIG.save()
                 ? ESP_LOGI(TAG, "保存成功")
                 : ESP_LOGE(TAG, "保存失败");
-        };
-        if_call(doc, cb_fn, {"ssid", "pass"});
+        }
+        else
+        {
+            JsonDocument doc;
+            doc["ssid"] = CONFIG.WIFI_SSID;
+            doc["pass"] = CONFIG.WIFI_PASS;
+            String JsonString;
+            serializeJson(doc, JsonString);
+            web_console_send(JsonString);
+        }
     };
 
     register_web_console_callback(WEB_PORT_CONFIG, web_cbfn);
