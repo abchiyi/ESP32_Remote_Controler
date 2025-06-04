@@ -12,6 +12,7 @@
 #include <esp_mac.h>
 #include <tool.h>
 #include <config.h>
+#include "wifi_link.h"
 
 #define TAG "Radio"
 
@@ -63,8 +64,23 @@ IRAM_ATTR void task_radio_send(void *pvParameters)
   }
 }
 
-void init_radio(radio_link_operation_t *rlop)
+void init_radio()
 {
+  radio_link_operation_t *rlop = nullptr;
+  /*** 初始化无线通讯模式 ***/
+  switch (CONFIG.radio_mode)
+  {
+  case ESP_NOW:
+    rlop = WiFi_Esp_Now();
+    ESP_LOGI(TAG, "Radio mode: ESP_NOW");
+    break;
+
+  default:
+    ESP_LOGE(TAG, "Unsupported radio mode: %d", CONFIG.radio_mode);
+    esp_system_abort("Radio mode is not supported");
+    break;
+  }
+
   if (rlop == nullptr)
   {
     ESP_LOGE(TAG, "Radio link operation is null");

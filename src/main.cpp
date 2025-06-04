@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <esp_log.h>
 // 无线依赖
-#include "wifi_link.h"
 #include "radio.h"
 #include "tool.h"
 #include "config.h"
@@ -15,16 +14,17 @@
 
 // LED
 #include "led.h"
-
-#include "web_console.h"
-
 #include "bat.h"
+#include "web_console.h"
+#include "array"
 
 #define TAG "Main ESP32 RC"
 
 void setup()
 {
   Serial.begin(115200);
+
+  CONFIG.begin(); // 初始化配置
 
   // ** 电池初始化 **
   init_bat();
@@ -34,14 +34,16 @@ void setup()
   init_led();
 
   // ** 无线初始化 **/
-  init_radio(get_link());
+  init_radio();
 
   // ** Web控制台初始化 **
   init_web_console(); // 启动Web控制台
 
   /** 启动蓝牙控制器接入 **/
-  Controller.begin();
-  ESP_LOGI(TAG, "setup controller success");
+  // Controller.begin();
+
+  vTaskDelete(NULL); // 干掉 loopTask
+  return;
 
   auto taskCrtpPacket = [](void *pt)
   {

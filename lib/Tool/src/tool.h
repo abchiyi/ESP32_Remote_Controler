@@ -6,13 +6,6 @@
 #include "functional"    // std:func
 #include "Preferences.h" // 储存
 
-// TODO 待移除的
-template <typename T, std::size_t N>
-bool areArraysEqual(const T (&a)[N], const T (&b)[N])
-{
-  return std::equal(a, a + N, b);
-};
-
 /**
  * @brief 计算给定数据的校验和。
  * @param data 指向要计算校验和的数据的指针。
@@ -31,5 +24,17 @@ IRAM_ATTR uint8_t calculate_cksum(void *data, size_t len);
  * @return 返回转换后的滴答数（Ticks）。
  */
 #define HZ2TICKS(hz) ((TickType_t)(1000.00f / hz))
+
+/**
+ * @brief 检查MAC地址是否有效。
+ *
+ * 该函数检查MAC地址的每个字节是否为有效值。
+ * 根据要求，MAC地址的每个字节不为0x00或0xFF时被认为是有效的。
+ *
+ * @param mac 指向MAC地址的指针。
+ * @param len MAC地址的长度，通常为6字节。
+ * @return 如果MAC地址有效返回true，否则返回false。
+ */
+bool is_valid_mac(const uint8_t *mac, size_t len);
 
 #endif

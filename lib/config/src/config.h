@@ -12,6 +12,7 @@ enum TASK_PRIORITY
 typedef enum
 {
     ESP_NOW,
+    __radio_mode_max
 } radio_mode_t;
 typedef enum
 {
@@ -50,6 +51,7 @@ public:
     ~Config(); // 析构函数用于清理任务
 
     bool save();
+    void print(); // 打印当前配置信息
 } config_t;
 
 extern config_t CONFIG; // 全局配置变量

@@ -1,4 +1,36 @@
-
+/**
+ * @file wifi_link.cpp
+ * @brief ESP32远程控制器的WiFi链路管理模块，基于ESP-NOW协议实现主从设备的自动配对与数据通信。
+ *
+ * 本模块负责：
+ *  - 设备主从配对流程的实现（广播、握手、确认等）
+ *  - 通过ESP-NOW进行无线数据包的收发
+ *  - 链路状态的维护与检测（连接/断开）
+ *  - WiFi模式的自动切换（AP/STA）
+ *  - 数据包的CRC校验
+ *  - 信道切换与重试机制
+ *  - 与FreeRTOS队列和任务的集成
+ *
+ * 主要类型与函数说明：
+ *  - mac_t：MAC地址类型，长度为ESP_NOW_ETH_ALEN
+ *  - bcast_packet_t：广播包结构体，包含主从MAC地址和原始数据
+ *  - linkStatus_t：链路状态枚举（已连接/未连接）
+ *  - pack_recv/pack_send：无线数据包的接收与发送接口
+ *  - is_connected：检测链路是否保持连接
+ *  - start：初始化WiFi与ESP-NOW，启动链路管理任务
+ *  - disconnect_at_master/disconnect_at_slave：主/从设备配对流程
+ *  - wifi_link_task：链路管理主任务，处理配对与数据分发
+ *  - packetCrcCheck：数据包CRC校验
+ *  - data_recv/data_sent：QuickESPNow回调，处理数据收发事件
+ *
+ * 注意事项：
+ *  - 需确保CONFIG、radio.h、tool.h等依赖已正确配置
+ *  - 需在支持ESP-NOW的ESP32平台上编译运行
+ *  - 任务栈大小和队列长度可根据实际需求调整
+ *
+ * @author meme_me2019
+ * @date 2025-06-04
+ */
 #include "wifi_link.h"
 
 #include "config.h"
@@ -11,76 +43,45 @@
 #include "esp_err.h"
 
 #include "vector"
+#include "atomic"
 
 #include "WiFi.h"
-
 #include "Arduino.h"
 #include "QuickEspNow.h"
 
 #define TAG "wifi_link"
-#define TimeOutMs 80 // 链路通信超时
+typedef std::array<unsigned char, ESP_NOW_ETH_ALEN> mac_t; // MAC地址类型
+typedef struct
+{
+    union
+    {
+        struct // 主机和从机的MAC地址
+        {
+            mac_t MAC_MASTER;
+            mac_t MAC_SLAVE;
+        };
+        uint8_t raw[CRTP_MAX_DATA_SIZE]; // raw数据
+    };
+} __attribute__((packed)) bcast_packet_t; // 广播包结构类型
+typedef enum
+{
+    wl_DISCONNECTED,
+    wl_CONNECTED,
+} linkStatus_t;
+static std::atomic<linkStatus_t> linkStatus(wl_DISCONNECTED); // 链路状态
+static std::atomic<int16_t> lastRSSI(0);                      // 最后的RSSI值
 
-#define HEADER_NAME "ESP" // 从机SSID名称头，以此起始的AP将视为从机
-
-typedef std::array<unsigned char, ESP_NOW_ETH_ALEN> mac_t; // MAC 地址
-
-static esp_now_peer_info_t peer_info;       // 对等对象
-static TickType_t wifiSendInterval = 0;     // 上次成功发包时间
-QueueHandle_t queue_recv = nullptr;         // 数据接收队列
-QueueHandle_t crtpPacketDelivery = nullptr; // 数据分发队列
-// static bool init = false;                   // 是否初始化成功
+#define TimeOutMs 80                               // 链路通信超时
+static mac_t MAC_TARGET;                           // 目标MAC地址
+static TickType_t wifiSendInterval = 0;            // 上次成功发包时间
+static QueueHandle_t radioPackRecv = nullptr;      // 数据接收队列
+static QueueHandle_t crtpPacketDelivery = nullptr; // 数据分发队列
 
 esp_err_t pack_recv(radio_packet_t *rp);
 esp_err_t pack_send(radio_packet_t *rp);
 bool is_connected();
 esp_err_t start();
 esp_err_t rest();
-
-typedef struct AP_info
-{
-    uint8_t CHANNEL;
-    int8_t RSSI;
-    String SSID;
-    mac_t MAC;
-
-    bool operator<(const AP_info &obj) { return RSSI < obj.RSSI; };
-
-    bool isValidMac() const
-    {
-        bool allZero = true;
-        bool allFF = true;
-        for (auto byte : MAC)
-        {
-            if (byte != 0)
-                allZero = false;
-            if (byte != 0xFF)
-                allFF = false;
-        }
-        return !(allZero || allFF);
-    }
-
-    String toStr()
-    {
-        const char Template_[] = "SSID: %s, MAC:" MACSTR ", RSSI: %d, Channel: %d";
-        char temp[std::strlen(Template_) + 30];
-        sprintf(temp, Template_, SSID, MAC2STR(MAC), RSSI, CHANNEL);
-        return String(temp);
-    }
-} ap_info_t;
-
-enum enum_wifi_link_status
-{
-    wl_DISCONNECTED,
-    wl_CONNECTED,
-};
-
-static struct
-{
-    int16_t RSSI;
-    enum_wifi_link_status status = wl_DISCONNECTED;
-} LINK_INFO;
-
-static ap_info_t DeviceAPInfo = {};
 
 radio_link_operation_t _RLOP{
     .recv = pack_recv,
@@ -89,13 +90,33 @@ radio_link_operation_t _RLOP{
     .start = start,
     .rest = rest};
 
+/**
+ * @brief 检查数据包的CRC校验和
+ *
+ * @param rp 待检查的无线数据包结构体引用
+ * @return true 校验和匹配
+ * @return false 校验和不匹配
+ */
+bool packetCrcCheck(const radio_packet_t &rp)
+{
+    auto crc = calculate_cksum((void *)rp.raw, sizeof(rp.raw) - 1);
+    auto ret = rp.checksum == crc;
+    if (!ret)
+        ESP_LOGE(TAG, "CRC ERROR, expected: %d, got: %d", crc, rp.checksum);
+
+    return ret;
+}
+
+// QuickESPNow回调函数
 void data_recv(uint8_t *mac, const uint8_t *data, uint8_t len, signed int rssi, bool broadcast)
 {
+    lastRSSI.store(rssi);
     if (data == nullptr)
         return;
+    auto rp = (radio_packet_t *)data;
 
-    ESP_LOGI(TAG, "From " MACSTR ", len:%d, rssi:%d, isBroadcast:%d",
-             MAC2STR(mac), len, rssi, broadcast);
+    // ESP_LOGI(TAG, "From " MACSTR ", len:%d, rssi:%d, isBroadcast:%d",
+    //          MAC2STR(mac), len, rssi, broadcast);
 
     if (len > sizeof(radio_packet_t))
     {
@@ -103,11 +124,12 @@ void data_recv(uint8_t *mac, const uint8_t *data, uint8_t len, signed int rssi, 
         return;
     }
 
-    static auto ret = xQueueSend(queue_recv, (radio_packet_t *)data, 0);
-    if (ret != pdPASS)
+    auto ret = xQueueSend(radioPackRecv, (radio_packet_t *)data, 0);
+    if (ret != pdTRUE)
         ESP_LOGE(TAG, "发送到队列失败, error code:%s", esp_err_to_name(ret));
 }
 
+// QuickESPNow回调函数
 void data_sent(uint8_t *address, uint8_t status)
 {
     static TickType_t lastRecvTime = 0;
@@ -119,91 +141,160 @@ void data_sent(uint8_t *address, uint8_t status)
         lastRecvTime = currentTime;
 }
 
+void disconnect_at_master()
+{
+    while (linkStatus.load() == wl_DISCONNECTED)
+    {
+
+        radio_packet_t rp = {};
+        auto cp = (CRTPPacket *)rp.data;
+        auto bp = (bcast_packet_t *)cp->data;
+        cp->channel = 0;
+        cp->port = CRTP_PORT_LINK;
+        WiFi.macAddress((uint8_t *)bp->MAC_MASTER.data());
+        rp.checksum = calculate_cksum(rp.data, sizeof(rp.data) - 1);
+
+        // * STEP 1 在当前信道广播数据包 100ms/次
+        quickEspNow.sendBcast(rp.raw, sizeof(rp.raw));
+        if (xQueueReceive(radioPackRecv, &rp, 100) == pdTRUE)
+        {
+            // * STEP 2 当收到从机回复时向从机原样返回数据包
+            if (!packetCrcCheck(rp))
+                ESP_LOGE(TAG, "Packet from SLAVE ,CRC ERROR");
+            else
+            {
+                // * STEP 3 向从机发送数据包,发送失败重试3次否则回到广播模式
+                uint8_t retry_count = 3;
+                while (retry_count > 0) // 回复到slave
+                {
+                    if (quickEspNow.send(
+                            bp->MAC_SLAVE.data(),
+                            rp.raw,
+                            sizeof(rp.raw)))
+                        continue; // 如果发送失败则重试
+
+                    // 当发送成功时设置标志位及相关事务
+                    linkStatus.store(wl_CONNECTED);
+                    MAC_TARGET = bp->MAC_SLAVE;
+                    ESP_LOGI(TAG, "Connected to Slave: " MACSTR, MAC2STR(bp->MAC_SLAVE.data()));
+                    break; // 成功连接，跳出循环
+                }
+            }
+        };
+    }
+};
+
+void disconnect_at_slave()
+{
+    radio_packet_t rp = {};
+    static auto cp = (CRTPPacket *)rp.data;
+    static auto bp = (bcast_packet_t *)cp->data;
+
+    uint8_t channel = 13;
+    while (linkStatus.load() == wl_DISCONNECTED)
+    {
+        // 循环切换信道
+        auto ret = quickEspNow.setChannel(channel, WIFI_SECOND_CHAN_NONE);
+        channel == 0 ? channel-- : channel = 13;
+
+        // * STEP 1 在每个通道等待100ms, 以监听是否有主机在当前通道广播
+        if (xQueueReceive(radioPackRecv, &rp, 100) == pdTRUE)
+        {
+            ESP_LOGI(TAG, "Received broadcast packet on channel %d", channel);
+            // 如果数据包CRC校验失败则跳过
+            if (!packetCrcCheck(rp))
+            {
+                ESP_LOGE(TAG, "CRC ERROR in broadcast receive");
+                continue;
+            }
+            /**
+             *  向主机回复信息并等待主机确认连接
+             *  成功发送或重试次数超时则重新进入守听状态
+             */
+
+            // * STEP 2 当收到广播数据包时向包内写入本机的MAC地址并回复到主机
+
+            // 临时存储主机的MAC地址，用于比对两次接收的包是否来自同一主机
+            mac_t temp_target_mac = {0};
+            temp_target_mac = bp->MAC_MASTER;
+            uint16_t retry_count = 3;
+            WiFi.macAddress(bp->MAC_SLAVE.data()); // 设置从机的MAC地址
+            rp.checksum = calculate_cksum(rp.data, sizeof(rp.data) - 1);
+            while (retry_count > 0)
+            {
+                ESP_LOGI(TAG, "Return data to master");
+
+                // 如果发送失败则重试
+                if (quickEspNow
+                        .send(bp->MAC_MASTER.data(), rp.raw, sizeof(rp.raw)))
+                {
+                    ESP_LOGW(TAG, "Failed to send data to master, retrying");
+                    vTaskDelay(10);
+                    retry_count--;
+                    continue;
+                }
+
+                // * STEP 3 等待主机回复以确认连接,等待3次,总计600ms
+                // * 如超时则判断当前连接无效,重新进入守听模式
+                if (xQueueReceive(radioPackRecv, &rp, 200) == pdTRUE)
+                {
+                    ESP_LOGI(TAG, "Received response from master: " MACSTR,
+                             MAC2STR(bp->MAC_MASTER.data()));
+
+                    mac_t this_device_mac = {0};
+                    WiFi.macAddress(this_device_mac.data());
+                    auto crcCheckOk = packetCrcCheck(rp);
+                    auto macCheckOk_master = bp->MAC_MASTER == temp_target_mac;
+                    auto macCheckOk_slave = bp->MAC_SLAVE == this_device_mac;
+
+                    // * STEP 4 如果收到主机回复，则连接成功
+                    if (crcCheckOk && macCheckOk_master && macCheckOk_slave)
+                    {
+                        linkStatus.store(wl_CONNECTED);
+                        MAC_TARGET = bp->MAC_MASTER;
+                        ESP_LOGI(TAG, "Connected to master: " MACSTR, MAC2STR(bp->MAC_MASTER.data()));
+                        break; // 成功连接，跳出循环
+                    }
+                    else
+                        ESP_LOGE(TAG, "Master data check failed, CRC: %s, MAC_MASTER:[" MACSTR "], MAC_SLAVE:[" MACSTR "]",
+                                 crcCheckOk ? "OK" : "ERROR",
+                                 MAC2STR(bp->MAC_MASTER.data()),
+                                 MAC2STR(bp->MAC_SLAVE.data()));
+                }
+
+                ESP_LOGE(TAG, "No response from master, retrying[%d]",
+                         retry_count);
+                retry_count--;
+            };
+        };
+    };
+};
+
 /**
  *  处理设备配对和收包
  */
 void wifi_link_task(void *pvParameters)
 {
-    static auto AP = &DeviceAPInfo;
-
     static radio_packet_t rp = {};
 
     while (true)
     {
-        switch (LINK_INFO.status)
+        switch (linkStatus.load())
         {
-        case wl_DISCONNECTED: // 没有连接时寻找设备连接
-            vTaskDelay(500);
+        case wl_DISCONNECTED:
+            ESP_LOGI(TAG, "Control Mode:[ %s ]",
+                     CONFIG.control_mode == MASTER ? "MASTER" : "SLAVE");
+            CONFIG.control_mode == MASTER
+                ? disconnect_at_master()
+                : disconnect_at_slave();
             break;
-            [&]()
-            {
-                std::vector<ap_info_t> aps;
 
-                while (true) // 扫描信道0~13
-                {
-                    for (size_t ch = 1; ch < 14; ch++)
-                    {
-                        auto scanResults = WiFi.scanNetworks(0, 0, 0, 50, ch);
-                        if (!scanResults) // 没有扫描到AP跳转到下一信道扫描
-                            continue;
-                        for (size_t i = 0; i < scanResults; i++)
-
-                            // 从扫描结果中筛选出符合要求的AP
-                            if (WiFi.SSID(i).indexOf(HEADER_NAME) == 0)
-                            {
-                                ap_info_t ap;
-                                ap.RSSI = WiFi.RSSI(i),
-                                ap.SSID = WiFi.SSID(i),
-                                ap.CHANNEL = WiFi.channel(i),
-                                memcpy(&ap.MAC, WiFi.BSSID(i), sizeof(mac_t));
-
-                                aps.push_back(ap);
-                            };
-
-                        WiFi.scanDelete(); // 清空当前信道扫描结果
-                    }
-
-                    if (!aps.empty())
-                        break;
-                    ESP_LOGI(TAG, "No device found, try again");
-                }
-
-                std::sort(aps.begin(), aps.end());
-                *AP = aps[aps.size() - 1]; // 选择信号最强的AP
-
-                ESP_LOGI(TAG, "WL_FIND_DEVICE: %s, RSSI: %d, CHANNEL: %d",
-                         AP->SSID.c_str(), AP->RSSI, AP->CHANNEL);
-
-                memset(&peer_info, 0, sizeof(esp_now_peer_info_t));
-                memcpy(peer_info.peer_addr, AP->MAC.data(), ESP_NOW_ETH_ALEN);
-                peer_info.channel = AP->CHANNEL;
-                peer_info.ifidx = WIFI_IF_STA;
-                peer_info.encrypt = false;
-
-                auto ret = esp_now_add_peer(&peer_info);
-                if (ret != ESP_OK)
-                {
-                    ESP_LOGE(TAG, "Add peer fail, error code:%s", esp_err_to_name(ret));
-                    memset(&peer_info, 0, sizeof(esp_now_peer_info_t));
-                }
-
-                ret = esp_wifi_set_channel(AP->CHANNEL, WIFI_SECOND_CHAN_NONE);
-                if (ret != ESP_OK)
-                    ESP_LOGE(TAG, "Set channel fail, error code:%s", esp_err_to_name(ret));
-                // ESP_ERROR_CHECK(
-                //     esp_wifi_set_channel(AP->CHANNEL, WIFI_SECOND_CHAN_NONE));
-
-                LINK_INFO.status = wl_CONNECTED; // 连接成功
-                ESP_LOGI(TAG, "Connected devices '%s' success",
-                         AP->SSID.c_str());
-            }();
-            break;
         case wl_CONNECTED:
-            if (xQueueReceive(queue_recv, &rp, portMAX_DELAY) == pdTRUE)
+            if (xQueueReceive(radioPackRecv, &rp, portMAX_DELAY) == pdTRUE)
             {
                 // TODO 如果数据来自 esp-now 则不校验
                 // 验证数据是否有效
-                if (rp.checksum != calculate_cksum(rp.data, sizeof(rp.data) - 1))
+                if (!packetCrcCheck(rp))
                 {
                     ESP_LOGE(TAG, "CRC ERROR");
                     continue;
@@ -217,7 +308,22 @@ void wifi_link_task(void *pvParameters)
     }
 }
 
-void wifi_link_init()
+IRAM_ATTR esp_err_t pack_recv(radio_packet_t *rp)
+{
+    xQueueReceive(crtpPacketDelivery, rp, portMAX_DELAY);
+    return ESP_OK;
+}
+
+IRAM_ATTR esp_err_t pack_send(radio_packet_t *rp)
+{
+    static BaseType_t ret;
+    if (linkStatus.load() != wl_CONNECTED)
+        return ESP_ERR_NOT_FINISHED;
+
+    return quickEspNow.send(MAC_TARGET.data(), rp->raw, sizeof(*rp));
+}
+
+esp_err_t start()
 {
     /*** WiFi ***/
     /**
@@ -226,20 +332,17 @@ void wifi_link_init()
      *   2. 配置了SSID和密码，启动STA模式
      *   3. STA模式下连接失败，启动AP模式
      */
-
     auto start_on_AP = [&]()
     {
         mac_t mac = {0};
         char ssid[32] = {0};
-        ESP_ERROR_CHECK(WiFi.mode(WIFI_AP) ? ESP_OK : ESP_FAIL);
+        ESP_ERROR_CHECK(WiFi.mode(WIFI_AP_STA) ? ESP_OK : ESP_FAIL);
         WiFi.softAPmacAddress(mac.data()); // 设置AP的MAC地址
         sprintf(ssid, "ESP32-%02X:%02X:%02X", mac[3], mac[4], mac[5]);
         WiFi.softAP(ssid, NULL, 1, 0, 4, 0);
         ESP_LOGI(TAG, "Create open AP: %s, on channel: 1", ssid);
     };
 
-    ESP_LOGI(TAG, "WiFi SSID: %s, PASS: %s",
-             CONFIG.WIFI_SSID, CONFIG.WIFI_PASS);
     if (CONFIG.WIFI_SSID[0] != '\0')
     {
         ESP_ERROR_CHECK(WiFi.mode(WIFI_STA) ? ESP_OK : ESP_FAIL);
@@ -267,11 +370,7 @@ void wifi_link_init()
     /*** ESP-NOW ***/
     quickEspNow.onDataRcvd(data_recv);
     quickEspNow.onDataSent(data_sent);
-
-    if (WiFi.getMode() == WIFI_AP)
-        quickEspNow.begin(CURRENT_WIFI_CHANNEL, WIFI_IF_AP);
-    else
-        quickEspNow.begin();
+    quickEspNow.begin(WiFi.channel(), WIFI_IF_STA, false);
 
     // // 设置 ESPNOW 通讯速率
     // esp_wifi_config_espnow_rate(WIFI_IF_STA, WIFI_PHY_RATE_LORA_500K) == ESP_OK
@@ -279,42 +378,13 @@ void wifi_link_init()
     //     : ESP_LOGI(TAG, "Set ESPNOW RATE FAIL");
     // 设置 ESPNOW
 
-    queue_recv = xQueueCreate(10, sizeof(radio_packet_t));
-    if (queue_recv == nullptr)
-        esp_system_abort("Create queue_recv fail");
+    radioPackRecv = xQueueCreate(10, sizeof(radio_packet_t));
+    configASSERT(radioPackRecv != nullptr);
 
-    xTaskCreate(wifi_link_task, "wifi_link_task", 4096, NULL, TP_H, NULL);
-}
+    crtpPacketDelivery = xQueueCreate(10, sizeof(radio_packet_t::data));
+    configASSERT(crtpPacketDelivery != nullptr);
 
-// link operation
-IRAM_ATTR esp_err_t pack_recv(radio_packet_t *rp)
-{
-    xQueueReceive(queue_recv, rp, portMAX_DELAY);
-    return ESP_OK;
-}
-
-IRAM_ATTR esp_err_t pack_send(radio_packet_t *rp)
-{
-    static BaseType_t ret;
-    if (LINK_INFO.status != wl_CONNECTED)
-        return ESP_ERR_NOT_FINISHED;
-
-    return esp_now_send(peer_info.peer_addr, rp->raw, sizeof(*rp));
-    // ret = esp_now_send(peer_info.peer_addr, rp->raw, sizeof(*rp));
-    // if (ret != ESP_OK)
-    // {
-    //     ESP_LOGE(TAG, "esp_now_send fail, error: %s", esp_err_to_name(ret));
-    //     ESP_LOGE(TAG, "Devices info: Mac " MACSTR ", Channel %d",
-    //              MAC2STR(peer_info.peer_addr),
-    //              peer_info.channel);
-    // }
-    //
-    // return ret;
-}
-
-esp_err_t start()
-{
-    wifi_link_init();
+    xTaskCreate(wifi_link_task, "wifi_link_task", 1024 * 10, NULL, TP_H, NULL);
 
     return ESP_OK;
 }
@@ -338,7 +408,7 @@ esp_err_t rest()
     return ESP_OK;
 };
 
-radio_link_operation_t *get_link()
+radio_link_operation_t *WiFi_Esp_Now()
 {
     return &_RLOP;
 }

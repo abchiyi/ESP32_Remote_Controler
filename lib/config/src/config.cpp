@@ -150,7 +150,10 @@ void Config::begin()
 
         if (doc["rw"] == WEB_CONSOLE_W)
         {
-            if (!areAllKeysPresent(doc, {"ssid", "pass"}))
+            if (!areAllKeysPresent(doc, {"ssid",
+                                         "pass",
+                                         "radio_mode",
+                                         "control_mode"}))
             {
                 ESP_LOGE(TAG, "未知数据, %s", doc.as<String>().c_str());
                 return;
@@ -164,8 +167,10 @@ void Config::begin()
                     doc["pass"],
                     sizeof(CONFIG.WIFI_PASS));
 
-            ESP_LOGI(TAG, "SSID: %s, PASS: %s",
-                     CONFIG.WIFI_SSID, CONFIG.WIFI_PASS);
+            CONFIG.radio_mode = doc["radio_mode"];
+            CONFIG.control_mode = doc["control_mode"];
+
+            CONFIG.print();
 
             CONFIG.save()
                 ? ESP_LOGI(TAG, "保存成功")
@@ -176,6 +181,8 @@ void Config::begin()
             JsonDocument doc;
             doc["ssid"] = CONFIG.WIFI_SSID;
             doc["pass"] = CONFIG.WIFI_PASS;
+            doc["radio_mode"] = CONFIG.radio_mode;
+            doc["control_mode"] = CONFIG.control_mode;
             String JsonString;
             serializeJson(doc, JsonString);
             web_console_send(JsonString);
@@ -218,4 +225,15 @@ bool Config::save()
     // 计算并存储校验和到data_is_alive
     this->raw[0] = calculateChecksum(this->raw, sizeof(this->raw));
     return saveBytesToNVS(this->raw, sizeof(this->raw));
+}
+
+void Config::print()
+{
+    ESP_LOGI(TAG, "=== Current Configuration ===");
+    ESP_LOGI(TAG, "Data valid: %s", data_is_alive ? "Yes" : "No");
+    ESP_LOGI(TAG, "WIFI SSID: %s", WIFI_SSID);
+    ESP_LOGI(TAG, "WIFI Password: [Length: %d]", strlen(WIFI_PASS));
+    ESP_LOGI(TAG, "Radio Mode: %s", radio_mode == ESP_NOW ? "ESP_NOW" : "Unknown");
+    ESP_LOGI(TAG, "Control Mode: %s", control_mode == SLAVE ? "SLAVE" : "MASTER");
+    ESP_LOGI(TAG, "=========================");
 }

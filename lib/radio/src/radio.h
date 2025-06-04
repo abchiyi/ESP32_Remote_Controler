@@ -33,7 +33,7 @@ typedef struct
 
 typedef std::function<void(CRTPPacket *)> CRTPPacketHandler_fn_t;
 
-void init_radio(radio_link_operation_t *); // 初始化无线通讯
+void init_radio(); // 初始化无线通讯
 
 esp_err_t radio_send_packet(radio_packet_t *rp);
 

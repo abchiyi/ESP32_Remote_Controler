@@ -1,18 +1,34 @@
-#include <tool.h>
+#include "tool.h"
 
-void nvs_call(const char *name_space, std::function<void(Preferences &)> cb_fn)
+uint8_t calculate_cksum(void *data, size_t len)
 {
-  Preferences PREFS;
-  PREFS.begin(name_space);
-  cb_fn(PREFS);
-  PREFS.end();
+  uint8_t cksum = 0;
+  uint8_t *p = (uint8_t *)data;
+  for (size_t i = 0; i < len; i++)
+  {
+    cksum += p[i];
+  }
+  return cksum;
 }
 
-IRAM_ATTR uint8_t calculate_cksum(void *data, size_t len)
+bool is_valid_mac(const uint8_t *mac, size_t len)
 {
-  auto c = (unsigned char *)data;
-  unsigned char cksum = 0;
-  for (int i = 0; i < len; i++)
-    cksum += *(c++);
-  return cksum;
+  // 检查输入参数
+  if (mac == nullptr || len == 0)
+  {
+    return false;
+  }
+
+  // 检查每个字节
+  for (size_t i = 0; i < len; i++)
+  {
+    // 如果字节为0x00或0xFF，则MAC地址无效
+    if (mac[i] == 0x00 || mac[i] == 0xFF)
+    {
+      return false;
+    }
+  }
+
+  // 所有字节都有效
+  return true;
 }
