@@ -109,14 +109,14 @@ bool packetCrcCheck(const radio_packet_t &rp)
 
 // QuickESPNow回调函数
 void data_recv(uint8_t *mac, const uint8_t *data, uint8_t len, signed int rssi, bool broadcast)
+
 {
     lastRSSI.store(rssi);
     if (data == nullptr)
         return;
     auto rp = (radio_packet_t *)data;
-
-    // ESP_LOGI(TAG, "From " MACSTR ", len:%d, rssi:%d, isBroadcast:%d",
-    //          MAC2STR(mac), len, rssi, broadcast);
+    rp->rssi = rssi;
+    rp->is_broadcast = broadcast;
 
     if (len > sizeof(radio_packet_t))
     {
@@ -159,9 +159,10 @@ void disconnect_at_master()
         if (xQueueReceive(radioPackRecv, &rp, 100) == pdTRUE)
         {
             // * STEP 2 当收到从机回复时向从机原样返回数据包
-            if (!packetCrcCheck(rp))
-                ESP_LOGE(TAG, "Packet from SLAVE ,CRC ERROR");
-            else
+            auto is_not_broadcast = rp.is_broadcast == 0;
+            auto crcCheckOk = packetCrcCheck(rp);
+            auto macCheckOk = is_valid_mac(bp->MAC_SLAVE.data(), sizeof(mac_t));
+            if (crcCheckOk && macCheckOk && is_not_broadcast)
             {
                 // * STEP 3 向从机发送数据包,发送失败重试3次否则回到广播模式
                 uint8_t retry_count = 3;
@@ -180,6 +181,11 @@ void disconnect_at_master()
                     break; // 成功连接，跳出循环
                 }
             }
+            else
+                ESP_LOGD(TAG, "Received invalid data, CRC check %s, MAC check %s, Broadcast: %s",
+                         crcCheckOk ? "OK" : "ERROR",
+                         macCheckOk ? "OK" : "ERROR",
+                         is_not_broadcast ? "No" : "Yes");
         };
     }
 };
@@ -202,11 +208,19 @@ void disconnect_at_slave()
         {
             ESP_LOGI(TAG, "Received broadcast packet on channel %d", channel);
             // 如果数据包CRC校验失败则跳过
-            if (!packetCrcCheck(rp))
+
+            if (!packetCrcCheck(rp) && is_valid_mac)
             {
                 ESP_LOGE(TAG, "CRC ERROR in broadcast receive");
                 continue;
             }
+
+            if (rp.rssi < -40) // 信号强度小于-40dBm则认为信号过弱
+            {
+                ESP_LOGD(TAG, "Weak signal from master: %d dBm", rp.rssi);
+                continue; // 信号过弱则跳过
+            }
+
             /**
              *  向主机回复信息并等待主机确认连接
              *  成功发送或重试次数超时则重新进入守听状态

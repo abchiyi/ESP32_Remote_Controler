@@ -20,6 +20,9 @@ typedef struct
     };
     uint8_t raw[32];
   };
+
+  int16_t rssi;         // 接收信号强度指示
+  uint8_t is_broadcast; // 是否为广播包
 } __attribute__((packed)) radio_packet_t;
 
 typedef struct
