@@ -12,6 +12,7 @@ enum TASK_PRIORITY
 typedef enum
 {
     ESP_NOW,
+    BT_CONTROLLER,
     __radio_mode_max
 } radio_mode_t;
 typedef enum

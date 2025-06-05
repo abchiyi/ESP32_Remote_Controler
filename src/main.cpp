@@ -40,15 +40,13 @@ void setup()
   init_web_console(); // 启动Web控制台
 
   /** 启动蓝牙控制器接入 **/
-  // Controller.begin();
-
-  vTaskDelete(NULL); // 干掉 loopTask
-  return;
+  if ((CONFIG.control_mode == MASTER) || (CONFIG.radio_mode == BT_CONTROLLER))
+    Controller.begin();
 
   auto taskCrtpPacket = [](void *pt)
   {
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = HZ2TICKS(200);
+    const TickType_t xFrequency = HZ2TICKS(80);
     static radio_packet_t rp;
     auto crtp = (CRTPPacket *)rp.data;
 
@@ -63,9 +61,12 @@ void setup()
       return joy * step;
     };
 
+    Serial.println("");
     while (true)
     {
-
+      xTaskDelayUntil(&xLastWakeTime, xFrequency);
+      if (!Controller.is_connected())
+        continue;
       ROLL = match_angl(40, Controller.getAnalogHat(joyLHori));
       PITCH = match_angl(255, Controller.getAnalogHat(joyLVert));
       YAW = match_angl(60, Controller.getAnalogHat(joyRHori));
@@ -78,9 +79,9 @@ void setup()
       memcpy(&crtp->data[8], &YAW, sizeof(YAW));
       memcpy(&crtp->data[12], &THRUST, sizeof(THRUST));
 
-      radio_send_packet(&rp);
+      // Serial.printf("\r ROLL: %.2f, PITCH: %.2f, YAW: %.2f, THRUST: %d                     ", ROLL, PITCH, YAW, THRUST);
 
-      xTaskDelayUntil(&xLastWakeTime, xFrequency);
+      radio_send_packet(&rp);
     }
   };
 
