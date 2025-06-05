@@ -209,9 +209,15 @@ void disconnect_at_slave()
             ESP_LOGI(TAG, "Received broadcast packet on channel %d", channel);
             // 如果数据包CRC校验失败则跳过
 
-            if (!packetCrcCheck(rp) && is_valid_mac)
+            auto crcCheckOk = packetCrcCheck(rp);
+            auto is_broadcast = rp.is_broadcast == 1;
+            auto macCheckOk = is_valid_mac(bp->MAC_MASTER.data(), sizeof(mac_t));
+            if (!crcCheckOk && !macCheckOk && !is_broadcast)
             {
-                ESP_LOGE(TAG, "CRC ERROR in broadcast receive");
+                ESP_LOGE(TAG, "Crc check: %s ,macCheckOk: %s, is_broadcast: %s",
+                         crcCheckOk ? "OK" : "ERROR",
+                         macCheckOk ? "OK" : "ERROR",
+                         is_broadcast ? "Yes" : "No");
                 continue;
             }
 
