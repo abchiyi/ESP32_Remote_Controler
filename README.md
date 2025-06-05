@@ -108,10 +108,7 @@ npm run build
 
 ## 贡献
 
-欢迎提交Issue和Pull Request。在提交代码前，请确保：
-1. 代码符合项目的编码规范
-2. 添加了必要的测试
-3. 更新了相关文档
+欢迎提交Issue和Pull Request。
 
 ## 致谢
 
