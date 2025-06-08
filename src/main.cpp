@@ -20,6 +20,27 @@
 
 #define TAG "Main ESP32 RC"
 
+typedef struct
+{
+  union
+  {
+    struct
+    {
+      float ROLL;
+      float PITCH;
+      float YAW;
+      uint16_t THRUST;
+      bool breaker;
+      // 回传数据
+      int16_t rssi;    // 接收信号强度指示
+      int16_t voltage; // 电池电压
+    };
+
+    uint8_t raw[CRTP_MAX_DATA_SIZE];
+  };
+
+} __attribute((packed)) control_data_t;
+
 void setup()
 {
   Serial.begin(115200);
@@ -42,6 +63,16 @@ void setup()
   /** 启动蓝牙控制器接入 **/
   if ((CONFIG.control_mode == MASTER) || (CONFIG.radio_mode == BT_CONTROLLER))
     Controller.begin();
+
+  pinMode(0, OUTPUT);
+  auto vehicle_control = [](CRTPPacket *crtp)
+  {
+    auto data = (control_data_t *)crtp->data;
+
+    analogWrite(0, data->THRUST / 4);
+  };
+
+  radio_set_port_callback(CRTP_PORT_SETPOINT, vehicle_control);
 
   auto taskCrtpPacket = [](void *pt)
   {
