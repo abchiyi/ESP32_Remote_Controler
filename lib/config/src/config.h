@@ -1,6 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 #include "Arduino.h"
+#include "XBOX.h"
 
 enum TASK_PRIORITY
 {
@@ -43,6 +44,16 @@ public:
             radio_mode_t radio_mode;       // 无线模式
             control_mode_t control_mode;   // 控制模式
         };
+        struct
+        {
+            XBOX_ANALOG_HAT ROLL;
+            XBOX_ANALOG_HAT PITCH;
+            XBOX_ANALOG_HAT YAW;
+            XBOX_ANALOG_HAT THRUST;
+
+            XBOX_BUTTON breaker[2]; // 使用数组以组合按钮模式
+        };
+
         uint8_t raw[128];
     };
 
