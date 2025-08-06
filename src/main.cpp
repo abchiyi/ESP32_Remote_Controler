@@ -62,11 +62,22 @@ void setup()
 
   // ** 特定条件初始化蓝牙以连接无线控制器 **
 
-  if (CONFIG.control_mode == MASTER || CONFIG.radio_mode == BT_CONTROLLER)
-    Controller.begin();
+  // if (CONFIG.control_mode == MASTER || CONFIG.radio_mode == BT_CONTROLLER)
+  //   Controller.begin();
 
-  vTaskDelete(NULL); // 干掉 loopTask
+  // ESP_LOGI(TAG, "Waiting for controller to connect...");
+  // while (!Controller.is_connected())
+  //   vTaskDelay(pdMS_TO_TICKS(500));
+
+  // vTaskDelete(NULL); // 干掉 loopTask
 }
 void loop()
 {
+  packet_setpoint_t packet;
+
+  // getControlFromController(&packet);
+
+  // ESP_LOGI(TAG, "ROLL: %.2f, PITCH: %.2f, YAW: %.2f, THRUST: %u, breaker: %d",
+  //          packet.ROLL, packet.PITCH, packet.YAW, packet.THRUST, packet.breaker);
+  vTaskDelay(pdMS_TO_TICKS(100));
 }

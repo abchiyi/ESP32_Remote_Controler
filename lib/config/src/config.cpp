@@ -150,28 +150,64 @@ void Config::begin()
 
         if (doc["rw"] == WEB_CONSOLE_W)
         {
+            ESP_LOGE(TAG, "Json, %s", doc.as<String>().c_str());
+
             if (!areAllKeysPresent(doc, {"ssid",
                                          "pass",
                                          "radio_mode",
-                                         "control_mode"}))
+                                         "control_mode",
+
+                                         "THRUST",
+                                         "PITCH",
+                                         "ROLL",
+                                         "YAW",
+                                         "breaker",
+                                         "Reverse",
+
+                                         "ROLL_FLIP",
+                                         "PITCH_FLIP",
+                                         "YAW_FLIP",
+                                         "THRUST_FLIP",
+                                         "breaker_FLIP",
+                                         "Reverse_FLIP"}))
             {
                 ESP_LOGE(TAG, "未知数据, %s", doc.as<String>().c_str());
                 return;
             }
 
-            strlcpy(CONFIG.WIFI_SSID,
-                    doc["ssid"],
-                    sizeof(CONFIG.WIFI_SSID));
+            strlcpy(CONFIG.WIFI_SSID, doc["ssid"], sizeof(CONFIG.WIFI_SSID));
+            strlcpy(CONFIG.WIFI_PASS, doc["pass"], sizeof(CONFIG.WIFI_PASS));
 
-            strlcpy(CONFIG.WIFI_PASS,
-                    doc["pass"],
-                    sizeof(CONFIG.WIFI_PASS));
+            // 从 doc["breaker"] 取 2 字节数组到 CONFIG.breaker
+            JsonArray breakerArr = doc["breaker"].as<JsonArray>();
+            if (breakerArr.size() == 2)
+                for (size_t i = 0; i < 2; ++i)
+                    CONFIG.breaker[i] = breakerArr[i];
+            else
+                ESP_LOGE(TAG, "breaker 数组长度错误: %d", breakerArr.size());
+
+            JsonArray breakerFlipArr = doc["breaker_FLIP"].as<JsonArray>();
+            if (breakerFlipArr.size() == 2)
+                for (size_t i = 0; i < 2; ++i)
+                    CONFIG.breaker_FLIP[i] = breakerFlipArr[i];
+            else
+                ESP_LOGE(TAG, "breaker_FLIP 数组长度错误: %d", breakerFlipArr.size());
 
             CONFIG.radio_mode = doc["radio_mode"];
             CONFIG.control_mode = doc["control_mode"];
+            CONFIG.THRUST = doc["THRUST"];
+            CONFIG.PITCH = doc["PITCH"];
+            CONFIG.ROLL = doc["ROLL"];
+            CONFIG.YAW = doc["YAW"];
+            CONFIG.Reverse = doc["Reverse"];
+
+            CONFIG.ROLL_FLIP = doc["ROLL_FLIP"];
+            CONFIG.PITCH_FLIP = doc["PITCH_FLIP"];
+            CONFIG.YAW_FLIP = doc["YAW_FLIP"];
+            CONFIG.THRUST_FLIP = doc["THRUST_FLIP"];
+            CONFIG.Reverse_FLIP = doc["Reverse_FLIP"];
 
             CONFIG.print();
-
             CONFIG.save()
                 ? ESP_LOGI(TAG, "保存成功")
                 : ESP_LOGE(TAG, "保存失败");
@@ -183,14 +219,37 @@ void Config::begin()
             doc["pass"] = CONFIG.WIFI_PASS;
             doc["radio_mode"] = CONFIG.radio_mode;
             doc["control_mode"] = CONFIG.control_mode;
+            doc["THRUST"] = CONFIG.THRUST;
+            doc["PITCH"] = CONFIG.PITCH;
+            doc["ROLL"] = CONFIG.ROLL;
+            doc["YAW"] = CONFIG.YAW;
+            doc["Reverse"] = CONFIG.Reverse;
+
+            doc["ROLL_FLIP"] = CONFIG.ROLL_FLIP;
+            doc["PITCH_FLIP"] = CONFIG.PITCH_FLIP;
+            doc["YAW_FLIP"] = CONFIG.YAW_FLIP;
+            doc["THRUST_FLIP"] = CONFIG.THRUST_FLIP;
+            doc["Reverse_FLIP"] = CONFIG.Reverse_FLIP;
+
+            // breaker& breaker_FLIP 是数组，需要逐个赋值
+            JsonArray breakerArr = doc["breaker"].to<JsonArray>();
+            for (size_t i = 0; i < 2; ++i)
+                breakerArr.add(CONFIG.breaker[i]);
+
+            JsonArray breakerFlipArr = doc["breaker_FLIP"].to<JsonArray>();
+            for (size_t i = 0; i < 2; ++i)
+                breakerFlipArr.add(CONFIG.breaker_FLIP[i]);
+
             String JsonString;
             serializeJson(doc, JsonString);
             web_console_send(JsonString);
+            CONFIG.print();
         }
     };
 
     register_web_console_callback(WEB_PORT_CONFIG, web_cbfn);
 
+    this->print();
     // // 创建配置检查任务
     // xTaskCreate(
     //     configCheckTask, // 任务函数
@@ -235,5 +294,19 @@ void Config::print()
     ESP_LOGI(TAG, "WIFI Password: [Length: %d]", strlen(WIFI_PASS));
     ESP_LOGI(TAG, "Radio Mode: %s", radio_mode == ESP_NOW ? "ESP_NOW" : "Unknown");
     ESP_LOGI(TAG, "Control Mode: %s", control_mode == SLAVE ? "SLAVE" : "MASTER");
+
+    ESP_LOGI(TAG, "THRUST: %d", THRUST);
+    ESP_LOGI(TAG, "PITCH: %d", PITCH);
+    ESP_LOGI(TAG, "ROLL: %d", ROLL);
+    ESP_LOGI(TAG, "YAW: %d", YAW);
+    ESP_LOGI(TAG, "breaker: [%d, %d]", breaker[0], breaker[1]);
+
+    ESP_LOGI(TAG, "Reverse: %d", Reverse);
+    ESP_LOGI(TAG, "ROLL_FLIP: %d", ROLL_FLIP);
+    ESP_LOGI(TAG, "PITCH_FLIP: %d", PITCH_FLIP);
+    ESP_LOGI(TAG, "YAW_FLIP: %d", YAW_FLIP);
+    ESP_LOGI(TAG, "THRUST_FLIP: %d", THRUST_FLIP);
+    ESP_LOGI(TAG, "breaker_FLIP: [%d, %d]", breaker_FLIP[0], breaker_FLIP[1]);
+    ESP_LOGI(TAG, "Reverse_FLIP: %d", Reverse_FLIP);
     ESP_LOGI(TAG, "=========================");
 }

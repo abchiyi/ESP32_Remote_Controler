@@ -24,11 +24,11 @@ typedef enum
 
 #define WIFI_SSID_MAX 32
 #define WIFI_PASS_MAX 64
-
+#define CONFID_DATA_SIZE 256 // 配置数据大小
 typedef class Config
 {
 private:
-    uint8_t previous_raw[128];                    // 存储上一次的raw值
+    uint8_t previous_raw[CONFID_DATA_SIZE];       // 存储上一次的raw值
     static void configCheckTask(void *parameter); // 定时检查任务
     TaskHandle_t checkTaskHandle;                 // 任务句柄
     uint8_t calculateChecksum(uint8_t *, size_t); // 计算校验和
@@ -43,18 +43,24 @@ public:
             char WIFI_PASS[WIFI_PASS_MAX]; // Wi-Fi 密码
             radio_mode_t radio_mode;       // 无线模式
             control_mode_t control_mode;   // 控制模式
-        };
-        struct
-        {
-            XBOX_ANALOG_HAT ROLL;
-            XBOX_ANALOG_HAT PITCH;
-            XBOX_ANALOG_HAT YAW;
-            XBOX_ANALOG_HAT THRUST;
 
-            XBOX_BUTTON breaker[2]; // 使用数组以组合按钮模式
-        };
+            XBOX_INPUT_t ROLL;       // 滚转
+            XBOX_INPUT_t PITCH;      // 俯仰
+            XBOX_INPUT_t YAW;        // 偏航
+            XBOX_INPUT_t THRUST;     // 推力
+            XBOX_INPUT_t breaker[2]; // 制动，使用数组以组合按钮模式
+            XBOX_INPUT_t Reverse;    // 反转推力
 
-        uint8_t raw[128];
+            // 对应通道的翻转值开关配置
+            uint8_t ROLL_FLIP;       // 滚转翻转
+            uint8_t PITCH_FLIP;      // 俯仰翻转
+            uint8_t YAW_FLIP;        // 偏航翻转
+            uint8_t THRUST_FLIP;     // 推力方向翻转
+            uint8_t breaker_FLIP[2]; // 制动翻转开关
+            uint8_t Reverse_FLIP;    // 反转推力开关
+        } __attribute__((packed));
+
+        uint8_t raw[CONFID_DATA_SIZE];
     };
 
     void begin();

@@ -26,6 +26,7 @@ bool areAllKeysPresent(const json_doc &doc,
     for (const auto &key : indices)
         if (doc[key].isNull())
         {
+            ESP_LOGW(TAG, "缺少配置项: %s", key);
             all_present = false;
             break;
         }
