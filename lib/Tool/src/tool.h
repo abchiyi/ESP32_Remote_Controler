@@ -5,6 +5,7 @@
 #include <algorithm>     // 用于 std::equal
 #include "functional"    // std:func
 #include "Preferences.h" // 储存
+#include "crtp.h"        // CRTP 数据包定义
 
 /**
  * @brief 计算给定数据的校验和。
@@ -36,5 +37,11 @@ IRAM_ATTR uint8_t calculate_cksum(void *data, size_t len);
  * @return 如果MAC地址有效返回true，否则返回false。
  */
 bool is_valid_mac(const uint8_t *mac, size_t len);
+
+/**
+ * @brief 从控制器获取设定点数据。
+ * @return 返回包含设定点数据的结构体 packet_setpoint_t
+ */
+packet_setpoint_t get_setpoint_data_from_controller();
 
 #endif
