@@ -81,3 +81,12 @@ void loop()
   //          packet.ROLL, packet.PITCH, packet.YAW, packet.THRUST, packet.breaker);
   vTaskDelay(pdMS_TO_TICKS(100));
 }
+
+void recv_setpoint_t(CRTPPacket *packet)
+{
+  packet_setpoint_t *setpoint = (packet_setpoint_t *)packet->data;
+
+  // 处理接收到的设定点数据
+  ESP_LOGI(TAG, "ROLL: %.2f, PITCH: %.2f, YAW: %.2f, THRUST: %u, breaker: %d",
+           setpoint->ROLL, setpoint->PITCH, setpoint->YAW, setpoint->THRUST, setpoint->breaker);
+}

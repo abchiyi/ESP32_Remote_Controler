@@ -1,0 +1,5 @@
+{
+  "name": "DataTransmit",
+  "expo": ["src/*"],
+  "headers": ["src/*.h"]
+}
