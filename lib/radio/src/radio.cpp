@@ -18,7 +18,7 @@
 
 QueueHandle_t Q_SEND_PACK = xQueueCreate(10, sizeof(radio_packet_t));
 
-CRTPPacketHandler_fn_t func_Array[16] = {nullptr};
+radio_cb_fn func_Array[16] = {nullptr};
 
 radio_link_operation_t noLink{
     .recv = [](radio_packet_t *rp)
@@ -49,7 +49,7 @@ IRAM_ATTR void task_radio_recv(void *pvParameters)
     {
       auto fn = func_Array[((CRTPPacket *)rp.data)->port];
       if (fn != nullptr)
-        fn((CRTPPacket *)rp.data);
+        fn(&rp);
     }
   }
 }
@@ -129,7 +129,7 @@ esp_err_t radio_send_packet(radio_packet_t *rp)
  * @param fn 要绑定的回调函数。
  * @return esp_err_t 返回操作结果，成功时返回 ESP_OK，失败时返回 ESP_FAIL。
  */
-esp_err_t radio_set_port_callback(CRTPPort port, CRTPPacketHandler_fn_t fn)
+esp_err_t radio_set_port_callback(CRTPPort port, radio_cb_fn fn)
 {
   if (!func_Array[port])
   {

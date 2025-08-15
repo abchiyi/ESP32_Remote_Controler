@@ -5,6 +5,8 @@
 #include "tool.h"
 #include "config.h"
 
+#include "dataTransmit.h"
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -55,7 +57,8 @@ void setup()
   init_led();
 
   // ** 无线初始化 **/
-  init_radio();
+  init_transmit(); // 初始化无线传输
+  // init_radio();
 
   // ** Web控制台初始化 **
   init_web_console(); // 启动Web控制台
@@ -82,11 +85,21 @@ void loop()
   vTaskDelay(pdMS_TO_TICKS(100));
 }
 
-void recv_setpoint_t(CRTPPacket *packet)
+/**
+ * @brief 处理接收到的设定点数据。
+ */
+void recv_setpoint(radio_packet_t *packet)
 {
-  packet_setpoint_t *setpoint = (packet_setpoint_t *)packet->data;
+  auto cp = (CRTPPacket *)packet->data;
+  auto sp = (packet_setpoint_t *)cp->data;
 
-  // 处理接收到的设定点数据
-  ESP_LOGI(TAG, "ROLL: %.2f, PITCH: %.2f, YAW: %.2f, THRUST: %u, breaker: %d",
-           setpoint->ROLL, setpoint->PITCH, setpoint->YAW, setpoint->THRUST, setpoint->breaker);
+  Serial.printf("\rReceived data Rssi: %d, Broadcast: %d,Roll: %.2f, Pitch: %.2f, Yaw: %.2f, Thrust: %u, Breaker: %d                        ",
+                packet->rssi, packet->is_broadcast, sp->ROLL, sp->PITCH, sp->YAW, sp->THRUST, sp->breaker);
+}
+
+/**
+ * @brief 将需要发送到主机的数据填充到 packet 中
+ */
+void send_on_slave(radio_packet_t *packet)
+{
 }

@@ -34,7 +34,7 @@ typedef struct
   std::function<esp_err_t(void)> rest;             // 重置通讯链路
 } radio_link_operation_t;
 
-typedef std::function<void(CRTPPacket *)> CRTPPacketHandler_fn_t;
+typedef std::function<void(radio_packet_t *)> radio_cb_fn;
 
 void init_radio(); // 初始化无线通讯
 
@@ -44,6 +44,6 @@ extern radio_link_operation_t *RLOP;
 
 bool radio_is_connected();
 
-esp_err_t radio_set_port_callback(CRTPPort port, CRTPPacketHandler_fn_t fn);
+esp_err_t radio_set_port_callback(CRTPPort port, radio_cb_fn fn);
 
 #endif
