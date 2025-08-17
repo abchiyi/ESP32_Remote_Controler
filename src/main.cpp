@@ -56,11 +56,11 @@ void setup()
   // ** LED初始化 **
   init_led();
 
-  // ** 无线初始化 **/
-  init_transmit(); // 初始化无线传输
-
   // ** Web控制台初始化 **
   init_web_console(); // 启动Web控制台
+  vTaskDelay(100);
+  // ** 无线初始化 **/
+  init_transmit(); // 初始化无线传输
 
   // ** 特定条件初始化蓝牙以连接无线控制器 **
 
@@ -71,17 +71,10 @@ void setup()
   // while (!Controller.is_connected())
   //   vTaskDelay(pdMS_TO_TICKS(500));
 
-  // vTaskDelete(NULL); // 干掉 loopTask
+  vTaskDelete(NULL); // 干掉 loopTask
 }
 void loop()
 {
-  packet_setpoint_t packet;
-
-  // getControlFromController(&packet);
-
-  // ESP_LOGI(TAG, "ROLL: %.2f, PITCH: %.2f, YAW: %.2f, THRUST: %u, breaker: %d",
-  //          packet.ROLL, packet.PITCH, packet.YAW, packet.THRUST, packet.breaker);
-  vTaskDelay(pdMS_TO_TICKS(100));
 }
 
 /**

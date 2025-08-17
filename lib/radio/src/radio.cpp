@@ -21,7 +21,8 @@ QueueHandle_t Q_SEND_PACK = xQueueCreate(10, sizeof(radio_packet_t));
 
 radio_cb_fn func_Array[16] = {nullptr};
 
-static RadioLink *radio_link;
+static auto NoLink = new RadioLink();
+static RadioLink *radio_link = NoLink;
 
 IRAM_ATTR void
 task_radio_recv(void *pvParameters)

@@ -39,28 +39,28 @@ class RadioLink
 public:
   virtual esp_err_t send(radio_packet_t *rp)
   {
-    Serial.println("RADIO MODE NOT SETTED !");
+    ESP_LOGD("RadioLink", "Not initialized, Check!!!");
     return ESP_FAIL;
   };
   virtual esp_err_t recv(radio_packet_t *rp)
   {
-    Serial.println("RADIO MODE NOT SETTED !");
+    ESP_LOGD("RadioLink", "Not initialized, Check!!!");
     return ESP_FAIL;
   };
 
   virtual bool is_connected()
   {
-    Serial.println("RADIO MODE NOT SETTED !");
+    ESP_LOGD("RadioLink", "Not initialized, Check!!!");
     return ESP_FAIL;
   };
   virtual esp_err_t start()
   {
-    Serial.println("RADIO MODE NOT SETTED !");
+    ESP_LOGD("RadioLink", "Not initialized, Check!!!");
     return ESP_FAIL;
   };
   virtual esp_err_t rest()
   {
-    Serial.println("RADIO MODE NOT SETTED !");
+    ESP_LOGD("RadioLink", "Not initialized, Check!!!");
     return ESP_FAIL;
   };
 };

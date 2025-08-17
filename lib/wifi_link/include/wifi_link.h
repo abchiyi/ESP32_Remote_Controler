@@ -5,4 +5,6 @@
 
 RadioLink *WiFi_Esp_Now();
 
+void WiFi_init();
+
 #endif

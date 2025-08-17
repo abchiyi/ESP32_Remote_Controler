@@ -77,6 +77,54 @@ static TickType_t wifiSendInterval = 0;            // 上次成功发包时间
 static QueueHandle_t radioPackRecv = nullptr;      // 数据接收队列
 static QueueHandle_t crtpPacketDelivery = nullptr; // 数据分发队列
 
+/**
+ *  选择WiFi 启动模式
+ *   1. 未配置SSID和密码，启动AP模式
+ *   2. 配置了SSID和密码，启动STA模式
+ *   3. STA模式下连接失败，启动AP模式
+ */
+void WiFi_init()
+{
+    static bool wifi_is_statred = false;
+    if (wifi_is_statred)
+        return;
+
+    auto start_on_AP = [&]()
+    {
+        mac_t mac = {0};
+        char ssid[32] = {0};
+        ESP_ERROR_CHECK(WiFi.mode(WIFI_AP_STA) ? ESP_OK : ESP_FAIL);
+        WiFi.softAPmacAddress(mac.data()); // 设置AP的MAC地址
+        sprintf(ssid, "ESP32-%02X:%02X:%02X", mac[3], mac[4], mac[5]);
+        WiFi.softAP(ssid, NULL, 1, 0, 4, 0);
+        ESP_LOGI(TAG, "Create open AP: %s, on channel: 1", ssid);
+    };
+
+    if (CONFIG.WIFI_SSID[0] != '\0')
+    {
+        ESP_ERROR_CHECK(WiFi.mode(WIFI_STA) ? ESP_OK : ESP_FAIL);
+        WiFi.begin(CONFIG.WIFI_SSID, CONFIG.WIFI_PASS);
+
+        uint8_t counter = 10;
+        while (WiFi.status() != WL_CONNECTED)
+        {
+            delay(500);
+            counter--;
+            if (!counter)
+                break;
+        }
+        if (counter)
+            ESP_LOGI(TAG, "Connected to WiFi: %s", CONFIG.WIFI_SSID);
+        else
+            start_on_AP();
+    }
+    else
+        start_on_AP();
+
+    WiFi.setTxPower(WIFI_POWER_19_5dBm); // 设置最大 TX Power 到 20db
+    wifi_is_statred = true;
+}
+
 class WifiLink : public RadioLink
 {
 public:
@@ -344,46 +392,7 @@ IRAM_ATTR esp_err_t WifiLink::send(radio_packet_t *rp)
 esp_err_t WifiLink::start()
 {
     /*** WiFi ***/
-    /**
-     *  选择WiFi 启动模式
-     *   1. 未配置SSID和密码，启动AP模式
-     *   2. 配置了SSID和密码，启动STA模式
-     *   3. STA模式下连接失败，启动AP模式
-     */
-    auto start_on_AP = [&]()
-    {
-        mac_t mac = {0};
-        char ssid[32] = {0};
-        ESP_ERROR_CHECK(WiFi.mode(WIFI_AP_STA) ? ESP_OK : ESP_FAIL);
-        WiFi.softAPmacAddress(mac.data()); // 设置AP的MAC地址
-        sprintf(ssid, "ESP32-%02X:%02X:%02X", mac[3], mac[4], mac[5]);
-        WiFi.softAP(ssid, NULL, 1, 0, 4, 0);
-        ESP_LOGI(TAG, "Create open AP: %s, on channel: 1", ssid);
-    };
-
-    if (CONFIG.WIFI_SSID[0] != '\0')
-    {
-        ESP_ERROR_CHECK(WiFi.mode(WIFI_STA) ? ESP_OK : ESP_FAIL);
-        WiFi.begin(CONFIG.WIFI_SSID, CONFIG.WIFI_PASS);
-
-        uint8_t counter = 10;
-        Serial.printf("Connecting to WiFi: %s", CONFIG.WIFI_SSID);
-        while (WiFi.status() != WL_CONNECTED)
-        {
-            delay(500);
-            counter--;
-            if (!counter)
-                break;
-        }
-        if (counter)
-            ESP_LOGI(TAG, "Connected to WiFi: %s", CONFIG.WIFI_SSID);
-        else
-            start_on_AP();
-    }
-    else
-        start_on_AP();
-
-    WiFi.setTxPower(WIFI_POWER_19_5dBm); // 设置最大 TX Power 到 20db
+    WiFi_init(); // 初始化WiFi
 
     /*** ESP-NOW ***/
     quickEspNow.onDataRcvd(data_recv);
