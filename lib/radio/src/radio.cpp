@@ -13,6 +13,7 @@
 #include <tool.h>
 #include <config.h>
 #include "wifi_link.h"
+#include "bt_controller_link.h"
 
 #define TAG "Radio"
 
@@ -20,33 +21,18 @@ QueueHandle_t Q_SEND_PACK = xQueueCreate(10, sizeof(radio_packet_t));
 
 radio_cb_fn func_Array[16] = {nullptr};
 
-radio_link_operation_t noLink{
-    .recv = [](radio_packet_t *rp)
-    { return ESP_FAIL; },
+static RadioLink *radio_link;
 
-    .send = [](radio_packet_t *rp)
-    { return ESP_FAIL; },
-
-    .is_connected = []()
-    { return false; },
-
-    .start = []()
-    { return ESP_FAIL; },
-
-    .rest = []()
-    { return ESP_FAIL; },
-};
-
-radio_link_operation_t *RLOP = &noLink;
-
-IRAM_ATTR void task_radio_recv(void *pvParameters)
+IRAM_ATTR void
+task_radio_recv(void *pvParameters)
 {
   static radio_packet_t rp;
 
   while (true)
   {
-    if (RLOP->recv(&rp) == ESP_OK)
+    if (radio_link->recv(&rp) == ESP_OK)
     {
+      // 如果有回调函数，调用它
       auto fn = func_Array[((CRTPPacket *)rp.data)->port];
       if (fn != nullptr)
         fn(&rp);
@@ -60,19 +46,23 @@ IRAM_ATTR void task_radio_send(void *pvParameters)
   while (true)
   {
     if (xQueueReceive(Q_SEND_PACK, &rp, portMAX_DELAY) == pdTRUE)
-      RLOP->send(&rp);
+      radio_link->send(&rp);
   }
 }
 
 void init_radio()
 {
-  radio_link_operation_t *rlop = nullptr;
+  ESP_LOGI(TAG, "Radio init ...");
   /*** 初始化无线通讯模式 ***/
   switch (CONFIG.radio_mode)
   {
   case ESP_NOW:
-    rlop = WiFi_Esp_Now();
+    radio_link = WiFi_Esp_Now();
     ESP_LOGI(TAG, "Radio mode: ESP_NOW");
+    break;
+
+  case BT_CONTROLLER:
+    radio_link = bt_Controller_link();
     break;
 
   default:
@@ -81,14 +71,13 @@ void init_radio()
     break;
   }
 
-  if (rlop == nullptr)
+  ESP_ERROR_CHECK(radio_link->start());
+
+  if (radio_link == nullptr)
   {
     ESP_LOGE(TAG, "Radio link operation is null");
-    return;
+    configASSERT(radio_link != nullptr);
   }
-
-  ESP_ERROR_CHECK(rlop->start());
-  RLOP = rlop;
 
   auto ret = xTaskCreate(task_radio_recv, "TaskRadioRecv",
                          2048, NULL, TP_H, NULL);
@@ -109,15 +98,10 @@ void init_radio()
   ESP_LOGI(TAG, "Radio started :)");
 }
 
-bool radio_link_is_connected()
-{
-  return RLOP->is_connected();
-}
-
 esp_err_t radio_send_packet(radio_packet_t *rp)
 {
   rp->checksum = calculate_cksum(rp->data, sizeof(rp->data));
-  return RLOP->send(rp);
+  return radio_link->send(rp);
 }
 
 /**
@@ -141,7 +125,5 @@ esp_err_t radio_set_port_callback(CRTPPort port, radio_cb_fn fn)
 
 bool radio_is_connected()
 {
-  if (RLOP->is_connected)
-    return RLOP->is_connected();
-  return false;
+  return radio_link->is_connected();
 }

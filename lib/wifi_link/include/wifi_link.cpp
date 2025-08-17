@@ -77,18 +77,15 @@ static TickType_t wifiSendInterval = 0;            // 上次成功发包时间
 static QueueHandle_t radioPackRecv = nullptr;      // 数据接收队列
 static QueueHandle_t crtpPacketDelivery = nullptr; // 数据分发队列
 
-esp_err_t pack_recv(radio_packet_t *rp);
-esp_err_t pack_send(radio_packet_t *rp);
-bool is_connected();
-esp_err_t start();
-esp_err_t rest();
-
-radio_link_operation_t _RLOP{
-    .recv = pack_recv,
-    .send = pack_send,
-    .is_connected = is_connected,
-    .start = start,
-    .rest = rest};
+class WifiLink : public RadioLink
+{
+public:
+    esp_err_t recv(radio_packet_t *rp) override;
+    esp_err_t send(radio_packet_t *rp) override;
+    bool is_connected() override;
+    esp_err_t start() override;
+    esp_err_t rest() override;
+};
 
 /**
  * @brief 检查数据包的CRC校验和
@@ -329,13 +326,13 @@ void wifi_link_task(void *pvParameters)
     }
 }
 
-IRAM_ATTR esp_err_t pack_recv(radio_packet_t *rp)
+IRAM_ATTR esp_err_t WifiLink::recv(radio_packet_t *rp)
 {
     xQueueReceive(crtpPacketDelivery, rp, portMAX_DELAY);
     return ESP_OK;
 }
 
-IRAM_ATTR esp_err_t pack_send(radio_packet_t *rp)
+IRAM_ATTR esp_err_t WifiLink::send(radio_packet_t *rp)
 {
     static BaseType_t ret;
     if (linkStatus.load() != wl_CONNECTED)
@@ -344,7 +341,7 @@ IRAM_ATTR esp_err_t pack_send(radio_packet_t *rp)
     return quickEspNow.send(MAC_TARGET.data(), rp->raw, sizeof(*rp));
 }
 
-esp_err_t start()
+esp_err_t WifiLink::start()
 {
     /*** WiFi ***/
     /**
@@ -418,18 +415,17 @@ esp_err_t start()
  *
  * @return true 表连接保持，false 表连接可能失效。
  */
-bool is_connected()
+bool WifiLink::is_connected()
 {
     return wifiSendInterval <= TimeOutMs && wifiSendInterval;
 }
 
-esp_err_t rest()
+esp_err_t WifiLink::rest()
 {
-
     return ESP_OK;
 };
 
-radio_link_operation_t *WiFi_Esp_Now()
+RadioLink *WiFi_Esp_Now()
 {
-    return &_RLOP;
+    return (RadioLink *)new WifiLink();
 }

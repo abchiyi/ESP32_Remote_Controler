@@ -34,13 +34,42 @@ typedef struct
   std::function<esp_err_t(void)> rest;             // 重置通讯链路
 } radio_link_operation_t;
 
+class RadioLink
+{
+public:
+  virtual esp_err_t send(radio_packet_t *rp)
+  {
+    Serial.println("RADIO MODE NOT SETTED !");
+    return ESP_FAIL;
+  };
+  virtual esp_err_t recv(radio_packet_t *rp)
+  {
+    Serial.println("RADIO MODE NOT SETTED !");
+    return ESP_FAIL;
+  };
+
+  virtual bool is_connected()
+  {
+    Serial.println("RADIO MODE NOT SETTED !");
+    return ESP_FAIL;
+  };
+  virtual esp_err_t start()
+  {
+    Serial.println("RADIO MODE NOT SETTED !");
+    return ESP_FAIL;
+  };
+  virtual esp_err_t rest()
+  {
+    Serial.println("RADIO MODE NOT SETTED !");
+    return ESP_FAIL;
+  };
+};
+
 typedef std::function<void(radio_packet_t *)> radio_cb_fn;
 
 void init_radio(); // 初始化无线通讯
 
 esp_err_t radio_send_packet(radio_packet_t *rp);
-
-extern radio_link_operation_t *RLOP;
 
 bool radio_is_connected();
 

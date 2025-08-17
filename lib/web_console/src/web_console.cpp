@@ -9,6 +9,8 @@
 #include "ESPAsyncWebServer.h"
 #include "SPIFFS.h"
 
+#include "wifi_link.h"
+#include "radio.h"
 #include "bat.h"
 
 #include "vector"
@@ -115,6 +117,18 @@ void web_console_send(String &jsonString)
 
 void init_web_console()
 {
+    static auto wifi_link = WiFi_Esp_Now();
+
+    if (CONFIG.radio_mode == BT_CONTROLLER)
+    {
+        ESP_LOGW(TAG, "Web Console wait for BT_CONTROLLER connected");
+        while (!radio_is_connected())
+            vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(5000);
+        wifi_link->start(); // 启动WiFi连接
+        ESP_LOGI(TAG, "Web Console Start");
+    }
+
     if (!SPIFFS.begin(true))
     {
         ESP_LOGE(TAG, "SPIFFS mount failed!");

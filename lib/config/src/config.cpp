@@ -292,7 +292,18 @@ void Config::print()
     ESP_LOGI(TAG, "Data valid: %s", data_is_alive ? "Yes" : "No");
     ESP_LOGI(TAG, "WIFI SSID: %s", WIFI_SSID);
     ESP_LOGI(TAG, "WIFI Password: [Length: %d]", strlen(WIFI_PASS));
-    ESP_LOGI(TAG, "Radio Mode: %s", radio_mode == ESP_NOW ? "ESP_NOW" : "Unknown");
+    switch (radio_mode)
+    {
+    case ESP_NOW:
+        ESP_LOGI(TAG, "Radio Mode: ESP_NOW");
+        break;
+    case BT_CONTROLLER:
+        ESP_LOGI(TAG, "Radio Mode: BT_CONTROLLER");
+        break;
+    default:
+        ESP_LOGI(TAG, "Radio Mode: Unknown (%d)", radio_mode);
+        break;
+    }
     ESP_LOGI(TAG, "Control Mode: %s", control_mode == SLAVE ? "SLAVE" : "MASTER");
 
     ESP_LOGI(TAG, "THRUST: %d", THRUST);

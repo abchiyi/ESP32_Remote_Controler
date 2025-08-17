@@ -14,21 +14,7 @@ void init_transmit()
 {
     // 初始化无线传输
     init_radio();
-
-    auto bt_CB = [](void) // 蓝牙控制器回调
-    {
-        radio_packet_t rp = {};
-        auto cp = (CRTPPacket *)&rp.data;
-        auto sp = (packet_setpoint_t *)cp->data;
-        get_setpoint_data_from_controller(sp->raw);
-        recv_setpoint(&rp);
-    };
-
-    // 注册接收回调
-    if (CONFIG.radio_mode == BT_CONTROLLER)
-        Controller.setCallBack(XBOX_ON_INPUT, bt_CB);
-    else
-        radio_set_port_callback(CRTP_PORT_SETPOINT, recv_setpoint);
+    radio_set_port_callback(CRTP_PORT_SETPOINT, recv_setpoint);
 
     // 启动发送任务
     auto send_task = [](void *parameter)
@@ -39,12 +25,13 @@ void init_transmit()
         if (CONFIG.control_mode == MASTER) // 发送设控制数据
             while (true)
             {
+                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(TRANSMIT_FQ));
+                if (radio_is_connected() == false)
+                    continue;
                 radio_packet_t rp = {};
                 auto cp = (CRTPPacket *)&rp.data;
                 get_setpoint_data_from_controller(cp->data);
                 radio_send_packet(&rp);
-
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(TRANSMIT_FQ));
             }
         else if (CONFIG.control_mode == SLAVE) // 发送从机数据
             while (true)

@@ -1,0 +1,5 @@
+{
+  "name": "bt_controller_link",
+  "expo": ["include/*"],
+  "headers": ["bt_controller_link.h"]
+}

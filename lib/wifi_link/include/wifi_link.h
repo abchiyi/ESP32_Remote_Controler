@@ -3,6 +3,6 @@
 
 #include "radio.h"
 
-radio_link_operation_t *WiFi_Esp_Now();
+RadioLink *WiFi_Esp_Now();
 
 #endif

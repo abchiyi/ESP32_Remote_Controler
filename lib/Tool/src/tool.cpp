@@ -2,6 +2,8 @@
 #include "config.h"
 #include "XBOX.h"
 
+#define TAG "Tool"
+
 uint8_t calculate_cksum(void *data, size_t len)
 {
   uint8_t cksum = 0;
@@ -37,6 +39,13 @@ bool is_valid_mac(const uint8_t *mac, size_t len)
 
 void get_setpoint_data_from_controller(uint8_t *addr)
 {
+
+  if (!Controller.is_connected())
+  {
+    ESP_LOGW(TAG, "Controller is not connected, using default values");
+    memset(addr, 0, sizeof(packet_setpoint_t));
+    return;
+  }
 
   auto *setpoint_data = (packet_setpoint_t *)addr;
 
