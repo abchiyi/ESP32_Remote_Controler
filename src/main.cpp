@@ -59,6 +59,7 @@ void setup()
   // ** Web控制台初始化 **
   init_web_console(); // 启动Web控制台
   vTaskDelay(100);
+
   // ** 无线初始化 **/
   init_transmit(); // 初始化无线传输
 

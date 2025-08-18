@@ -37,17 +37,14 @@ bool is_valid_mac(const uint8_t *mac, size_t len)
   return true;
 }
 
-void get_setpoint_data_from_controller(uint8_t *addr)
+void get_setpoint_data_from_controller(packet_setpoint_t *pack)
 {
-
-  if (!Controller.is_connected())
+  if (!Controller.is_connected() && pack == nullptr)
   {
     ESP_LOGW(TAG, "Controller is not connected, using default values");
-    memset(addr, 0, sizeof(packet_setpoint_t));
+    memset(pack, 0, sizeof(packet_setpoint_t));
     return;
   }
-
-  auto *setpoint_data = (packet_setpoint_t *)addr;
 
   // 将输入值从 -2048~2047 映射到 0~180°
   auto Range2Angle = [&](int value)
@@ -57,32 +54,43 @@ void get_setpoint_data_from_controller(uint8_t *addr)
   };
 
   int raw_pitch = Controller.getAnalogHat(CONFIG.PITCH);
-  setpoint_data->PITCH = Range2Angle(CONFIG.PITCH_FLIP ? -raw_pitch : raw_pitch);
+  pack->PITCH = Range2Angle(CONFIG.PITCH_FLIP ? -raw_pitch : raw_pitch);
 
   int raw_roll = Controller.getAnalogHat(CONFIG.ROLL);
-  setpoint_data->ROLL = Range2Angle(CONFIG.ROLL_FLIP ? -raw_roll : raw_roll);
+  pack->ROLL = Range2Angle(CONFIG.ROLL_FLIP ? -raw_roll : raw_roll);
 
   int raw_yaw = Controller.getAnalogHat(CONFIG.YAW);
-  setpoint_data->YAW = Range2Angle(CONFIG.YAW_FLIP ? -raw_yaw : raw_yaw);
+  pack->YAW = Range2Angle(CONFIG.YAW_FLIP ? -raw_yaw : raw_yaw);
 
   int r_t = Controller.getAnalogHat(CONFIG.THRUST);
-  setpoint_data->THRUST = Range2Angle(CONFIG.THRUST_FLIP ? -r_t : r_t);
+  pack->THRUST = Range2Angle(CONFIG.THRUST_FLIP ? -r_t : r_t);
 
   bool reverse = Controller.getButtonPress(CONFIG.Reverse);
-  setpoint_data->reverse = CONFIG.Reverse_FLIP ? !reverse : reverse;
+  pack->reverse = CONFIG.Reverse_FLIP ? !reverse : reverse;
 
-  if (CONFIG.breaker[0])
+  auto breaker_0 = CONFIG.breaker[0];
+  auto breaker_1 = CONFIG.breaker[1];
+
+  auto getBtnJoy = [](XBOX_INPUT_t btn)
   {
-    bool break_1 = Controller.getButtonPress(CONFIG.breaker[0]);
-    if (CONFIG.breaker[1])
+    if (btn < XBOX_BUTTON_MAX)
+      return (bool)Controller.getButtonPress(btn);
+    else
+      return (bool)Controller.getAnalogHat(btn);
+  };
+
+  if (breaker_0)
+  {
+    bool b0 = getBtnJoy(breaker_0);
+    b0 = CONFIG.breaker_FLIP[0] ? !b0 : b0;
+    if (breaker_1)
     {
-      bool break_2 = Controller.getButtonPress(CONFIG.breaker[1]);
-      setpoint_data->breaker = CONFIG.breaker_FLIP[0]
-                                   ? (!break_1 && !break_2)
-                                   : (break_1 && break_2);
+      bool b1 = getBtnJoy(breaker_1);
+      b1 = CONFIG.breaker_FLIP[1] ? !b1 : b1;
+      pack->breaker = b0 && b1;
     }
     else
-      setpoint_data->breaker = CONFIG.breaker_FLIP[0] ? !break_1 : break_1;
+      pack->breaker = b0;
   }
 }
 

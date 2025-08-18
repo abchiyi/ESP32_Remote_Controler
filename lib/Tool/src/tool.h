@@ -42,6 +42,6 @@ bool is_valid_mac(const uint8_t *mac, size_t len);
  * @brief 从控制器获取设定点数据。
  * @return 返回包含设定点数据的结构体 packet_setpoint_t
  */
-void get_setpoint_data_from_controller(uint8_t *addr);
+void get_setpoint_data_from_controller(packet_setpoint_t *pack);
 
 #endif

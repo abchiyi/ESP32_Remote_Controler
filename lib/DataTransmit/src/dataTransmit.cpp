@@ -30,7 +30,8 @@ void init_transmit()
                     continue;
                 radio_packet_t rp = {};
                 auto cp = (CRTPPacket *)&rp.data;
-                get_setpoint_data_from_controller(cp->data);
+                get_setpoint_data_from_controller(
+                    (packet_setpoint_t *)cp->data);
                 radio_send_packet(&rp);
             }
         else if (CONFIG.control_mode == SLAVE) // 发送从机数据

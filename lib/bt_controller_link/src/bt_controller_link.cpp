@@ -13,9 +13,8 @@ void xbox_on_input_cb()
     radio_packet_t rp = {};
     auto cp = (CRTPPacket *)&rp.data;
     auto sp = (packet_setpoint_t *)cp->data;
-
-    get_setpoint_data_from_controller(sp->raw);
-
+    cp->port = CRTP_PORT_SETPOINT;
+    get_setpoint_data_from_controller(sp);
     xQueueSend(crtpPacketDelivery, &rp, 0);
 }
 
