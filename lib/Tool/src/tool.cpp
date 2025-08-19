@@ -1,6 +1,7 @@
 #include "tool.h"
 #include "config.h"
 #include "XBOX.h"
+#include "array"
 
 #define TAG "Tool"
 
@@ -53,6 +54,18 @@ void get_setpoint_data_from_controller(packet_setpoint_t *pack)
     return map(value, -2048, 2047, 0, 180);
   };
 
+  auto GetThrust = [&](XBOX_INPUT_t analogHatKey)
+  {
+    std::array<uint8_t, 2> trigger = {trigLT, trigRT};
+    auto it = std::find(trigger.begin(), trigger.end(), analogHatKey);
+    int16_t raw_thrust = Controller.getAnalogHat(analogHatKey);
+    raw_thrust = CONFIG.THRUST_FLIP ? -raw_thrust : raw_thrust;
+    if (it != trigger.end())
+      return static_cast<uint16_t>(map(raw_thrust, 0, 1023, 0, UINT16_MAX));
+    else
+      return static_cast<uint16_t>(map(raw_thrust, -2048, 2048, 0, UINT16_MAX));
+  };
+
   int raw_pitch = Controller.getAnalogHat(CONFIG.PITCH);
   pack->PITCH = Range2Angle(CONFIG.PITCH_FLIP ? -raw_pitch : raw_pitch);
 
@@ -63,7 +76,7 @@ void get_setpoint_data_from_controller(packet_setpoint_t *pack)
   pack->YAW = Range2Angle(CONFIG.YAW_FLIP ? -raw_yaw : raw_yaw);
 
   int r_t = Controller.getAnalogHat(CONFIG.THRUST);
-  pack->THRUST = Range2Angle(CONFIG.THRUST_FLIP ? -r_t : r_t);
+  pack->THRUST = GetThrust(CONFIG.THRUST);
 
   bool reverse = Controller.getButtonPress(CONFIG.Reverse);
   pack->reverse = CONFIG.Reverse_FLIP ? !reverse : reverse;
