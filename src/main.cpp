@@ -20,7 +20,14 @@
 #include "web_console.h"
 #include "array"
 
+// MOTOR
+#include "Rz_series.h"
+
+#define FI 0
+#define BI 1
+
 #define TAG "Main ESP32 RC"
+RZ_HBridgeDriver motor(FI, BI);
 
 typedef struct
 {
@@ -85,6 +92,11 @@ void recv_setpoint(radio_packet_t *packet)
 {
   auto cp = (CRTPPacket *)packet->data;
   auto sp = (packet_setpoint_t *)cp->data;
+
+  if (sp->breaker)
+    motor.stop();
+  else
+    sp->reverse ? motor.backward(sp->THRUST) : motor.forward(sp->THRUST);
 
   Serial.printf("\rReceived data Rssi: %d, Broadcast: %d,Roll: %.2f, Pitch: %.2f, Yaw: %.2f, Thrust: %u, Breaker: %d                        ",
                 packet->rssi, packet->is_broadcast, sp->ROLL, sp->PITCH, sp->YAW, sp->THRUST, sp->breaker);
