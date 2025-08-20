@@ -59,11 +59,17 @@ void get_setpoint_data_from_controller(packet_setpoint_t *pack)
     std::array<uint8_t, 2> trigger = {trigLT, trigRT};
     auto it = std::find(trigger.begin(), trigger.end(), analogHatKey);
     int16_t raw_thrust = Controller.getAnalogHat(analogHatKey);
-    raw_thrust = CONFIG.THRUST_FLIP ? -raw_thrust : raw_thrust;
+
     if (it != trigger.end())
-      return static_cast<uint16_t>(map(raw_thrust, 0, 1023, 0, UINT16_MAX));
+      if (CONFIG.THRUST_FLIP)
+        return static_cast<uint16_t>(map(raw_thrust, 0, 1023, UINT16_MAX, 0));
+      else
+        return static_cast<uint16_t>(map(raw_thrust, 0, 1023, 0, UINT16_MAX));
     else
+    {
+      raw_thrust = CONFIG.THRUST_FLIP ? -raw_thrust : raw_thrust;
       return static_cast<uint16_t>(map(raw_thrust, -2048, 2048, 0, UINT16_MAX));
+    }
   };
 
   int raw_pitch = Controller.getAnalogHat(CONFIG.PITCH);
