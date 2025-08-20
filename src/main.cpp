@@ -23,32 +23,16 @@
 // MOTOR
 #include "Rz_series.h"
 
-#define FI 0
-#define BI 1
+// SERVO
+#include "ESP32Servo.h"
+Servo servo;
+
+#define FI 1
+#define BI 0
+#define PIN_SERVO 3
 
 #define TAG "Main ESP32 RC"
 RZ_HBridgeDriver motor(FI, BI);
-
-typedef struct
-{
-  union
-  {
-    struct
-    {
-      float ROLL;
-      float PITCH;
-      float YAW;
-      uint16_t THRUST;
-      bool breaker;
-      // 回传数据
-      int16_t rssi;    // 接收信号强度指示
-      int16_t voltage; // 电池电压
-    };
-
-    uint8_t raw[CRTP_MAX_DATA_SIZE];
-  };
-
-} __attribute((packed)) control_data_t;
 
 void setup()
 {
@@ -70,14 +54,11 @@ void setup()
   // ** 无线初始化 **/
   init_transmit(); // 初始化无线传输
 
-  // ** 特定条件初始化蓝牙以连接无线控制器 **
+  // ** 初始化 舵机 **/
 
-  // if (CONFIG.control_mode == MASTER || CONFIG.radio_mode == BT_CONTROLLER)
-  //   Controller.begin();
-
-  // ESP_LOGI(TAG, "Waiting for controller to connect...");
-  // while (!Controller.is_connected())
-  //   vTaskDelay(pdMS_TO_TICKS(500));
+  ESP32PWM::allocateTimer(1);
+  servo.setPeriodHertz(50);
+  servo.attach(PIN_SERVO, 1000, 2000);
 
   vTaskDelete(NULL); // 干掉 loopTask
 }
@@ -93,13 +74,17 @@ void recv_setpoint(radio_packet_t *packet)
   auto cp = (CRTPPacket *)packet->data;
   auto sp = (packet_setpoint_t *)cp->data;
 
+  uint8_t thrust = map(sp->THRUST, 0, UINT16_MAX, 0, 255);
+
   if (sp->breaker)
     motor.stop();
   else
-    sp->reverse ? motor.backward(sp->THRUST) : motor.forward(sp->THRUST);
+    sp->reverse ? motor.backward(thrust) : motor.forward(thrust);
+
+  servo.write(sp->YAW);
 
   Serial.printf("\rReceived data Rssi: %d, Broadcast: %d,Roll: %.2f, Pitch: %.2f, Yaw: %.2f, Thrust: %u, Breaker: %d                        ",
-                packet->rssi, packet->is_broadcast, sp->ROLL, sp->PITCH, sp->YAW, sp->THRUST, sp->breaker);
+                packet->rssi, packet->is_broadcast, sp->ROLL, sp->PITCH, sp->YAW, thrust, sp->breaker);
 }
 
 /**
