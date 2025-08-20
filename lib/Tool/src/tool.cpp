@@ -67,8 +67,11 @@ void get_setpoint_data_from_controller(packet_setpoint_t *pack)
         return static_cast<uint16_t>(map(raw_thrust, 0, 1023, 0, UINT16_MAX));
     else
     {
-      raw_thrust = CONFIG.THRUST_FLIP ? -raw_thrust : raw_thrust;
-      return static_cast<uint16_t>(map(raw_thrust, -2048, 2048, 0, UINT16_MAX));
+      raw_thrust = abs(raw_thrust);
+      if (CONFIG.THRUST_FLIP)
+        return static_cast<uint16_t>(map(raw_thrust, 0, 2048, UINT16_MAX, 0));
+      else
+        return static_cast<uint16_t>(map(raw_thrust, 0, 2048, 0, UINT16_MAX));
     }
   };
 
