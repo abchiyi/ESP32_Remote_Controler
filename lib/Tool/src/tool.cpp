@@ -54,60 +54,52 @@ void get_setpoint_data_from_controller(packet_setpoint_t *pack)
     return map(value, -2048, 2047, 0, 180);
   };
 
-  auto GetThrust = [&](XBOX_INPUT_t analogHatKey)
+  auto GetThrust = [&](XBOX_INPUT_t analogHatKey, bool flip)
   {
     std::array<uint8_t, 2> trigger = {trigLT, trigRT};
     auto it = std::find(trigger.begin(), trigger.end(), analogHatKey);
-    int16_t raw_thrust = Controller.getAnalogHat(analogHatKey);
+    int16_t raw_thrust = Controller.getInput(analogHatKey);
 
     if (it != trigger.end())
-      if (CONFIG.THRUST_FLIP)
+      if (flip)
         return static_cast<uint16_t>(map(raw_thrust, 0, 1023, UINT16_MAX, 0));
       else
         return static_cast<uint16_t>(map(raw_thrust, 0, 1023, 0, UINT16_MAX));
     else
     {
       raw_thrust = abs(raw_thrust);
-      if (CONFIG.THRUST_FLIP)
+      if (flip)
         return static_cast<uint16_t>(map(raw_thrust, 0, 2048, UINT16_MAX, 0));
       else
         return static_cast<uint16_t>(map(raw_thrust, 0, 2048, 0, UINT16_MAX));
     }
   };
 
-  int raw_pitch = Controller.getAnalogHat(CONFIG.PITCH);
+  int raw_pitch = Controller.getInput(CONFIG.PITCH);
   pack->PITCH = Range2Angle(CONFIG.PITCH_FLIP ? -raw_pitch : raw_pitch);
 
-  int raw_roll = Controller.getAnalogHat(CONFIG.ROLL);
+  int raw_roll = Controller.getInput(CONFIG.ROLL);
   pack->ROLL = Range2Angle(CONFIG.ROLL_FLIP ? -raw_roll : raw_roll);
 
-  int raw_yaw = Controller.getAnalogHat(CONFIG.YAW);
+  int raw_yaw = Controller.getInput(CONFIG.YAW);
   pack->YAW = Range2Angle(CONFIG.YAW_FLIP ? -raw_yaw : raw_yaw);
 
-  int r_t = Controller.getAnalogHat(CONFIG.THRUST);
-  pack->THRUST = GetThrust(CONFIG.THRUST);
+  int r_t = Controller.getInput(CONFIG.THRUST);
+  pack->THRUST = GetThrust(CONFIG.THRUST, CONFIG.THRUST_FLIP);
 
-  bool reverse = Controller.getButtonPress(CONFIG.Reverse);
-  pack->reverse = CONFIG.Reverse_FLIP ? !reverse : reverse;
+  int16_t r_reverse = Controller.getInput(CONFIG.Reverse);
+  pack->REVERSE = GetThrust(CONFIG.Reverse, CONFIG.Reverse_FLIP);
 
   auto breaker_0 = CONFIG.breaker[0];
   auto breaker_1 = CONFIG.breaker[1];
 
-  auto getBtnJoy = [](XBOX_INPUT_t btn)
-  {
-    if (btn < XBOX_BUTTON_MAX)
-      return (bool)Controller.getButtonPress(btn);
-    else
-      return (bool)Controller.getAnalogHat(btn);
-  };
-
   if (breaker_0)
   {
-    bool b0 = getBtnJoy(breaker_0);
+    bool b0 = Controller.getInput(breaker_0);
     b0 = CONFIG.breaker_FLIP[0] ? !b0 : b0;
     if (breaker_1)
     {
-      bool b1 = getBtnJoy(breaker_1);
+      bool b1 = Controller.getInput(breaker_1);
       b1 = CONFIG.breaker_FLIP[1] ? !b1 : b1;
       pack->breaker = b0 && b1;
     }

@@ -63,15 +63,6 @@ void setup()
   // ** 无线初始化 **/
   init_transmit(); // 初始化无线传输
 
-  // ** 特定条件初始化蓝牙以连接无线控制器 **
-
-  // if (CONFIG.control_mode == MASTER || CONFIG.radio_mode == BT_CONTROLLER)
-  //   Controller.begin();
-
-  // ESP_LOGI(TAG, "Waiting for controller to connect...");
-  // while (!Controller.is_connected())
-  //   vTaskDelay(pdMS_TO_TICKS(500));
-
   vTaskDelete(NULL); // 干掉 loopTask
 }
 void loop()
@@ -86,8 +77,8 @@ void recv_setpoint(radio_packet_t *packet)
   auto cp = (CRTPPacket *)packet->data;
   auto sp = (packet_setpoint_t *)cp->data;
 
-  Serial.printf("\rReceived data Rssi: %d, Broadcast: %d,Roll: %.2f, Pitch: %.2f, Yaw: %.2f, Thrust: %u, Breaker: %d                        ",
-                packet->rssi, packet->is_broadcast, sp->ROLL, sp->PITCH, sp->YAW, sp->THRUST, sp->breaker);
+  Serial.printf("\rReceived data Rssi: %d, Broadcast: %d,Roll: %.2f, Pitch: %.2f, Yaw: %.2f, Thrust: %u, Breaker: %d, Reverse: %d                       ",
+                packet->rssi, packet->is_broadcast, sp->ROLL, sp->PITCH, sp->YAW, sp->THRUST, sp->breaker, sp->REVERSE);
 }
 
 /**
