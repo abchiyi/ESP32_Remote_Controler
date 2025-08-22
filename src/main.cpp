@@ -30,9 +30,55 @@ Servo servo;
 #define FI 1
 #define BI 0
 #define PIN_SERVO 3
+#define YAW_MAX 100
 
 #define TAG "Main ESP32 RC"
 RZ_HBridgeDriver motor(FI, BI);
+
+static uint8_t backward = 0;
+static uint8_t forward = 0;
+static uint8_t yaw = 90;
+
+void vehicle_control_task(void *pvParameters)
+{
+
+  while (true)
+  {
+    servo.write(yaw);
+    if (forward)
+      while (true)
+      {
+        servo.write(yaw);
+
+        if (backward)
+          motor.stop();
+        else
+          motor.forward(forward);
+
+        if (!forward && !backward)
+          break;
+
+        vTaskDelay(50);
+      }
+
+    if (backward)
+      while (true)
+      {
+        servo.write(yaw);
+        if (forward)
+          motor.stop();
+        else
+          motor.backward(backward);
+
+        if (!forward && !backward)
+          break;
+
+        vTaskDelay(50);
+      }
+
+    vTaskDelay(50);
+  }
+}
 
 void setup()
 {
@@ -55,10 +101,11 @@ void setup()
   init_transmit(); // 初始化无线传输
 
   // ** 初始化 舵机 **/
-
   ESP32PWM::allocateTimer(1);
   servo.setPeriodHertz(50);
   servo.attach(PIN_SERVO, 1000, 2000);
+
+  xTaskCreate(vehicle_control_task, "vehicle_control_task", 1024 * 3, NULL, TP_N, NULL);
 
   vTaskDelete(NULL); // 干掉 loopTask
 }
@@ -74,17 +121,9 @@ void recv_setpoint(radio_packet_t *packet)
   auto cp = (CRTPPacket *)packet->data;
   auto sp = (packet_setpoint_t *)cp->data;
 
-  uint8_t thrust = map(sp->THRUST, 0, UINT16_MAX, 0, 255);
-
-  if (sp->breaker)
-    motor.stop();
-  else
-    sp->reverse ? motor.backward(thrust) : motor.forward(thrust);
-
-  servo.write(sp->YAW);
-
-  Serial.printf("\rReceived data Rssi: %d, Broadcast: %d,Roll: %.2f, Pitch: %.2f, Yaw: %.2f, Thrust: %u, Breaker: %d                        ",
-                packet->rssi, packet->is_broadcast, sp->ROLL, sp->PITCH, sp->YAW, thrust, sp->breaker);
+  forward = map(sp->THRUST, 0, UINT16_MAX, 0, 255);
+  backward = map(sp->REVERSE, 0, UINT16_MAX, 0, 255);
+  yaw = map(sp->YAW, 0, 180, 35, 145);
 }
 
 /**
