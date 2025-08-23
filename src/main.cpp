@@ -22,27 +22,6 @@
 
 #define TAG "Main ESP32 RC"
 
-typedef struct
-{
-  union
-  {
-    struct
-    {
-      float ROLL;
-      float PITCH;
-      float YAW;
-      uint16_t THRUST;
-      bool breaker;
-      // 回传数据
-      int16_t rssi;    // 接收信号强度指示
-      int16_t voltage; // 电池电压
-    };
-
-    uint8_t raw[CRTP_MAX_DATA_SIZE];
-  };
-
-} __attribute((packed)) control_data_t;
-
 void setup()
 {
   Serial.begin(115200);
@@ -76,9 +55,6 @@ void recv_setpoint(radio_packet_t *packet)
 {
   auto cp = (CRTPPacket *)packet->data;
   auto sp = (packet_setpoint_t *)cp->data;
-
-  Serial.printf("\rReceived data Rssi: %d, Broadcast: %d,Roll: %.2f, Pitch: %.2f, Yaw: %.2f, Thrust: %u, Breaker: %d, Reverse: %d                       ",
-                packet->rssi, packet->is_broadcast, sp->ROLL, sp->PITCH, sp->YAW, sp->THRUST, sp->breaker, sp->REVERSE);
 }
 
 /**
